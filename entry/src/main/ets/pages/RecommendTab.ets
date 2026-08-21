@@ -14,7 +14,6 @@ import { RefreshHint } from '../common/utils/RefreshHint';
 export struct RecommendTab {
   onOpenSearch?: () => void;
   @Prop siteName: string = 'EcoHub';
-  @Prop @Watch('onActiveChange') active: boolean = true;
   @State private banners: BannerItem[] = [];
   @State private sections: HomeSection[] = [];
   @State private loading: boolean = true;
@@ -24,12 +23,10 @@ export struct RecommendTab {
   private scroller: Scroller = new Scroller();
 
   private hasLoaded: boolean = false;
-  private wasActive: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
 
   aboutToAppear() {
-    this.wasActive = this.active;
     this.reconnectCb = () => {
       this.loadHome(false);
     };
@@ -43,16 +40,6 @@ export struct RecommendTab {
 
   aboutToDisappear(): void {
     SourceGuard.offReconnect(this.reconnectCb);
-  }
-
-  onActiveChange(): void {
-    const becameActive = this.active && !this.wasActive;
-    this.wasActive = this.active;
-    if (!becameActive || !this.hasLoaded || this.fetchLock) {
-      return;
-    }
-    this.refreshing = true;
-    this.loadHome(true, false);
   }
 
   private async loadHome(fromPull: boolean, showHint: boolean = false): Promise<void> {

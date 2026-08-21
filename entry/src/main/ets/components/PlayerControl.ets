@@ -58,6 +58,52 @@ export struct PlayerIconBtn {
 }
 
 @Component
+export struct PlayerLabelBtn {
+  @Prop src: Resource = $r('sys.symbol.play_fill');
+  @Prop label: string = '';
+  @Prop canTap: boolean = true;
+  onTap?: () => void;
+  private armed: boolean = true;
+
+  private handleTap(): void {
+    if (!this.canTap || !this.armed) {
+      return;
+    }
+    this.armed = false;
+    setTimeout(() => {
+      this.armed = true;
+    }, 120);
+    if (this.onTap) {
+      this.onTap();
+    }
+  }
+
+  build() {
+    Row({ space: 4 }) {
+      SymbolGlyph(this.src)
+        .fontSize(16)
+        .fontColor(['#FFFFFF'])
+        .hitTestBehavior(HitTestMode.None)
+      Text(this.label)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#FFFFFF')
+        .hitTestBehavior(HitTestMode.None)
+    }
+    .height(44)
+    .padding({ left: 8, right: 10 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .opacity(this.canTap ? 1 : 0.28)
+    .responseRegion({ x: 0, y: 0, width: '100%', height: '100%' })
+    .priorityGesture(
+      TapGesture({ count: 1 })
+        .onAction(() => this.handleTap())
+    )
+  }
+}
+
+@Component
 export struct PlayerTextBtn {
   @Prop label: string = '';
   @Prop boxSize: number = 52;

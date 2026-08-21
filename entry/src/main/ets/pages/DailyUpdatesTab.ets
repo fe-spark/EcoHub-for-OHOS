@@ -13,7 +13,6 @@ const FILTER_OTHER = -1;
 
 @Component
 export struct DailyUpdatesTab {
-  @Prop @Watch('onActiveChange') active: boolean = true;
   @State private films: MovieBasicInfo[] = [];
   @State private nav: CategoryItem[] = [];
   @State private filterPid: number = FILTER_ALL;
@@ -22,12 +21,10 @@ export struct DailyUpdatesTab {
   @State private errorText: string = '';
 
   private hasLoaded: boolean = false;
-  private wasActive: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
 
   aboutToAppear() {
-    this.wasActive = this.active;
     this.reconnectCb = () => {
       this.loadData(false);
     };
@@ -41,16 +38,6 @@ export struct DailyUpdatesTab {
 
   aboutToDisappear(): void {
     SourceGuard.offReconnect(this.reconnectCb);
-  }
-
-  onActiveChange(): void {
-    const becameActive = this.active && !this.wasActive;
-    this.wasActive = this.active;
-    if (!becameActive || !this.hasLoaded || this.fetchLock) {
-      return;
-    }
-    this.refreshing = true;
-    this.loadData(true, false);
   }
 
   private async loadData(fromPull: boolean, showHint: boolean = false): Promise<void> {

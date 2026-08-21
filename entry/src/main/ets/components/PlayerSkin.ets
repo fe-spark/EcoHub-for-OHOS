@@ -1,7 +1,7 @@
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { PlayerTipKind } from '../common/utils/PlayerPan';
-import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerTextBtn } from './PlayerControl';
+import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerLabelBtn, PlayerTextBtn } from './PlayerControl';
 import { PlayerGestureLayer } from './PlayerGesture';
 import { PlayerErrorPad, PlayerLoadingCard, PlayerTip } from './PlayerTip';
 
@@ -39,7 +39,6 @@ export struct PlayerSkin {
   onPrev?: () => void;
   onNext?: () => void;
   onSpeed?: () => void;
-  onCatalog?: () => void;
   onRetry?: () => void;
   onErrorDetail?: () => void;
   onSeekBack?: () => void;
@@ -164,6 +163,7 @@ export struct PlayerSkin {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
           .margin({ left: 4, right: 8 })
+        this.skipBtns()
       }
       .width('100%')
       .height(44)
@@ -193,17 +193,15 @@ export struct PlayerSkin {
   @Builder
   skipBtns() {
     if (this.hasPrev || this.hasNext) {
-      PlayerIconBtn({
+      PlayerLabelBtn({
         src: $r('sys.symbol.backward_end_fill'),
-        iconSize: 20,
-        boxSize: 44,
+        label: '上集',
         canTap: this.hasPrev,
         onTap: this.onPrev
       })
-      PlayerIconBtn({
+      PlayerLabelBtn({
         src: $r('sys.symbol.forward_end_fill'),
-        iconSize: 20,
-        boxSize: 44,
+        label: '下集',
         canTap: this.hasNext,
         onTap: this.onNext
       })
@@ -218,21 +216,12 @@ export struct PlayerSkin {
           this.sliderBar()
           Row() {
             this.playToggle()
-            this.skipBtns()
             Text(this.timeText())
               .fontSize(12)
               .fontColor('rgba(255,255,255,0.92)')
               .margin({ left: 4 })
               .maxLines(1)
             Blank()
-            if (this.onCatalog) {
-              PlayerIconBtn({
-                src: $r('sys.symbol.list_bullet'),
-                iconSize: 20,
-                boxSize: 44,
-                onTap: this.onCatalog
-              })
-            }
             PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
             PlayerIconBtn({
               src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
@@ -265,7 +254,6 @@ export struct PlayerSkin {
       } else {
         Row() {
           this.playToggle()
-          this.skipBtns()
           Column() {
             this.sliderBar()
           }
@@ -275,14 +263,6 @@ export struct PlayerSkin {
             .fontSize(11)
             .fontColor('rgba(255,255,255,0.88)')
             .maxLines(1)
-          if (this.onCatalog) {
-            PlayerIconBtn({
-              src: $r('sys.symbol.list_bullet'),
-              iconSize: 18,
-              boxSize: 44,
-              onTap: this.onCatalog
-            })
-          }
           PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
           PlayerIconBtn({
             src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),

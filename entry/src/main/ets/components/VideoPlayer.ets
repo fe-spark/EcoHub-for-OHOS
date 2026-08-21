@@ -28,7 +28,6 @@ export struct VideoPlayer {
   onPrev?: () => void;
   onNext?: () => void;
   onFullscreenChange?: (full: boolean) => void;
-  onOpenCatalog?: () => void;
   @State private duration: number = 0;
   @State private currentTime: number = 0;
   @State private isPlaying: boolean = false;
@@ -713,7 +712,6 @@ export struct VideoPlayer {
         }
       },
       onSpeed: () => this.openSpeedDialog(),
-      onCatalog: this.onOpenCatalog,
       onRetry: () => this.retry(),
       onErrorDetail: () => this.showErrorDetail(),
       onSeekBack: () => this.seekBy(-10),

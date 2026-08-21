@@ -134,7 +134,6 @@ struct Index {
           if (this.tabReady[0]) {
             RecommendTab({
               siteName: this.siteName,
-              active: this.currentTabIndex === 0,
               onOpenSearch: () => {
                 this.selectTab(2);
               }
@@ -142,7 +141,7 @@ struct Index {
               .visibility(this.currentTabIndex === 0 ? Visibility.Visible : Visibility.None)
           }
           if (this.tabReady[1]) {
-            DailyUpdatesTab({ active: this.currentTabIndex === 1 })
+            DailyUpdatesTab()
               .visibility(this.currentTabIndex === 1 ? Visibility.Visible : Visibility.None)
           }
           if (this.tabReady[2]) {

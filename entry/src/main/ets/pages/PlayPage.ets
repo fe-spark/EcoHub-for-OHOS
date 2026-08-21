@@ -33,7 +33,6 @@ struct PlayPage {
   @State private episodeIndex: number = 0;
   @State private playUrl: string = '';
   @State private playToken: number = 0;
-  @State private catalogOpen: boolean = false;
   @State private playTitle: string = '';
   @State private initialTime: number = 0;
   @State private related: MovieBasicInfo[] = [];
@@ -357,9 +356,6 @@ struct PlayPage {
           },
           onPrev: () => this.playPrev(),
           onNext: () => this.playNext(),
-          onOpenCatalog: () => {
-            this.catalogOpen = true;
-          },
           onFullscreenChange: (full: boolean) => this.setPlayerFull(full),
           onProgress: (current: number, duration: number) => {
             this.persistHistory(current, duration);
@@ -445,35 +441,5 @@ struct PlayPage {
       bottom: this.playerFull ? 0 : this.bottomInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
-    .bindSheet($$this.catalogOpen, this.catalogSheet(), {
-      height: SheetSize.LARGE,
-      dragBar: true,
-      showClose: true,
-      backgroundColor: '#191B20',
-      onDisappear: () => {
-        this.catalogOpen = false;
-      }
-    })
-  }
-
-  @Builder
-  catalogSheet() {
-    PlayDetailPanel({
-      pickerOnly: true,
-      name: this.name,
-      subTitle: this.subTitle,
-      plot: this.plot,
-      sources: this.sources,
-      playingSourceId: this.playingSourceId,
-      viewingSourceId: this.viewingSourceId,
-      episodeIndex: this.episodeIndex,
-      onViewSource: (id: string) => {
-        this.viewingSourceId = id;
-      },
-      onSelectEpisode: (sourceId: string, index: number) => {
-        this.selectEpisode(sourceId, index);
-        this.catalogOpen = false;
-      }
-    })
   }
 }
