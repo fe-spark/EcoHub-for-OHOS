@@ -1,0 +1,8 @@
+# Created by hvigor
+.hvigor/
+.idea/
+build/
+oh_modules/
+*.element
+node_modules/
+local.properties

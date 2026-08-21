@@ -1,0 +1,8 @@
+{
+  "name": "ecohub",
+  "version": "1.0.0",
+  "description": "EcoHub HarmonyOS Project",
+  "modelVersion": "5.0.0",
+  "dependencies": {},
+  "devDependencies": {}
+}

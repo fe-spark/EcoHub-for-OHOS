@@ -1,0 +1,11 @@
+{
+  "src": [
+    "pages/ServerConfigPage",
+    "pages/Index",
+    "pages/FilterPage",
+    "pages/PlayPage",
+    "pages/HistoryPage",
+    "pages/CustomPlayerPage",
+    "pages/TipPage"
+  ]
+}

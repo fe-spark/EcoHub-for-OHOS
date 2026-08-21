@@ -1,0 +1,54 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/spark/.ohos/config/default_harmony_7pZ_JUuLRuJglERK9RlUARk92UUKrfG4VGk-RNxIde0=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B50E8D5B0A16D5CAEB7415C68B49F071120E755C6AECBA73BA01E1AB54F92154FC9951D74DD0C92",
+          "profile": "/Users/spark/.ohos/config/default_harmony_7pZ_JUuLRuJglERK9RlUARk92UUKrfG4VGk-RNxIde0=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/spark/.ohos/config/default_harmony_7pZ_JUuLRuJglERK9RlUARk92UUKrfG4VGk-RNxIde0=.p12",
+          "storePassword": "0000001B718FED7FD38863D0158CF96C8C36207EC363E2DC43C61FA759031954A0A71467E95EE0CE948717"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compileSdkVersion": "6.1.1(24)",
+        "compatibleSdkVersion": "5.0.0(12)",
+        "targetSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS"
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "profile"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

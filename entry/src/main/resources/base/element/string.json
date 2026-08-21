@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "EcoHub 鸿蒙客户端模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "EcoHub 主入口 Ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "EcoHub"
+    }
+  ]
+}
