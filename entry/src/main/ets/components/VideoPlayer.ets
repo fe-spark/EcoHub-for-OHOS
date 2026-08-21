@@ -524,8 +524,90 @@ export struct VideoPlayer {
     this.finishPanSeek();
   }
 
+  @Builder
+  skin(layer: string) {
+    PlayerSkin({
+      layer: layer,
+      isFull: this.fullNow(),
+      showHud: this.showHud,
+      showBack: this.showBack,
+      title: this.title,
+      playRequested: this.playRequested,
+      isPlaying: this.isPlaying,
+      completed: this.completed,
+      opening: this.opening,
+      seeking: this.seeking,
+      stalled: this.stalled,
+      errorText: this.errorText,
+      currentTime: this.currentTime,
+      duration: this.duration,
+      muted: this.muted,
+      speedLabel: this.speedLabel,
+      hasPrev: this.hasPrev,
+      hasNext: this.hasNext,
+      longPressing: this.longPressing,
+      feedback: this.feedback,
+      feedbackKind: this.feedbackKind,
+      showSpeed: this.showSpeed,
+      topInset: this.topInset,
+      leftInset: this.leftInset,
+      rightInset: this.rightInset,
+      bottomInset: this.bottomInset,
+      ready: this.ready,
+      onBack: () => this.handleBack(),
+      onPlay: () => this.togglePlay(),
+      onFull: () => this.toggleFull(),
+      onMute: () => this.toggleMute(),
+      onPrev: () => {
+        if (this.onPrev) {
+          this.onPrev();
+        }
+      },
+      onNext: () => {
+        if (this.onNext) {
+          this.onNext();
+        }
+      },
+      onSpeed: () => {
+        this.showSpeed = true;
+      },
+      onPickSpeed: (index: number) => this.pickSpeed(index),
+      onCloseSpeed: () => {
+        this.showSpeed = false;
+      },
+      onRetry: () => this.retry(),
+      onErrorDetail: () => this.showErrorDetail(),
+      onSeekBack: () => this.seekBy(-10),
+      onSeekForward: () => this.seekBy(10),
+      onSeekStart: (value: number) => {
+        this.dragging = true;
+        this.currentTime = value;
+        this.clearHide();
+        this.showHud = true;
+      },
+      onSeekUpdate: (value: number) => {
+        this.currentTime = value;
+      },
+      onSeekEnd: (value: number) => {
+        this.seekTo(value);
+        this.dragging = false;
+        this.showHud = true;
+        this.armHide();
+      },
+      onToggleHud: () => this.toggleHud(),
+      onLongPress: () => this.beginSpeed(),
+      onLongPressEnd: () => this.endSpeed(),
+      onPanStart: (event: GestureEvent) => this.panStart(event),
+      onPanMove: (event: GestureEvent) => this.panMove(event),
+      onPanEnd: () => this.panEnd(),
+      onPanCancel: () => this.panCancel()
+    })
+      .width('100%')
+  }
+
   build() {
-    Stack({ alignContent: Alignment.TopStart }) {
+    Column() {
+      Stack({ alignContent: Alignment.TopStart }) {
       AVVolumePanel({ volumeLevel: this.volumeIndex })
         .width(1)
         .height(1)
@@ -547,6 +629,7 @@ export struct VideoPlayer {
           .muted(this.muted || this.volumeIndex <= 0)
           .objectFit(ImageFit.Contain)
           .backgroundColor('#000000')
+          .hitTestBehavior(HitTestMode.None)
           .onPrepared((info: PreparedInfo) => {
             this.duration = info.duration;
             this.ready = true;
@@ -641,83 +724,13 @@ export struct VideoPlayer {
           .backgroundColor('#000000')
       }
 
-      PlayerSkin({
-        isFull: this.fullNow(),
-        showHud: this.showHud,
-        showBack: this.showBack,
-        title: this.title,
-        playRequested: this.playRequested,
-        isPlaying: this.isPlaying,
-        completed: this.completed,
-        opening: this.opening,
-        seeking: this.seeking,
-        stalled: this.stalled,
-        errorText: this.errorText,
-        currentTime: this.currentTime,
-        duration: this.duration,
-        muted: this.muted,
-        speedLabel: this.speedLabel,
-        hasPrev: this.hasPrev,
-        hasNext: this.hasNext,
-        longPressing: this.longPressing,
-        feedback: this.feedback,
-        feedbackKind: this.feedbackKind,
-        showSpeed: this.showSpeed,
-        topInset: this.topInset,
-        leftInset: this.leftInset,
-        rightInset: this.rightInset,
-        bottomInset: this.bottomInset,
-        ready: this.ready,
-        onBack: () => this.handleBack(),
-        onPlay: () => this.togglePlay(),
-        onFull: () => this.toggleFull(),
-        onMute: () => this.toggleMute(),
-        onPrev: () => {
-          if (this.onPrev) {
-            this.onPrev();
-          }
-        },
-        onNext: () => {
-          if (this.onNext) {
-            this.onNext();
-          }
-        },
-        onSpeed: () => {
-          this.showSpeed = true;
-        },
-        onPickSpeed: (index: number) => this.pickSpeed(index),
-        onCloseSpeed: () => {
-          this.showSpeed = false;
-        },
-        onRetry: () => this.retry(),
-        onErrorDetail: () => this.showErrorDetail(),
-        onSeekBack: () => this.seekBy(-10),
-        onSeekForward: () => this.seekBy(10),
-        onSeekStart: (value: number) => {
-          this.dragging = true;
-          this.currentTime = value;
-          this.clearHide();
-          this.showHud = true;
-        },
-        onSeekUpdate: (value: number) => {
-          this.currentTime = value;
-        },
-        onSeekEnd: (value: number) => {
-          this.seekTo(value);
-          this.dragging = false;
-          this.showHud = true;
-          this.armHide();
-        },
-        onToggleHud: () => this.toggleHud(),
-        onLongPress: () => this.beginSpeed(),
-        onLongPressEnd: () => this.endSpeed(),
-        onPanStart: (event: GestureEvent) => this.panStart(event),
-        onPanMove: (event: GestureEvent) => this.panMove(event),
-        onPanEnd: () => this.panEnd(),
-        onPanCancel: () => this.panCancel()
-      })
-        .width('100%')
-        .height('100%')
+        this.skin('hud')
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .clip(true)
+
+      this.skin('bar')
     }
     .width('100%')
     .height('100%')

@@ -9,6 +9,7 @@ import { PlayerErrorPad, PlayerLoadingCard, PlayerMuteBtn, PlayerSpeedSheet, Pla
 @Component
 export struct PlayerSkin {
   @Prop isFull: boolean = false;
+  @Prop layer: string = 'all';
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
   @Prop title: string = '';
@@ -445,94 +446,94 @@ export struct PlayerSkin {
   }
 
   build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      PlayerGestureLayer({
-        onPlay: this.onPlay,
-        onToggleHud: this.onToggleHud,
-        onLongPress: this.onLongPress,
-        onLongPressEnd: this.onLongPressEnd,
-        onPanStart: this.onPanStart,
-        onPanMove: this.onPanMove,
-        onPanEnd: this.onPanEnd,
-        onPanCancel: this.onPanCancel
-      })
-        .width('100%')
-        .height('100%')
-
-      if (this.showCenterPlay()) {
-        Column()
+    if (this.layer === 'bar') {
+      Column() {
+        this.bottomBar()
+      }
+      .width('100%')
+      .hitTestBehavior(HitTestMode.Block)
+    } else {
+      Stack({ alignContent: Alignment.TopStart }) {
+        PlayerGestureLayer({
+          onPlay: this.onPlay,
+          onToggleHud: this.onToggleHud,
+          onLongPress: this.onLongPress,
+          onLongPressEnd: this.onLongPressEnd,
+          onPanStart: this.onPanStart,
+          onPanMove: this.onPanMove,
+          onPanEnd: this.onPanEnd,
+          onPanCancel: this.onPanCancel
+        })
           .width('100%')
           .height('100%')
-          .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
-          .hitTestBehavior(HitTestMode.None)
-      }
 
-      Column() {
-        this.topBar()
+        if (this.showCenterPlay()) {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
+            .hitTestBehavior(HitTestMode.None)
+        }
 
         Column() {
           this.centerGroup()
         }
         .width('100%')
-        .layoutWeight(1)
+        .height('100%')
         .justifyContent(FlexAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
 
-        this.bottomBar()
+        this.topBar()
+
+        if (!this.isFull && this.showBack) {
+          Row() {
+            BackIcon({ color: '#FFFFFF' })
+          }
+          .width(40)
+          .height(40)
+          .justifyContent(FlexAlign.Center)
+          .hitTestBehavior(HitTestMode.Block)
+          .position({ x: 4, y: 4 })
+          .onClick(() => {
+            if (this.onBack) {
+              this.onBack();
+            }
+          })
+        }
+
+        if (this.errorText) {
+          PlayerErrorPad({
+            onRetry: () => {
+              if (this.onRetry) {
+                this.onRetry();
+              }
+            },
+            onErrorDetail: () => {
+              if (this.onErrorDetail) {
+                this.onErrorDetail();
+              }
+            }
+          })
+        }
+        if (this.showSpeed) {
+          PlayerSpeedSheet({
+            speedLabel: this.speedLabel,
+            onCloseSpeed: () => {
+              if (this.onCloseSpeed) {
+                this.onCloseSpeed();
+              }
+            },
+            onPickSpeed: (index: number) => {
+              if (this.onPickSpeed) {
+                this.onPickSpeed(index);
+              }
+            }
+          })
+        }
       }
       .width('100%')
       .height('100%')
-      .alignItems(HorizontalAlign.Start)
-      .hitTestBehavior(HitTestMode.Transparent)
-
-      if (!this.isFull && this.showBack) {
-        Row() {
-          BackIcon({ color: '#FFFFFF' })
-        }
-        .width(40)
-        .height(40)
-        .justifyContent(FlexAlign.Center)
-        .hitTestBehavior(HitTestMode.Block)
-        .position({ x: 4, y: 4 })
-        .onClick(() => {
-          if (this.onBack) {
-            this.onBack();
-          }
-        })
-      }
-
-      if (this.errorText) {
-        PlayerErrorPad({
-          onRetry: () => {
-            if (this.onRetry) {
-              this.onRetry();
-            }
-          },
-          onErrorDetail: () => {
-            if (this.onErrorDetail) {
-              this.onErrorDetail();
-            }
-          }
-        })
-      }
-      if (this.showSpeed) {
-        PlayerSpeedSheet({
-          speedLabel: this.speedLabel,
-          onCloseSpeed: () => {
-            if (this.onCloseSpeed) {
-              this.onCloseSpeed();
-            }
-          },
-          onPickSpeed: (index: number) => {
-            if (this.onPickSpeed) {
-              this.onPickSpeed(index);
-            }
-          }
-        })
-      }
+      .clip(true)
     }
-    .width('100%')
-    .height('100%')
-    .hitTestBehavior(HitTestMode.Default)
   }
 }
