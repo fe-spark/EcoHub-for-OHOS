@@ -18,10 +18,8 @@ export class PlayerWindow {
       if (full) {
         await win.setWindowSystemBarEnable([]);
         await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_LANDSCAPE);
-        await win.setWindowKeepScreenOn(true);
       } else {
         await win.setPreferredOrientation(window.Orientation.PORTRAIT);
-        await win.setWindowKeepScreenOn(false);
         WindowBar.apply(context);
       }
     } catch (err) {

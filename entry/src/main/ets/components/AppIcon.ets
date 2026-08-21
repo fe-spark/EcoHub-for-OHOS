@@ -10,9 +10,11 @@ export struct AppIcon {
         .fontSize(this.iconSize)
         .fontColor([this.color])
         .fontWeight(FontWeight.Medium)
+        .hitTestBehavior(HitTestMode.None)
     }
     .width(this.iconSize)
     .height(this.iconSize)
     .clip(true)
+    .hitTestBehavior(HitTestMode.None)
   }
 }

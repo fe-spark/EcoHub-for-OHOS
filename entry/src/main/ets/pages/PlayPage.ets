@@ -337,7 +337,11 @@ struct PlayPage {
           onBack: () => {
             router.back();
           },
-          onEnded: () => this.playNext(),
+          onEnded: () => {
+            if (this.hasNext()) {
+              this.playNext();
+            }
+          },
           onPrev: () => this.playPrev(),
           onNext: () => this.playNext(),
           onFullscreenChange: (full: boolean) => this.setPlayerFull(full),

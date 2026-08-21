@@ -62,6 +62,7 @@ export struct VideoPlayer {
   private dragging: boolean = false;
   private seekTarget: number = -1;
   private seekAt: number = 0;
+  private lastToggleAt: number = 0;
   private pan: PlayerPan = new PlayerPan();
 
   aboutToAppear() {
@@ -115,6 +116,7 @@ export struct VideoPlayer {
     this.dragging = false;
     this.seekTarget = -1;
     this.seekAt = 0;
+    this.lastToggleAt = 0;
     this.pan.reset();
     this.armHide();
   }
@@ -156,6 +158,7 @@ export struct VideoPlayer {
       this.feedbackKind = PlayerTipKind.NONE;
     }
     this.showSpeed = false;
+    PlayerWindow.setKeepScreenOn(this.ctx(), false);
     if (this.ready) {
       this.controller.pause();
     }
@@ -269,6 +272,11 @@ export struct VideoPlayer {
   }
 
   private togglePlay(): void {
+    const now = Date.now();
+    if (now - this.lastToggleAt < 280) {
+      return;
+    }
+    this.lastToggleAt = now;
     if (!this.canPlay() && !this.completed) {
       return;
     }
@@ -285,9 +293,11 @@ export struct VideoPlayer {
       this.armHide();
       return;
     }
-    if (this.playRequested && !this.completed) {
+    if (this.playRequested) {
       this.playRequested = false;
+      this.isPlaying = false;
       this.controller.pause();
+      this.syncKeepScreen();
       this.showHud = true;
       this.clearHide();
     } else {
@@ -304,10 +314,25 @@ export struct VideoPlayer {
     this.armHide();
     if (this.onFullscreenChange) {
       this.onFullscreenChange(next);
-      return;
+    } else {
+      this.innerFull = next;
+      PlayerWindow.setFullscreen(this.ctx(), next);
     }
-    this.innerFull = next;
-    PlayerWindow.setFullscreen(this.ctx(), next);
+    this.syncKeepScreen();
+  }
+
+  private syncKeepScreen(): void {
+    const on = this.pageActive && this.playRequested && this.isPlaying && !this.completed && !this.errorText;
+    PlayerWindow.setKeepScreenOn(this.ctx(), on);
+  }
+
+  private formatPlayError(wasReady: boolean): string {
+    const stage = wasReady ? '播放过程中失败' : '打开视频失败';
+    const url = this.videoUrl.trim();
+    if (!url) {
+      return `${stage}\n未提供播放地址`;
+    }
+    return `${stage}\n${url}`;
   }
 
   private syncVolume(): void {
@@ -525,9 +550,8 @@ export struct VideoPlayer {
   }
 
   @Builder
-  skin(layer: string) {
+  skin() {
     PlayerSkin({
-      layer: layer,
       isFull: this.fullNow(),
       showHud: this.showHud,
       showBack: this.showBack,
@@ -603,11 +627,11 @@ export struct VideoPlayer {
       onPanCancel: () => this.panCancel()
     })
       .width('100%')
+      .height('100%')
   }
 
   build() {
-    Column() {
-      Stack({ alignContent: Alignment.TopStart }) {
+    Stack({ alignContent: Alignment.TopStart }) {
       AVVolumePanel({ volumeLevel: this.volumeIndex })
         .width(1)
         .height(1)
@@ -624,7 +648,7 @@ export struct VideoPlayer {
           .id(`eco_player_${this.nonce}`)
           .width('100%')
           .height('100%')
-          .autoPlay(true)
+          .autoPlay(this.playRequested)
           .controls(false)
           .muted(this.muted || this.volumeIndex <= 0)
           .objectFit(ImageFit.Contain)
@@ -648,6 +672,11 @@ export struct VideoPlayer {
             }
           })
           .onStart(() => {
+            if (!this.playRequested) {
+              this.controller.pause();
+              this.isPlaying = false;
+              return;
+            }
             this.isPlaying = true;
             this.opening = false;
             this.completed = false;
@@ -655,14 +684,14 @@ export struct VideoPlayer {
               this.seeking = false;
             }
             this.noteProgress();
-            PlayerWindow.setKeepScreenOn(this.ctx(), true);
+            this.syncKeepScreen();
             this.armHide();
           })
           .onPause(() => {
             this.isPlaying = false;
             this.stalled = false;
             this.clearStallWatch();
-            PlayerWindow.setKeepScreenOn(this.ctx(), false);
+            this.syncKeepScreen();
             if (!this.playRequested) {
               this.showHud = true;
               this.clearHide();
@@ -695,7 +724,7 @@ export struct VideoPlayer {
             this.stalled = false;
             this.clearStallWatch();
             this.showHud = true;
-            PlayerWindow.setKeepScreenOn(this.ctx(), false);
+            this.syncKeepScreen();
             this.lastPersist = 0;
             this.emitProgress(this.duration > 0 ? this.duration : this.currentTime, this.duration);
             if (this.onEnded) {
@@ -703,13 +732,14 @@ export struct VideoPlayer {
             }
           })
           .onError(() => {
+            const wasReady = this.ready;
             this.isPlaying = false;
             this.playRequested = false;
             this.opening = false;
             this.ready = false;
             this.showHud = true;
-            this.errorText = '播放失败';
-            PlayerWindow.setKeepScreenOn(this.ctx(), false);
+            this.errorText = this.formatPlayError(wasReady);
+            this.syncKeepScreen();
           })
       } else if (this.poster) {
         Image(this.poster)
@@ -724,13 +754,7 @@ export struct VideoPlayer {
           .backgroundColor('#000000')
       }
 
-        this.skin('hud')
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .clip(true)
-
-      this.skin('bar')
+      this.skin()
     }
     .width('100%')
     .height('100%')

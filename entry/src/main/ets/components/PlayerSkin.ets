@@ -1,15 +1,13 @@
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { PlayerTipKind } from '../common/utils/PlayerPan';
-import { AppIcon } from './AppIcon';
-import { BackIcon } from './BackIcon';
+import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerTextBtn } from './PlayerControl';
 import { PlayerGestureLayer } from './PlayerGesture';
-import { PlayerErrorPad, PlayerLoadingCard, PlayerMuteBtn, PlayerSpeedSheet, PlayerTip } from './PlayerTip';
+import { PlayerErrorPad, PlayerLoadingCard, PlayerSpeedSheet, PlayerTip } from './PlayerTip';
 
 @Component
 export struct PlayerSkin {
   @Prop isFull: boolean = false;
-  @Prop layer: string = 'all';
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
   @Prop title: string = '';
@@ -128,55 +126,20 @@ export struct PlayerSkin {
   }
 
   @Builder
-  iconBtn(src: Resource, size: number, glyphKey: string, onTap: () => void) {
-    Row() {
-      AppIcon({ src: src, iconSize: size, color: '#FFFFFF' })
-        .key(glyphKey)
-    }
-    .key(glyphKey)
-    .width(36)
-    .height(36)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
-    .backgroundColor(Color.Transparent)
-    .hitTestBehavior(HitTestMode.Block)
-    .onClick(() => onTap())
-  }
-
-  @Builder
-  textChip(label: string, enabled: boolean, onTap: () => void) {
-    Text(label)
-      .fontSize(12)
-      .fontWeight(FontWeight.Medium)
-      .fontColor(enabled ? '#FFFFFF' : 'rgba(255,255,255,0.45)')
-      .height(32)
-      .padding({ left: 10, right: 10 })
-      .textAlign(TextAlign.Center)
-      .backgroundColor('rgba(0,0,0,0.42)')
-      .borderRadius(16)
-      .border({ width: 1, color: 'rgba(255,255,255,0.14)' })
-      .onClick(() => {
-        if (enabled) {
-          onTap();
-        }
-      })
-  }
-
-  @Builder
   sliderBar() {
     Slider({
       value: this.currentTime,
       min: 0,
       max: this.duration > 0 ? this.duration : 1,
       step: 0.2,
-      style: SliderStyle.InSet
+      style: SliderStyle.OutSet
     })
       .width('100%')
-      .height(16)
-      .trackThickness(3)
-      .blockSize({ width: 10, height: 10 })
-      .blockColor(AppTheme.ACCENT)
-      .trackColor('rgba(255,255,255,0.22)')
+      .height(20)
+      .trackThickness(2)
+      .blockSize({ width: 12, height: 12 })
+      .blockColor('#FFFFFF')
+      .trackColor('rgba(255,255,255,0.28)')
       .selectedColor(AppTheme.ACCENT)
       .enabled(this.duration > 0 && this.ready)
       .onChange((value: number, mode: SliderChangeMode) => {
@@ -191,93 +154,33 @@ export struct PlayerSkin {
   }
 
   @Builder
-  circleBtn(src: Resource, size: number, iconSize: number, glyphKey: string, onTap: () => void, prominent: boolean) {
-    Row() {
-      AppIcon({ src: src, iconSize: iconSize, color: '#FFFFFF' })
-        .key(glyphKey)
-    }
-    .key(glyphKey)
-    .width(size)
-    .height(size)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
-    .backgroundColor(prominent ? 'rgba(0,0,0,0.34)' : 'rgba(0,0,0,0.20)')
-    .borderRadius(size / 2)
-    .border({ width: 1, color: prominent ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.12)' })
-    .hitTestBehavior(HitTestMode.Block)
-    .onClick(() => onTap())
-  }
-
-  @Builder
-  textCircleBtn(label: string, size: number, onTap: () => void) {
-    Row() {
-      Text(label)
-        .fontSize(13)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#FFFFFF')
-    }
-    .width(size)
-    .height(size)
-    .justifyContent(FlexAlign.Center)
-    .backgroundColor('rgba(0,0,0,0.20)')
-    .borderRadius(size / 2)
-    .border({ width: 1, color: 'rgba(255,255,255,0.12)' })
-    .hitTestBehavior(HitTestMode.Block)
-    .onClick(() => onTap())
-  }
-
-  @Builder
   topBar() {
     if (this.showTopFull()) {
-      Row({ space: 8 }) {
-        Row() {
-          BackIcon({ color: '#FFFFFF' })
-        }
-        .width(40)
-        .height(40)
-        .justifyContent(FlexAlign.Center)
-        .hitTestBehavior(HitTestMode.Block)
-        .onClick(() => {
-          if (this.onBack) {
-            this.onBack();
-          }
-        })
+      Row() {
+        PlayerBackBtn({ onTap: this.onBack })
         Text(this.title)
           .fontSize(15)
-          .fontWeight(FontWeight.Bold)
+          .fontWeight(FontWeight.Medium)
           .fontColor('#FFFFFF')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
+          .margin({ left: 4, right: 8 })
         if (this.hasPrev) {
-          this.textChip('上集', true, () => {
-            if (this.onPrev) {
-              this.onPrev();
-            }
-          })
+          PlayerChip({ label: '上集', canTap: true, onTap: this.onPrev })
         }
         if (this.hasNext) {
-          this.textChip('下集', true, () => {
-            if (this.onNext) {
-              this.onNext();
-            }
-          })
+          PlayerChip({ label: '下集', canTap: true, onTap: this.onNext })
         }
-        this.textChip(this.speedLabel, this.ready, () => {
-          if (this.onSpeed) {
-            this.onSpeed();
-          }
-        })
       }
       .width('100%')
-      .height(52)
+      .height(44)
       .padding({
         left: this.edge(8, this.leftInset),
         right: this.edge(8, this.rightInset),
         top: this.edge(4, this.topInset)
       })
       .alignItems(VerticalAlign.Center)
-      .hitTestBehavior(HitTestMode.Block)
       .linearGradient({
         angle: 180,
         colors: [['rgba(0,0,0,0.68)', 0], ['rgba(0,0,0,0.34)', 0.5], ['rgba(0,0,0,0)', 1]]
@@ -286,104 +189,85 @@ export struct PlayerSkin {
   }
 
   @Builder
+  playToggle() {
+    PlayerIconBtn({
+      src: this.continuing() ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'),
+      iconSize: 22,
+      boxSize: 44,
+      onTap: this.onPlay
+    })
+  }
+
+  @Builder
   bottomBar() {
     if (this.showBottom()) {
       if (this.isFull) {
-        Column({ space: 6 }) {
+        Column({ space: 2 }) {
           this.sliderBar()
           Row() {
-            if (this.continuing()) {
-              this.iconBtn($r('sys.symbol.pause_fill'), 22, 'pause', () => {
-                if (this.onPlay) {
-                  this.onPlay();
-                }
-              })
-            } else {
-              this.iconBtn($r('sys.symbol.play_fill'), 22, 'play', () => {
-                if (this.onPlay) {
-                  this.onPlay();
-                }
-              })
-            }
+            this.playToggle()
             Text(this.timeText())
               .fontSize(12)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#FFFFFF')
-              .margin({ left: 8 })
+              .fontColor('rgba(255,255,255,0.92)')
+              .margin({ left: 4 })
               .maxLines(1)
             Blank()
-            PlayerMuteBtn({
-              muted: this.muted,
-              iconSize: 18,
-              onMute: this.onMute
+            PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
+            PlayerIconBtn({
+              src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
+              iconSize: 20,
+              boxSize: 44,
+              onTap: this.onMute
             })
-            this.iconBtn($r('sys.symbol.arrow_down_right_and_arrow_up_left'), 18, 'exit_full', () => {
-              if (this.onFull) {
-                this.onFull();
-              }
+            PlayerIconBtn({
+              src: $r('sys.symbol.arrow_down_right_and_arrow_up_left'),
+              iconSize: 18,
+              boxSize: 44,
+              onTap: this.onFull
             })
           }
           .width('100%')
-          .height(36)
+          .height(44)
           .alignItems(VerticalAlign.Center)
         }
         .width('100%')
         .padding({
-          left: this.edge(8, this.leftInset),
-          right: this.edge(8, this.rightInset),
-          bottom: this.edge(6, this.bottomInset),
+          left: this.edge(4, this.leftInset),
+          right: this.edge(4, this.rightInset),
+          bottom: this.edge(8, this.bottomInset),
           top: 4
         })
-        .hitTestBehavior(HitTestMode.Block)
         .linearGradient({
           angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]]
+          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
         })
       } else {
         Row() {
-          if (this.continuing()) {
-            this.iconBtn($r('sys.symbol.pause_fill'), 20, 'pause', () => {
-              if (this.onPlay) {
-                this.onPlay();
-              }
-            })
-          } else {
-            this.iconBtn($r('sys.symbol.play_fill'), 20, 'play', () => {
-              if (this.onPlay) {
-                this.onPlay();
-              }
-            })
-          }
+          this.playToggle()
           Column() {
             this.sliderBar()
           }
           .layoutWeight(1)
-          .margin({ left: 4, right: 8 })
+          .margin({ left: 2, right: 8 })
           Text(this.timeText())
             .fontSize(11)
-            .fontColor('rgba(255,255,255,0.9)')
-            .width(78)
+            .fontColor('rgba(255,255,255,0.88)')
             .maxLines(1)
-            .textAlign(TextAlign.End)
-          PlayerMuteBtn({
-            muted: this.muted,
-            iconSize: 16,
-            onMute: this.onMute
-          })
-          this.iconBtn($r('sys.symbol.arrow_up_left_and_arrow_down_right'), 16, 'enter_full', () => {
-            if (this.onFull) {
-              this.onFull();
-            }
+          PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
+          PlayerIconBtn({
+            src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
+            iconSize: 18,
+            boxSize: 44,
+            onTap: this.onFull
           })
         }
         .width('100%')
-        .height(40)
-        .padding({ left: 4, right: 4 })
+        .height(44)
+        .padding({ left: 2, right: 2 })
         .alignItems(VerticalAlign.Center)
-        .hitTestBehavior(HitTestMode.Block)
         .linearGradient({
           angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.82)', 1]]
+          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
         })
       }
     } else if (!this.errorText && this.ready) {
@@ -396,33 +280,27 @@ export struct PlayerSkin {
       .width('100%')
       .height(2)
       .backgroundColor('rgba(255,255,255,0.18)')
+      .hitTestBehavior(HitTestMode.None)
     }
   }
 
   @Builder
   centerPlay() {
     if (this.showCenterPlay()) {
-      Row({ space: 24 }) {
+      Row({ space: 28 }) {
         if (this.isFull) {
-          this.textCircleBtn('-10', 52, () => {
-            if (this.onSeekBack) {
-              this.onSeekBack();
-            }
-          })
+          PlayerTextBtn({ label: '-10', boxSize: 48, onTap: this.onSeekBack })
         }
-        this.circleBtn(
-          this.completed ? $r('sys.symbol.arrow_counterclockwise') : $r('sys.symbol.play_fill'),
-          76, 42, this.completed ? 'replay' : 'cplay', () => {
-            if (this.onPlay) {
-              this.onPlay();
-            }
-          }, true)
+        PlayerIconBtn({
+          src: this.completed ? $r('sys.symbol.arrow_counterclockwise') : $r('sys.symbol.play_fill'),
+          iconSize: 36,
+          boxSize: 64,
+          circle: true,
+          prominent: true,
+          onTap: this.onPlay
+        })
         if (this.isFull) {
-          this.textCircleBtn('+10', 52, () => {
-            if (this.onSeekForward) {
-              this.onSeekForward();
-            }
-          })
+          PlayerTextBtn({ label: '+10', boxSize: 48, onTap: this.onSeekForward })
         }
       }
     }
@@ -446,94 +324,80 @@ export struct PlayerSkin {
   }
 
   build() {
-    if (this.layer === 'bar') {
-      Column() {
-        this.bottomBar()
-      }
-      .width('100%')
-      .hitTestBehavior(HitTestMode.Block)
-    } else {
-      Stack({ alignContent: Alignment.TopStart }) {
-        PlayerGestureLayer({
-          onPlay: this.onPlay,
-          onToggleHud: this.onToggleHud,
-          onLongPress: this.onLongPress,
-          onLongPressEnd: this.onLongPressEnd,
-          onPanStart: this.onPanStart,
-          onPanMove: this.onPanMove,
-          onPanEnd: this.onPanEnd,
-          onPanCancel: this.onPanCancel
-        })
+    Stack() {
+      PlayerGestureLayer({
+        onPlay: this.onPlay,
+        onToggleHud: this.onToggleHud,
+        onLongPress: this.onLongPress,
+        onLongPressEnd: this.onLongPressEnd,
+        onPanStart: this.onPanStart,
+        onPanMove: this.onPanMove,
+        onPanEnd: this.onPanEnd,
+        onPanCancel: this.onPanCancel
+      })
+        .width('100%')
+        .height('100%')
+
+      if (this.showCenterPlay()) {
+        Column()
           .width('100%')
           .height('100%')
+          .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
+          .hitTestBehavior(HitTestMode.None)
+      }
 
-        if (this.showCenterPlay()) {
-          Column()
-            .width('100%')
-            .height('100%')
-            .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
-            .hitTestBehavior(HitTestMode.None)
-        }
-
+      Column() {
+        this.topBar()
         Column() {
           this.centerGroup()
         }
         .width('100%')
-        .height('100%')
+        .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
-
-        this.topBar()
-
-        if (!this.isFull && this.showBack) {
-          Row() {
-            BackIcon({ color: '#FFFFFF' })
-          }
-          .width(40)
-          .height(40)
-          .justifyContent(FlexAlign.Center)
-          .hitTestBehavior(HitTestMode.Block)
-          .position({ x: 4, y: 4 })
-          .onClick(() => {
-            if (this.onBack) {
-              this.onBack();
-            }
-          })
-        }
-
-        if (this.errorText) {
-          PlayerErrorPad({
-            onRetry: () => {
-              if (this.onRetry) {
-                this.onRetry();
-              }
-            },
-            onErrorDetail: () => {
-              if (this.onErrorDetail) {
-                this.onErrorDetail();
-              }
-            }
-          })
-        }
-        if (this.showSpeed) {
-          PlayerSpeedSheet({
-            speedLabel: this.speedLabel,
-            onCloseSpeed: () => {
-              if (this.onCloseSpeed) {
-                this.onCloseSpeed();
-              }
-            },
-            onPickSpeed: (index: number) => {
-              if (this.onPickSpeed) {
-                this.onPickSpeed(index);
-              }
-            }
-          })
-        }
+        this.bottomBar()
       }
       .width('100%')
       .height('100%')
-      .clip(true)
+      .hitTestBehavior(HitTestMode.Transparent)
+
+      if (!this.isFull && this.showBack) {
+        PlayerBackBtn({ onTap: this.onBack })
+          .position({ x: 4, y: 4 })
+      }
+
+      if (this.errorText) {
+        PlayerErrorPad({
+          onRetry: () => {
+            if (this.onRetry) {
+              this.onRetry();
+            }
+          },
+          onErrorDetail: () => {
+            if (this.onErrorDetail) {
+              this.onErrorDetail();
+            }
+          }
+        })
+      }
+      if (this.showSpeed) {
+        PlayerSpeedSheet({
+          speedLabel: this.speedLabel,
+          onCloseSpeed: () => {
+            if (this.onCloseSpeed) {
+              this.onCloseSpeed();
+            }
+          },
+          onPickSpeed: (index: number) => {
+            if (this.onPickSpeed) {
+              this.onPickSpeed(index);
+            }
+          }
+        })
+      }
     }
+    .width('100%')
+    .height('100%')
+    .clip(true)
   }
 }

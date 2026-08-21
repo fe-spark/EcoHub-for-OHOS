@@ -3,37 +3,6 @@ import { AppIcon } from './AppIcon';
 import { PlayerTipKind } from '../common/utils/PlayerPan';
 
 @Component
-export struct PlayerMuteBtn {
-  @Prop muted: boolean = false;
-  @Prop iconSize: number = 16;
-  onMute?: () => void;
-
-  build() {
-    Row() {
-      if (this.muted) {
-        AppIcon({ src: $r('sys.symbol.speaker_slash'), iconSize: this.iconSize, color: '#FFFFFF' })
-          .key('mute')
-      } else {
-        AppIcon({ src: $r('sys.symbol.speaker_wave_2'), iconSize: this.iconSize, color: '#FFFFFF' })
-          .key('vol')
-      }
-    }
-    .key(this.muted ? 'mute' : 'vol')
-    .width(36)
-    .height(36)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
-    .backgroundColor(Color.Transparent)
-    .hitTestBehavior(HitTestMode.Block)
-    .onClick(() => {
-      if (this.onMute) {
-        this.onMute();
-      }
-    })
-  }
-}
-
-@Component
 export struct PlayerTip {
   @Prop message: string = '';
   @Prop kind: number = PlayerTipKind.NONE;
