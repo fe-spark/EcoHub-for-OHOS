@@ -1,5 +1,6 @@
 import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
+import { HistoryManager } from '../common/utils/HistoryManager';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 
 
@@ -9,6 +10,8 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     ServerConfigManager.getInstance().init(this.context).then(() => {
+      return HistoryManager.migrateLegacy();
+    }).then(() => {
       return ServerConfigManager.getInstance().getServerUrl();
     }).then((url: string) => {
       const targetPage = url ? 'pages/Index' : 'pages/ServerConfigPage';

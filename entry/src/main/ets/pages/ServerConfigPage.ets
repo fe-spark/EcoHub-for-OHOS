@@ -61,6 +61,7 @@ struct ServerConfigPage {
       return;
     }
     promptAction.showToast({ message: '源已接入' });
+    SourceGuard.notifyReconnected();
     router.replaceUrl({ url: 'pages/Index' });
   }
 

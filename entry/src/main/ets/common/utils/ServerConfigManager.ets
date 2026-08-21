@@ -52,7 +52,39 @@ export class ServerConfigManager {
   }
 
   public getOrigin(): string {
+    if (!this.cachedUrl.trim()) {
+      return '';
+    }
     return ServerConfigManager.stripApiSuffix(this.normalizeRaw(this.cachedUrl));
+  }
+
+  public storageScope(): string {
+    return ServerConfigManager.hostScope(this.getOrigin());
+  }
+
+  public scopedKey(name: string): string {
+    const scope = this.storageScope();
+    if (!scope) {
+      return '';
+    }
+    return `${name}@${scope}`;
+  }
+
+  public static hostScope(origin: string): string {
+    let value = origin.trim().toLowerCase();
+    if (!value) {
+      return '';
+    }
+    if (value.indexOf('https://') === 0) {
+      value = value.substring(8);
+    } else if (value.indexOf('http://') === 0) {
+      value = value.substring(7);
+    }
+    const slash = value.indexOf('/');
+    if (slash >= 0) {
+      value = value.substring(0, slash);
+    }
+    return value;
   }
 
   public getApiBase(): string {

@@ -10,6 +10,10 @@ export class HistoryManager {
     return ServerConfigManager.getInstance().getPreferences();
   }
 
+  private static dataKey(): string {
+    return ServerConfigManager.getInstance().scopedKey(KEY_HISTORY);
+  }
+
   static async find(id: string): Promise<HistoryItem | null> {
     const map = await HistoryManager.readMap();
     const item = map[id];
@@ -60,13 +64,52 @@ export class HistoryManager {
     await HistoryManager.writeMap({});
   }
 
+  static async migrateLegacy(): Promise<void> {
+    const store = HistoryManager.store();
+    const key = HistoryManager.dataKey();
+    if (!store || !key) {
+      return;
+    }
+    const origin = ServerConfigManager.getInstance().getOrigin().toLowerCase();
+    const aliases: string[] = [KEY_HISTORY];
+    if (origin) {
+      aliases.push(`${KEY_HISTORY}@${origin}`);
+      if (origin.indexOf('https://') === 0) {
+        aliases.push(`${KEY_HISTORY}@http://${origin.substring(8)}`);
+      } else if (origin.indexOf('http://') === 0) {
+        aliases.push(`${KEY_HISTORY}@https://${origin.substring(7)}`);
+      }
+    }
+    try {
+      let current = (await store.get(key, '')) as string;
+      for (let i = 0; i < aliases.length; i++) {
+        const alias = aliases[i];
+        if (alias === key) {
+          continue;
+        }
+        const raw = (await store.get(alias, '')) as string;
+        if (!raw || raw === '{}') {
+          continue;
+        }
+        if (!current || current === '{}') {
+          await store.put(key, raw);
+          current = raw;
+        }
+        await store.delete(alias);
+      }
+      await store.flush();
+    } catch (err) {
+    }
+  }
+
   private static async readMap(): Promise<Record<string, HistoryItem>> {
     const store = HistoryManager.store();
-    if (!store) {
+    const key = HistoryManager.dataKey();
+    if (!store || !key) {
       return {};
     }
     try {
-      const raw = (await store.get(KEY_HISTORY, '{}')) as string;
+      const raw = (await store.get(key, '{}')) as string;
       const parsed = JSON.parse(raw) as Record<string, HistoryItem>;
       return parsed ? parsed : {};
     } catch (err) {
@@ -76,10 +119,11 @@ export class HistoryManager {
 
   private static async writeMap(map: Record<string, HistoryItem>): Promise<void> {
     const store = HistoryManager.store();
-    if (!store) {
+    const key = HistoryManager.dataKey();
+    if (!store || !key) {
       return;
     }
-    await store.put(KEY_HISTORY, JSON.stringify(map));
+    await store.put(key, JSON.stringify(map));
     await store.flush();
   }
 }

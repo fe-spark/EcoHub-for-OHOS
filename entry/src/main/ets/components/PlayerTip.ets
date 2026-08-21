@@ -1,4 +1,5 @@
 import { AppTheme } from '../common/constants/AppTheme';
+import { PlayerSpeed } from '../common/utils/PlayerSpeed';
 import { AppIcon } from './AppIcon';
 import { PlayerTipKind } from '../common/utils/PlayerPan';
 
@@ -135,68 +136,56 @@ export struct PlayerErrorPad {
   }
 }
 
-@Component
-export struct PlayerSpeedSheet {
-  @Prop speedLabel: string = '1.0x';
-  onCloseSpeed?: () => void;
-  onPickSpeed?: (index: number) => void;
+@CustomDialog
+export struct PlayerSpeedDialog {
+  controller?: CustomDialogController
+  speedLabel: string = '1.0x'
+  onPickSpeed: (index: number) => void = (_index: number) => {}
 
   build() {
     Column() {
-      Column()
-        .width('100%')
-        .layoutWeight(1)
-        .onClick(() => {
-          if (this.onCloseSpeed) {
-            this.onCloseSpeed();
-          }
-        })
-      Column() {
-        Row() {
-          Text('播放速度')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-          Blank()
-          Text(`当前 ${this.speedLabel}`)
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ACCENT)
-        }
-        .width('100%')
-        Text('点击后立即生效')
-          .fontSize(12)
-          .fontColor('rgba(255,255,255,0.55)')
-          .margin({ top: 6, bottom: 12 })
-          .width('100%')
-        Flex({ wrap: FlexWrap.Wrap }) {
-          ForEach(['0.75x', '1.0x', '1.25x', '1.75x', '2.0x'], (label: string, index: number) => {
-            Text(label)
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#FFFFFF')
-              .width(80)
-              .height(40)
-              .textAlign(TextAlign.Center)
-              .margin({ right: 8, bottom: 8 })
-              .backgroundColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255,255,255,0.08)')
-              .borderRadius(12)
-              .onClick(() => {
-                if (this.onPickSpeed) {
-                  this.onPickSpeed(index);
-                }
-              })
-          }, (label: string) => `spd_${label}`)
-        }
-        .width('100%')
+      Row() {
+        Text('播放速度')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF')
+        Blank()
+        Text(`当前 ${this.speedLabel}`)
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.ACCENT)
       }
       .width('100%')
-      .padding(16)
-      .backgroundColor('#191B20')
-      .borderRadius(20)
-      .margin({ left: 12, right: 12, bottom: 12 })
+      Text('点击后立即生效')
+        .fontSize(12)
+        .fontColor('rgba(255,255,255,0.55)')
+        .margin({ top: 6, bottom: 12 })
+        .width('100%')
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
+          Text(label)
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+            .width(80)
+            .height(40)
+            .textAlign(TextAlign.Center)
+            .margin({ right: 8, bottom: 8 })
+            .backgroundColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255,255,255,0.08)')
+            .borderRadius(12)
+            .onClick(() => {
+              this.onPickSpeed(index)
+              if (this.controller) {
+                this.controller.close()
+              }
+            })
+        }, (label: string) => `spd_${label}`)
+      }
+      .width('100%')
     }
     .width('100%')
-    .height('100%')
+    .padding({ left: 16, right: 16, top: 16, bottom: 24 })
+    .backgroundColor('#191B20')
+    .borderRadius({ topLeft: 20, topRight: 20 })
   }
 }

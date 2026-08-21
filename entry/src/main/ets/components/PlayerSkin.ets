@@ -3,7 +3,7 @@ import { FormatUtil } from '../common/utils/FormatUtil';
 import { PlayerTipKind } from '../common/utils/PlayerPan';
 import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerTextBtn } from './PlayerControl';
 import { PlayerGestureLayer } from './PlayerGesture';
-import { PlayerErrorPad, PlayerLoadingCard, PlayerSpeedSheet, PlayerTip } from './PlayerTip';
+import { PlayerErrorPad, PlayerLoadingCard, PlayerTip } from './PlayerTip';
 
 @Component
 export struct PlayerSkin {
@@ -26,7 +26,6 @@ export struct PlayerSkin {
   @Prop @Watch('onLongPressWatch') longPressing: boolean = false;
   @Prop feedback: string = '';
   @Prop feedbackKind: number = PlayerTipKind.NONE;
-  @Prop showSpeed: boolean = false;
   @Prop topInset: number = 0;
   @Prop leftInset: number = 0;
   @Prop rightInset: number = 0;
@@ -40,7 +39,7 @@ export struct PlayerSkin {
   onPrev?: () => void;
   onNext?: () => void;
   onSpeed?: () => void;
-  onPickSpeed?: (index: number) => void;
+  onCatalog?: () => void;
   onRetry?: () => void;
   onErrorDetail?: () => void;
   onSeekBack?: () => void;
@@ -48,7 +47,6 @@ export struct PlayerSkin {
   onSeekStart?: (value: number) => void;
   onSeekUpdate?: (value: number) => void;
   onSeekEnd?: (value: number) => void;
-  onCloseSpeed?: () => void;
   onToggleHud?: () => void;
   onLongPress?: () => void;
   onLongPressEnd?: () => void;
@@ -166,12 +164,6 @@ export struct PlayerSkin {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
           .margin({ left: 4, right: 8 })
-        if (this.hasPrev) {
-          PlayerChip({ label: '上集', canTap: true, onTap: this.onPrev })
-        }
-        if (this.hasNext) {
-          PlayerChip({ label: '下集', canTap: true, onTap: this.onNext })
-        }
       }
       .width('100%')
       .height(44)
@@ -199,6 +191,26 @@ export struct PlayerSkin {
   }
 
   @Builder
+  skipBtns() {
+    if (this.hasPrev || this.hasNext) {
+      PlayerIconBtn({
+        src: $r('sys.symbol.backward_end_fill'),
+        iconSize: 20,
+        boxSize: 44,
+        canTap: this.hasPrev,
+        onTap: this.onPrev
+      })
+      PlayerIconBtn({
+        src: $r('sys.symbol.forward_end_fill'),
+        iconSize: 20,
+        boxSize: 44,
+        canTap: this.hasNext,
+        onTap: this.onNext
+      })
+    }
+  }
+
+  @Builder
   bottomBar() {
     if (this.showBottom()) {
       if (this.isFull) {
@@ -206,12 +218,21 @@ export struct PlayerSkin {
           this.sliderBar()
           Row() {
             this.playToggle()
+            this.skipBtns()
             Text(this.timeText())
               .fontSize(12)
               .fontColor('rgba(255,255,255,0.92)')
               .margin({ left: 4 })
               .maxLines(1)
             Blank()
+            if (this.onCatalog) {
+              PlayerIconBtn({
+                src: $r('sys.symbol.list_bullet'),
+                iconSize: 20,
+                boxSize: 44,
+                onTap: this.onCatalog
+              })
+            }
             PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
             PlayerIconBtn({
               src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
@@ -244,6 +265,7 @@ export struct PlayerSkin {
       } else {
         Row() {
           this.playToggle()
+          this.skipBtns()
           Column() {
             this.sliderBar()
           }
@@ -253,6 +275,14 @@ export struct PlayerSkin {
             .fontSize(11)
             .fontColor('rgba(255,255,255,0.88)')
             .maxLines(1)
+          if (this.onCatalog) {
+            PlayerIconBtn({
+              src: $r('sys.symbol.list_bullet'),
+              iconSize: 18,
+              boxSize: 44,
+              onTap: this.onCatalog
+            })
+          }
           PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
           PlayerIconBtn({
             src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
@@ -310,7 +340,7 @@ export struct PlayerSkin {
   centerGroup() {
     Column({ space: 12 }) {
       if (this.longPressing) {
-        PlayerTip({ message: '2.0x', kind: PlayerTipKind.SPEED, speedTick: this.speedTick })
+        PlayerTip({ message: this.speedLabel, kind: PlayerTipKind.SPEED, speedTick: this.speedTick })
       } else if (this.feedback) {
         PlayerTip({ message: this.feedback, kind: this.feedbackKind })
       }
@@ -376,21 +406,6 @@ export struct PlayerSkin {
           onErrorDetail: () => {
             if (this.onErrorDetail) {
               this.onErrorDetail();
-            }
-          }
-        })
-      }
-      if (this.showSpeed) {
-        PlayerSpeedSheet({
-          speedLabel: this.speedLabel,
-          onCloseSpeed: () => {
-            if (this.onCloseSpeed) {
-              this.onCloseSpeed();
-            }
-          },
-          onPickSpeed: (index: number) => {
-            if (this.onPickSpeed) {
-              this.onPickSpeed(index);
             }
           }
         })

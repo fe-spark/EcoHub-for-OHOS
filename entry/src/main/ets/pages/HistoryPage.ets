@@ -4,6 +4,8 @@ import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { HistoryManager } from '../common/utils/HistoryManager';
 import { NavUtil } from '../common/utils/NavUtil';
+import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { SourceGuard } from '../common/utils/SourceGuard';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
 import { PageHeader } from '../components/PageHeader';
@@ -19,13 +21,22 @@ struct HistoryPage {
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  private sourceCb: () => void = () => {};
 
   aboutToAppear() {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
+    this.sourceCb = () => {
+      this.reload(false);
+    };
+    SourceGuard.onReconnect(this.sourceCb);
     this.reload(false);
+  }
+
+  aboutToDisappear(): void {
+    SourceGuard.offReconnect(this.sourceCb);
   }
 
   private async reload(fromPull: boolean): Promise<void> {
@@ -44,7 +55,7 @@ struct HistoryPage {
   private confirmClear(): void {
     AlertDialog.show({
       title: '清空观看历史',
-      message: '确定删除全部观看记录吗？',
+      message: '确定删除当前软件源的全部观看记录吗？',
       primaryButton: {
         value: '清空',
         fontColor: AppTheme.ACCENT,
@@ -101,7 +112,7 @@ struct HistoryPage {
           ForEach(this.list, (item: HistoryItem) => {
             ListItem() {
               Row() {
-                Image(item.picture)
+                Image(ServerConfigManager.getInstance().resolveMediaUrl(item.picture))
                   .width(86)
                   .height(128)
                   .objectFit(ImageFit.Cover)

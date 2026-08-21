@@ -6,6 +6,7 @@ import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { HistoryManager } from '../common/utils/HistoryManager';
 import { NavUtil } from '../common/utils/NavUtil';
+import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { PlayerWindow } from '../common/utils/PlayerWindow';
 import { common } from '@kit.AbilityKit';
@@ -31,6 +32,8 @@ struct PlayPage {
   @State private viewingSourceId: string = '';
   @State private episodeIndex: number = 0;
   @State private playUrl: string = '';
+  @State private playToken: number = 0;
+  @State private catalogOpen: boolean = false;
   @State private playTitle: string = '';
   @State private initialTime: number = 0;
   @State private related: MovieBasicInfo[] = [];
@@ -49,6 +52,7 @@ struct PlayPage {
   private loadToken: number = 0;
   private relateToken: number = 0;
   private historySeq: number = 0;
+  private persistEnabled: boolean = true;
 
   aboutToAppear() {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
@@ -68,6 +72,9 @@ struct PlayPage {
     this.loadPlay(sourceId);
     this.loadRelate();
     this.reconnectCb = () => {
+      this.persistEnabled = false;
+      this.historySeq++;
+      this.playUrl = '';
       if (!this.filmId) {
         return;
       }
@@ -138,6 +145,7 @@ struct PlayPage {
       this.playTitle = `${detail.name} · ${info.current.episode}`;
       this.sourceName = this.findSource(this.playingSourceId)?.name || '默认源';
       this.errorText = '';
+      this.persistEnabled = true;
       this.persistHistory();
     } catch (err) {
       if (token !== this.loadToken) {
@@ -200,6 +208,7 @@ struct PlayPage {
     this.episodeIndex = index;
     this.initialTime = 0;
     this.playUrl = episode.link;
+    this.playToken += 1;
     this.playTitle = `${this.name} · ${episode.episode}`;
     this.sourceName = source.name;
     this.persistHistory(0, 0);
@@ -242,7 +251,10 @@ struct PlayPage {
   }
 
   private persistHistory(currentTime?: number, duration?: number): void {
-    if (!this.filmId || !this.name) {
+    if (!this.persistEnabled || !this.filmId || !this.name) {
+      return;
+    }
+    if (!ServerConfigManager.getInstance().storageScope()) {
       return;
     }
     const seq = ++this.historySeq;
@@ -257,7 +269,7 @@ struct PlayPage {
     const episode: MovieUrlInfo = source && source.linkList.length > episodeIndex ?
       source.linkList[episodeIndex] : fallback;
     HistoryManager.find(filmId).then((previous: HistoryItem | null) => {
-      if (seq !== this.historySeq) {
+      if (seq !== this.historySeq || !this.persistEnabled) {
         return;
       }
       const item: HistoryItem = {
@@ -322,6 +334,7 @@ struct PlayPage {
       } else {
         VideoPlayer({
           videoUrl: this.playUrl,
+          reloadToken: this.playToken,
           title: `${this.name} ${this.currentEpisodeName()}`,
           poster: this.picture,
           initialTime: this.initialTime,
@@ -344,6 +357,9 @@ struct PlayPage {
           },
           onPrev: () => this.playPrev(),
           onNext: () => this.playNext(),
+          onOpenCatalog: () => {
+            this.catalogOpen = true;
+          },
           onFullscreenChange: (full: boolean) => this.setPlayerFull(full),
           onProgress: (current: number, duration: number) => {
             this.persistHistory(current, duration);
@@ -429,5 +445,35 @@ struct PlayPage {
       bottom: this.playerFull ? 0 : this.bottomInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+    .bindSheet($$this.catalogOpen, this.catalogSheet(), {
+      height: SheetSize.LARGE,
+      dragBar: true,
+      showClose: true,
+      backgroundColor: '#191B20',
+      onDisappear: () => {
+        this.catalogOpen = false;
+      }
+    })
+  }
+
+  @Builder
+  catalogSheet() {
+    PlayDetailPanel({
+      pickerOnly: true,
+      name: this.name,
+      subTitle: this.subTitle,
+      plot: this.plot,
+      sources: this.sources,
+      playingSourceId: this.playingSourceId,
+      viewingSourceId: this.viewingSourceId,
+      episodeIndex: this.episodeIndex,
+      onViewSource: (id: string) => {
+        this.viewingSourceId = id;
+      },
+      onSelectEpisode: (sourceId: string, index: number) => {
+        this.selectEpisode(sourceId, index);
+        this.catalogOpen = false;
+      }
+    })
   }
 }

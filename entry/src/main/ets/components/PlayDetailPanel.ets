@@ -17,6 +17,7 @@ export struct PlayDetailPanel {
   @Prop @Watch('onPlayIndexChange') episodeIndex: number = 0;
   onViewSource?: (id: string) => void;
   onSelectEpisode?: (sourceId: string, index: number) => void;
+  @Prop pickerOnly: boolean = false;
   @State private plotOpen: boolean = false;
   @State private groupSourceIds: string[] = [];
   @State private groupIndexes: number[] = [];
@@ -312,6 +313,40 @@ export struct PlayDetailPanel {
   }
 
   build() {
+    if (this.pickerOnly) {
+      Column() {
+        Text('线路与剧集')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.TEXT_PRIMARY)
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 8, bottom: 4 })
+        this.groupBar()
+        List() {
+          if (this.episodeList().length === 0) {
+            ListItem() {
+              Text('暂无数据')
+                .fontSize(13)
+                .fontColor(AppTheme.TEXT_MUTED)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding({ top: 32, bottom: 32 })
+            }
+          } else {
+            ForEach(this.epRowIds(), (row: number) => {
+              ListItem() {
+                this.epRow(row)
+              }
+            }, (row: number) => `pick_ep_${this.viewingSourceId}_${this.groupStart()}_${row}`)
+          }
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Off)
+      }
+      .width('100%')
+      .height('100%')
+    } else {
     List() {
       ListItem() {
         Column() {
@@ -411,5 +446,6 @@ export struct PlayDetailPanel {
     .height('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    }
   }
 }

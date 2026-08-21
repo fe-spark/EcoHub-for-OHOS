@@ -4,10 +4,12 @@ import { PlayerVolumeInfo, PlayerWindow } from '../common/utils/PlayerWindow';
 import { PlayerSpeed } from '../common/utils/PlayerSpeed';
 import { PlayerPan, PlayerPanResult, PlayerTipKind } from '../common/utils/PlayerPan';
 import { PlayerSkin } from './PlayerSkin';
+import { PlayerSpeedDialog } from './PlayerTip';
 
 @Component
 export struct VideoPlayer {
   @Prop @Watch('onUrlChange') videoUrl: string = '';
+  @Prop @Watch('onReloadTokenChange') reloadToken: number = 0;
   @Prop title: string = '';
   @Prop poster: string = '';
   @Prop initialTime: number = 0;
@@ -26,6 +28,7 @@ export struct VideoPlayer {
   onPrev?: () => void;
   onNext?: () => void;
   onFullscreenChange?: (full: boolean) => void;
+  onOpenCatalog?: () => void;
   @State private duration: number = 0;
   @State private currentTime: number = 0;
   @State private isPlaying: boolean = false;
@@ -47,11 +50,16 @@ export struct VideoPlayer {
   @State private showSpeed: boolean = false;
   @State private speedIndex: number = 1;
   @State private speedLabel: string = '1.0x';
+  @State private playSrc: string = '';
+  @State private playerOn: boolean = false;
   private controller: VideoController = new VideoController();
   private lastPersist: number = 0;
   private hideTimer: number = -1;
   private stallTimer: number = -1;
   private tipTimer: number = -1;
+  private openTimer: number = -1;
+  private bootGen: number = 0;
+  private mountGen: number = 0;
   private pageWasHidden: boolean = false;
   private lastUpdateAt: number = 0;
   private playerW: number = 1;
@@ -64,10 +72,16 @@ export struct VideoPlayer {
   private seekAt: number = 0;
   private lastToggleAt: number = 0;
   private pan: PlayerPan = new PlayerPan();
+  private speedDialog: CustomDialogController | null = null;
 
   aboutToAppear() {
     this.nonce = 1;
+    this.bootGen = 1;
+    this.mountGen = 1;
     this.opening = !!this.videoUrl;
+    this.playSrc = this.videoUrl;
+    this.playerOn = !!this.videoUrl;
+    this.armOpenWatch();
     this.armHide();
     this.syncVolume();
   }
@@ -76,6 +90,9 @@ export struct VideoPlayer {
     this.clearHide();
     this.clearStallWatch();
     this.clearTip();
+    this.clearOpenWatch();
+    this.closeSpeedDialog();
+    this.bootGen++;
     const ctx = this.ctx();
     PlayerWindow.resetBrightness(ctx);
     PlayerWindow.setKeepScreenOn(ctx, false);
@@ -89,14 +106,12 @@ export struct VideoPlayer {
   }
 
   onUrlChange(): void {
-    this.controller = new VideoController();
     this.duration = 0;
     this.currentTime = 0;
     this.isPlaying = false;
     this.playRequested = true;
     this.completed = false;
     this.showHud = true;
-    this.nonce += 1;
     this.lastPersist = 0;
     this.opening = !!this.videoUrl;
     this.errorText = '';
@@ -112,13 +127,38 @@ export struct VideoPlayer {
     this.feedback = '';
     this.feedbackKind = PlayerTipKind.NONE;
     this.clearTip();
-    this.showSpeed = false;
+    this.closeSpeedDialog();
     this.dragging = false;
     this.seekTarget = -1;
     this.seekAt = 0;
     this.lastToggleAt = 0;
     this.pan.reset();
     this.armHide();
+    this.remountPlayer();
+  }
+
+  onReloadTokenChange(): void {
+    this.duration = 0;
+    this.currentTime = 0;
+    this.isPlaying = false;
+    this.playRequested = true;
+    this.completed = false;
+    this.showHud = true;
+    this.lastPersist = 0;
+    this.opening = !!this.videoUrl;
+    this.errorText = '';
+    this.seeking = false;
+    this.stalled = false;
+    this.clearStallWatch();
+    this.ready = false;
+    this.closeSpeedDialog();
+    this.dragging = false;
+    this.seekTarget = -1;
+    this.seekAt = 0;
+    this.lastToggleAt = 0;
+    this.pan.reset();
+    this.armHide();
+    this.remountPlayer();
   }
 
   onPageActiveChange(): void {
@@ -391,11 +431,62 @@ export struct VideoPlayer {
     this.ready = false;
     this.completed = false;
     this.playRequested = true;
+    this.isPlaying = false;
     this.stalled = false;
+    this.seeking = false;
+    this.seekTarget = -1;
     this.clearStallWatch();
+    this.showHud = true;
+    this.remountPlayer();
+  }
+
+  private live(): boolean {
+    return this.playerOn && this.bootGen === this.mountGen;
+  }
+
+  private remountPlayer(): void {
+    const gen = ++this.bootGen;
+    this.playerOn = false;
+    this.playSrc = '';
     this.controller = new VideoController();
     this.nonce += 1;
-    this.showHud = true;
+    this.armOpenWatch();
+    if (!this.videoUrl) {
+      this.clearOpenWatch();
+      this.opening = false;
+      return;
+    }
+    setTimeout(() => {
+      if (gen !== this.bootGen) {
+        return;
+      }
+      this.mountGen = gen;
+      this.playSrc = this.videoUrl;
+      this.playerOn = true;
+    }, 80);
+  }
+
+  private armOpenWatch(): void {
+    this.clearOpenWatch();
+    if (!this.opening) {
+      return;
+    }
+    this.openTimer = setTimeout(() => {
+      this.openTimer = -1;
+      if (this.live() && this.opening && !this.ready && !this.errorText) {
+        this.opening = false;
+        this.playRequested = false;
+        this.errorText = this.formatPlayError(false);
+        this.syncKeepScreen();
+      }
+    }, 12000);
+  }
+
+  private clearOpenWatch(): void {
+    if (this.openTimer >= 0) {
+      clearTimeout(this.openTimer);
+      this.openTimer = -1;
+    }
   }
 
   private showErrorDetail(): void {
@@ -410,8 +501,38 @@ export struct VideoPlayer {
     this.speedIndex = index;
     this.speedLabel = PlayerSpeed.label(index);
     this.showSpeed = false;
+    this.closeSpeedDialog();
     this.showHud = true;
     this.armHide();
+  }
+
+  private openSpeedDialog(): void {
+    this.closeSpeedDialog();
+    this.showSpeed = true;
+    this.speedDialog = new CustomDialogController({
+      builder: PlayerSpeedDialog({
+        speedLabel: this.speedLabel,
+        onPickSpeed: (index: number) => this.pickSpeed(index)
+      }),
+      autoCancel: true,
+      alignment: DialogAlignment.Bottom,
+      customStyle: true,
+      backgroundColor: Color.Transparent,
+      maskColor: 'rgba(0,0,0,0.52)',
+      cancel: () => {
+        this.showSpeed = false;
+        this.speedDialog = null;
+      }
+    });
+    this.speedDialog.open();
+  }
+
+  private closeSpeedDialog(): void {
+    this.showSpeed = false;
+    if (this.speedDialog) {
+      this.speedDialog.close();
+      this.speedDialog = null;
+    }
   }
 
   private seekTo(time: number): void {
@@ -459,8 +580,8 @@ export struct VideoPlayer {
     }
     this.savedSpeedIndex = this.speedIndex;
     this.longPressing = true;
-    this.speedIndex = 4;
-    this.speedLabel = '2.0x';
+    this.speedIndex = PlayerSpeed.FAST_INDEX;
+    this.speedLabel = PlayerSpeed.label(PlayerSpeed.FAST_INDEX);
     this.feedback = '';
     this.feedbackKind = PlayerTipKind.NONE;
     this.showHud = false;
@@ -572,7 +693,6 @@ export struct VideoPlayer {
       longPressing: this.longPressing,
       feedback: this.feedback,
       feedbackKind: this.feedbackKind,
-      showSpeed: this.showSpeed,
       topInset: this.topInset,
       leftInset: this.leftInset,
       rightInset: this.rightInset,
@@ -592,13 +712,8 @@ export struct VideoPlayer {
           this.onNext();
         }
       },
-      onSpeed: () => {
-        this.showSpeed = true;
-      },
-      onPickSpeed: (index: number) => this.pickSpeed(index),
-      onCloseSpeed: () => {
-        this.showSpeed = false;
-      },
+      onSpeed: () => this.openSpeedDialog(),
+      onCatalog: this.onOpenCatalog,
       onRetry: () => this.retry(),
       onErrorDetail: () => this.showErrorDetail(),
       onSeekBack: () => this.seekBy(-10),
@@ -638,9 +753,9 @@ export struct VideoPlayer {
         .hitTestBehavior(HitTestMode.None)
         .opacity(0)
 
-      if (this.videoUrl) {
+      if (this.playerOn && this.playSrc) {
         Video({
-          src: this.videoUrl,
+          src: this.playSrc,
           previewUri: this.poster,
           controller: this.controller,
           currentProgressRate: PlayerSpeed.of(this.speedIndex)
@@ -655,9 +770,13 @@ export struct VideoPlayer {
           .backgroundColor('#000000')
           .hitTestBehavior(HitTestMode.None)
           .onPrepared((info: PreparedInfo) => {
+            if (!this.live()) {
+              return;
+            }
             this.duration = info.duration;
             this.ready = true;
             this.opening = false;
+            this.clearOpenWatch();
             this.errorText = '';
             const resumeAt = this.resumeTime();
             if (resumeAt >= 2) {
@@ -672,6 +791,9 @@ export struct VideoPlayer {
             }
           })
           .onStart(() => {
+            if (!this.live()) {
+              return;
+            }
             if (!this.playRequested) {
               this.controller.pause();
               this.isPlaying = false;
@@ -679,6 +801,7 @@ export struct VideoPlayer {
             }
             this.isPlaying = true;
             this.opening = false;
+            this.clearOpenWatch();
             this.completed = false;
             if (this.seekTarget < 0) {
               this.seeking = false;
@@ -688,6 +811,9 @@ export struct VideoPlayer {
             this.armHide();
           })
           .onPause(() => {
+            if (!this.live()) {
+              return;
+            }
             this.isPlaying = false;
             this.stalled = false;
             this.clearStallWatch();
@@ -699,6 +825,9 @@ export struct VideoPlayer {
             this.emitProgress(this.currentTime, this.duration);
           })
           .onUpdate((info: PlaybackInfo) => {
+            if (!this.live()) {
+              return;
+            }
             this.opening = false;
             if (info.time > 0) {
               this.isPlaying = this.playRequested;
@@ -708,16 +837,25 @@ export struct VideoPlayer {
             this.emitProgress(this.currentTime, this.duration);
           })
           .onSeeking(() => {
+            if (!this.live()) {
+              return;
+            }
             if (this.seekTarget >= 0 || this.dragging) {
               this.seeking = true;
             }
           })
           .onSeeked(() => {
+            if (!this.live()) {
+              return;
+            }
             if (this.seekTarget < 0) {
               this.seeking = false;
             }
           })
           .onFinish(() => {
+            if (!this.live()) {
+              return;
+            }
             this.isPlaying = false;
             this.playRequested = false;
             this.completed = true;
@@ -732,10 +870,14 @@ export struct VideoPlayer {
             }
           })
           .onError(() => {
+            if (!this.live()) {
+              return;
+            }
             const wasReady = this.ready;
             this.isPlaying = false;
             this.playRequested = false;
             this.opening = false;
+            this.clearOpenWatch();
             this.ready = false;
             this.showHud = true;
             this.errorText = this.formatPlayError(wasReady);

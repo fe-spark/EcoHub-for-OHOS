@@ -7,11 +7,12 @@ export struct PlayerIconBtn {
   @Prop boxSize: number = 36;
   @Prop circle: boolean = false;
   @Prop prominent: boolean = false;
+  @Prop canTap: boolean = true;
   onTap?: () => void;
   private armed: boolean = true;
 
   private handleTap(): void {
-    if (!this.armed) {
+    if (!this.canTap || !this.armed) {
       return;
     }
     this.armed = false;
@@ -42,6 +43,7 @@ export struct PlayerIconBtn {
     .height(this.boxSize)
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
+    .opacity(this.canTap ? 1 : 0.28)
     .backgroundColor(this.bgColor())
     .borderRadius(this.circle ? this.boxSize / 2 : 4)
     .borderWidth(this.circle ? 1 : 0)
