@@ -1,4 +1,4 @@
-# EcoHarmony
+# ecohub-harmony
 
 EcoHub 的鸿蒙原生客户端。
 
