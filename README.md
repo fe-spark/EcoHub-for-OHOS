@@ -7,7 +7,7 @@
 | | EcoHub | EcoHub App for OHOS |
 | --- | --- | --- |
 | 是什么 | 服务端 + Web | OHOS App |
-| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | [fe-spark/ecohubapp](https://github.com/fe-spark/ecohubapp) |
+| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | [fe-spark/ecohubapp-for-ohos](https://github.com/fe-spark/ecohubapp-for-ohos) |
 | 产物 | Docker 镜像 / 网站 | `.hap` 安装包 |
 | 设备显示名 | — | EcoHub |
 | 包名 | — | `com.ecohub.spark` |
