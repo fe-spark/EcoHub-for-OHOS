@@ -1,8 +1,18 @@
-# ecohub-harmony
+# EcoHub HarmonyOS App
 
-EcoHub 的鸿蒙原生客户端。
+这是 **EcoHub 的鸿蒙原生 App**，安装到手机 / 平板后连接你自己部署的 EcoHub 服务。
 
-本仓库作为 [EcoHub](https://github.com/fe-spark/EcoHub) 的 git submodule，路径为 `harmony/`。
+本仓库 **不是** [EcoHub](https://github.com/fe-spark/EcoHub) 本体。EcoHub 是自托管影视聚合的服务端和 Web；这里只做 HarmonyOS 客户端，产物是可安装的 HAP。
+
+| | EcoHub | 本仓库 |
+| --- | --- | --- |
+| 是什么 | 服务端 + Web | HarmonyOS App |
+| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | `ecohub-harmony` |
+| 产物 | Docker 镜像 / 网站 | `.hap` 安装包 |
+| 设备显示名 | — | EcoHub |
+| 包名 | — | `com.ecohub.spark` |
+
+在 EcoHub 主仓里作为 git submodule，路径为 `harmony/`。
 
 ## 开发
 
