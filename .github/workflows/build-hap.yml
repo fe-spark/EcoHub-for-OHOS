@@ -1,0 +1,168 @@
+name: Build HAP
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hap-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Assemble HAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev
+
+      - name: Setup HarmonyOS CLI tools
+        uses: ErBWs/setup-ohos@v2
+        with:
+          version: 6.1.1.280
+          cache: true
+
+      - name: Point SDK and npm registries
+        run: |
+          {
+            echo "hwsdk.dir=${HOS_SDK_HOME}"
+            echo "ohos.sdk.dir=${HOS_SDK_HOME}"
+          } > local.properties
+          echo "DEVECO_SDK_HOME=${HOS_SDK_HOME}" >> "$GITHUB_ENV"
+          npm config set registry https://repo.huaweicloud.com/repository/npm/
+          npm config set "@ohos:registry" https://repo.harmonyos.com/npm/
+
+      - name: Prepare signing
+        env:
+          HOS_SIGN_P12: ${{ secrets.HOS_SIGN_P12 }}
+          HOS_SIGN_CERT: ${{ secrets.HOS_SIGN_CERT }}
+          HOS_SIGN_PROFILE: ${{ secrets.HOS_SIGN_PROFILE }}
+          HOS_SIGN_KEY_ALIAS: ${{ secrets.HOS_SIGN_KEY_ALIAS }}
+          HOS_SIGN_KEY_PASSWORD: ${{ secrets.HOS_SIGN_KEY_PASSWORD }}
+          HOS_SIGN_STORE_PASSWORD: ${{ secrets.HOS_SIGN_STORE_PASSWORD }}
+        run: |
+          python3 <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+
+          profile = Path("build-profile.json5")
+          data = json.loads(profile.read_text())
+          p12 = os.environ.get("HOS_SIGN_P12", "")
+          cert = os.environ.get("HOS_SIGN_CERT", "")
+          p7b = os.environ.get("HOS_SIGN_PROFILE", "")
+          signed = bool(p12 and cert and p7b)
+
+          if signed:
+              sign_dir = Path.home() / "hos-sign"
+              sign_dir.mkdir(parents=True, exist_ok=True)
+
+              def write_b64(name: str, raw: str) -> str:
+                  path = sign_dir / name
+                  path.write_bytes(base64.b64decode(raw))
+                  return str(path)
+
+              material = {
+                  "certpath": write_b64("debug.cer", cert),
+                  "keyAlias": os.environ.get("HOS_SIGN_KEY_ALIAS") or "debugKey",
+                  "keyPassword": os.environ.get("HOS_SIGN_KEY_PASSWORD") or "",
+                  "profile": write_b64("debug.p7b", p7b),
+                  "signAlg": "SHA256withECDSA",
+                  "storeFile": write_b64("debug.p12", p12),
+                  "storePassword": os.environ.get("HOS_SIGN_STORE_PASSWORD") or "",
+              }
+              if not material["keyPassword"] or not material["storePassword"]:
+                  raise SystemExit("HOS_SIGN_KEY_PASSWORD and HOS_SIGN_STORE_PASSWORD are required when signing")
+              data["app"]["signingConfigs"] = [{
+                  "name": "default",
+                  "type": "HarmonyOS",
+                  "material": material,
+              }]
+              for product in data["app"].get("products", []):
+                  product["signingConfig"] = "default"
+              print("Signing materials injected")
+          else:
+              data["app"]["signingConfigs"] = []
+              for product in data["app"].get("products", []):
+                  product.pop("signingConfig", None)
+              print("No signing secrets; building unsigned HAP")
+
+          profile.write_text(json.dumps(data, indent=2) + "\n")
+          PY
+
+      - name: Install ohpm dependencies
+        run: ohpm install --all --registry https://ohpm.openharmony.cn/ohpm/
+
+      - name: Assemble HAP
+        run: |
+          hvigorw --accept-license --no-daemon -v
+          hvigorw assembleHap --mode module -p product=default -p module=entry -p buildMode=release --no-daemon --stacktrace
+
+      - name: Collect artifacts
+        id: hap
+        run: |
+          mkdir -p dist
+          version=$(python3 -c "import json; print(json.load(open('AppScope/app.json5'))['app']['versionName'])")
+          short_sha="${GITHUB_SHA::7}"
+          found=0
+          for src in entry/build/default/outputs/default/*.hap; do
+            [ -f "$src" ] || continue
+            found=1
+            base=$(basename "$src")
+            if [[ "$base" == *signed.hap ]]; then
+              kind=signed
+            else
+              kind=unsigned
+            fi
+            dest="dist/EcoHub-${version}-${short_sha}-${kind}.hap"
+            cp "$src" "$dest"
+            echo "Copied $src -> $dest"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No HAP produced under entry/build/default/outputs/default/" >&2
+            ls -la entry/build/default/outputs/default/ || true
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload HAP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecohub-hap
+          path: dist/*.hap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attach HAP to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/*.hap --clobber
+          else
+            gh release create "$tag" dist/*.hap --title "$tag" --generate-notes
+          fi
