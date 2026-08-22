@@ -61,6 +61,7 @@ export struct VideoPlayer {
   private mountGen: number = 0;
   private pageWasHidden: boolean = false;
   private lastUpdateAt: number = 0;
+  private lastProgressTime: number = -1;
   private playerW: number = 1;
   private playerH: number = 1;
   private savedSpeedIndex: number = 1;
@@ -115,8 +116,7 @@ export struct VideoPlayer {
     this.opening = !!this.videoUrl;
     this.errorText = '';
     this.seeking = false;
-    this.stalled = false;
-    this.clearStallWatch();
+    this.resetStallWatch();
     this.ready = false;
     if (this.longPressing) {
       this.speedIndex = this.savedSpeedIndex;
@@ -147,8 +147,7 @@ export struct VideoPlayer {
     this.opening = !!this.videoUrl;
     this.errorText = '';
     this.seeking = false;
-    this.stalled = false;
-    this.clearStallWatch();
+    this.resetStallWatch();
     this.ready = false;
     this.closeSpeedDialog();
     this.dragging = false;
@@ -183,8 +182,7 @@ export struct VideoPlayer {
 
   private enterBackground(): void {
     this.pageWasHidden = true;
-    this.clearStallWatch();
-    this.stalled = false;
+    this.resetStallWatch();
     this.seeking = false;
     this.seekTarget = -1;
     if (this.longPressing) {
@@ -208,8 +206,7 @@ export struct VideoPlayer {
       return;
     }
     this.pageWasHidden = false;
-    this.stalled = false;
-    this.clearStallWatch();
+    this.resetStallWatch();
     if (!this.playRequested) {
       return;
     }
@@ -275,7 +272,20 @@ export struct VideoPlayer {
     }
   }
 
-  private noteProgress(): void {
+  private resetStallWatch(): void {
+    this.clearStallWatch();
+    this.stalled = false;
+    this.lastProgressTime = -1;
+  }
+
+  private noteProgress(time: number = -1): void {
+    if (time >= 0) {
+      const moved = this.lastProgressTime < 0 || Math.abs(time - this.lastProgressTime) > 0.001;
+      this.lastProgressTime = time;
+      if (!moved) {
+        return;
+      }
+    }
     this.lastUpdateAt = Date.now();
     if (this.stalled) {
       this.stalled = false;
@@ -284,14 +294,14 @@ export struct VideoPlayer {
     if (!this.playRequested || !this.isPlaying || this.completed || this.errorText) {
       return;
     }
+    // Video.onUpdate 正常播放也可能约 1s 一次；短暂停顿不弹「加载中」
     this.stallTimer = setTimeout(() => {
       this.stallTimer = -1;
       if (this.playRequested && this.isPlaying && !this.completed && !this.errorText &&
-        !this.dragging && this.seekTarget < 0 &&
-        Date.now() - this.lastUpdateAt >= 900) {
+        !this.dragging && this.seekTarget < 0) {
         this.stalled = true;
       }
-    }, 1000);
+    }, 2500);
   }
 
   private toggleHud(): void {
@@ -431,10 +441,9 @@ export struct VideoPlayer {
     this.completed = false;
     this.playRequested = true;
     this.isPlaying = false;
-    this.stalled = false;
+    this.resetStallWatch();
     this.seeking = false;
     this.seekTarget = -1;
-    this.clearStallWatch();
     this.showHud = true;
     this.remountPlayer();
   }
@@ -830,7 +839,7 @@ export struct VideoPlayer {
             if (info.time > 0) {
               this.isPlaying = this.playRequested;
             }
-            this.noteProgress();
+            this.noteProgress(info.time);
             this.applyPlaybackTime(info.time);
             this.emitProgress(this.currentTime, this.duration);
           })
