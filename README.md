@@ -7,7 +7,7 @@
 | | EcoHub | 本仓库 |
 | --- | --- | --- |
 | 是什么 | 服务端 + Web | HarmonyOS App |
-| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | `ecohub-harmony` |
+| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | [`ecohub-app`](https://github.com/fe-spark/ecohub-app) |
 | 产物 | Docker 镜像 / 网站 | `.hap` 安装包 |
 | 设备显示名 | — | EcoHub |
 | 包名 | — | `com.ecohub.spark` |
