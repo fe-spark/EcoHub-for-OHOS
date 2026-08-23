@@ -4,12 +4,12 @@
 
 本仓库 **不是 EcoHub 本体**。EcoHub 是自托管影视聚合的服务端和 Web；这里只做 OHOS App，产物是 HAP 安装包。
 
-同级还有 [EcoHub for Android](https://github.com/fe-spark/app-for-android)。
+同级还有 [EcoHub for Android](https://github.com/fe-spark/EcoHub-for-Android)。
 
 | | EcoHub | EcoHub for OHOS |
 | --- | --- | --- |
 | 是什么 | 服务端 + Web | OHOS App |
-| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | [fe-spark/app-for-ohos](https://github.com/fe-spark/app-for-ohos) |
+| 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | [fe-spark/EcoHub-for-OHOS](https://github.com/fe-spark/EcoHub-for-OHOS) |
 | 产物 | Docker 镜像 / 网站 | `.hap` 安装包 |
 | 设备显示名 | — | EcoHub |
 | 包名 | — | `com.ecohub.spark` |
