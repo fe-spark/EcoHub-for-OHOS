@@ -1,7 +1,7 @@
 {
-  "name": "ecohub",
+  "name": "ecohub_ohos",
   "version": "1.0.0",
-  "description": "EcoHub HarmonyOS Project",
+  "description": "EcoHub for OHOS",
   "modelVersion": "5.0.0",
   "dependencies": {},
   "devDependencies": {}
