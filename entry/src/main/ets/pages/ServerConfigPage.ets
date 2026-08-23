@@ -10,8 +10,6 @@ import { SourceGuard } from '../common/utils/SourceGuard';
 import { common } from '@kit.AbilityKit';
 import { AppIcon } from '../components/AppIcon';
 
-const DEMO_SOURCE = 'https://eco.fe-spark.cn/api';
-
 @Entry
 @Component
 struct ServerConfigPage {
@@ -101,7 +99,7 @@ struct ServerConfigPage {
 
         Row() {
           AppIcon({ src: $r('sys.symbol.link'), iconSize: 18, color: AppTheme.TEXT_MUTED })
-          TextInput({ text: this.serverUrl, placeholder: DEMO_SOURCE })
+          TextInput({ text: this.serverUrl, placeholder: '请输入软件源地址' })
             .layoutWeight(1)
             .height(48)
             .fontSize(14)
@@ -119,19 +117,6 @@ struct ServerConfigPage {
         .padding({ left: 12, right: 12 })
         .backgroundColor(AppTheme.BG_CARD)
         .borderRadius(AppTheme.RADIUS_MD)
-
-        Row() {
-          AppIcon({ src: $r('sys.symbol.wifi'), iconSize: 14, color: AppTheme.ACCENT })
-          Text('填入演示源')
-            .fontSize(12)
-            .fontColor(AppTheme.ACCENT)
-            .margin({ left: 6 })
-        }
-        .margin({ top: 12 })
-        .alignSelf(ItemAlign.Start)
-        .onClick(() => {
-          this.serverUrl = DEMO_SOURCE;
-        })
 
         Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
           .width('100%')
