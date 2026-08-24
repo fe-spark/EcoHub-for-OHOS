@@ -48,22 +48,27 @@ export struct FilmRow {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
+      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
       .margin({ bottom: AppTheme.SPACE_MD })
 
       if (this.films.length === 0) {
         Text('暂无影片')
           .fontSize(12)
           .fontColor(AppTheme.TEXT_MUTED)
+          .padding({ left: AppTheme.SPACE_LG })
       } else {
         Scroll() {
           Row({ space: AppTheme.SPACE_SM }) {
             ForEach(this.films, (film: MovieBasicInfo) => {
-              FilmCard({ film: film, cardWidth: 112 })
+              FilmCard({ film: film, cardWidth: 108 })
             }, (film: MovieBasicInfo) => `${film.id}`)
           }
+          .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
         }
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .width('100%')
         .nestedScroll({
           scrollForward: NestedScrollMode.SELF_FIRST,
           scrollBackward: NestedScrollMode.SELF_FIRST
@@ -71,7 +76,7 @@ export struct FilmRow {
       }
     }
     .width('100%')
-    .padding(AppTheme.SPACE_LG)
+    .padding({ top: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_LG })
     .alignItems(HorizontalAlign.Start)
     .backgroundColor(AppTheme.BG_ELEVATED)
     .borderRadius(AppTheme.RADIUS_LG)
@@ -83,3 +88,6 @@ export struct FilmRow {
     })
   }
 }
+
+
+

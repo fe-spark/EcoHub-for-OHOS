@@ -1,5 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
-import { BannerItem, HomeSection, MovieBasicInfo } from '../model/FilmModels';
+import { BannerItem, HomeSection } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { NavUtil } from '../common/utils/NavUtil';
@@ -52,7 +52,7 @@ export struct RecommendTab {
     let ok = false;
     try {
       const home = await FilmApi.getHome();
-      this.banners = this.buildHeroDeck(home.banners, home.content);
+      this.banners = home.banners;
       this.sections = home.content;
       ok = true;
     } catch (err) {
@@ -65,46 +65,6 @@ export struct RecommendTab {
         RefreshHint.succeed();
       }
     }
-  }
-
-  private buildHeroDeck(banners: BannerItem[], content: HomeSection[]): BannerItem[] {
-    const seen: string[] = [];
-    const deck: BannerItem[] = [];
-    const pushBanner = (item: BannerItem) => {
-      const id = item.mid > 0 ? `${item.mid}` : item.id;
-      if (!id || seen.indexOf(id) >= 0) {
-        return;
-      }
-      if (!item.picture && !item.poster && !item.pictureSlide) {
-        return;
-      }
-      seen.push(id);
-      deck.push(item);
-    };
-    for (let i = 0; i < banners.length; i++) {
-      pushBanner(banners[i]);
-    }
-    for (let s = 0; s < content.length && deck.length < 5; s++) {
-      const movies = content[s].hot.concat(content[s].movies);
-      for (let i = 0; i < movies.length && deck.length < 5; i++) {
-        const film = movies[i];
-        const banner: BannerItem = {
-          id: `${film.id}`,
-          mid: film.id,
-          name: film.name,
-          year: film.year,
-          cName: film.cName,
-          poster: film.picture,
-          picture: film.picture,
-          pictureSlide: film.pictureSlide,
-          remark: film.remarks,
-          blurb: film.blurb,
-          area: film.area
-        };
-        pushBanner(banner);
-      }
-    }
-    return deck;
   }
 
   private updateHeaderAlpha(): void {
@@ -259,6 +219,7 @@ export struct RecommendTab {
                   }
                   .scrollable(ScrollDirection.Horizontal)
                   .scrollBar(BarState.Off)
+                  .edgeEffect(EdgeEffect.Spring)
                   .align(Alignment.Start)
                   .width('100%')
                   .nestedScroll({
