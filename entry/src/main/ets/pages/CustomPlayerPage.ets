@@ -20,6 +20,7 @@ struct CustomPlayerPage {
   @State private viewH: number = 9;
   @State private playerFull: boolean = false;
   @State private playerActive: boolean = true;
+  private inputController: TextInputController = new TextInputController();
 
   aboutToAppear() {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
@@ -64,9 +65,12 @@ struct CustomPlayerPage {
   }
 
   private play(): void {
+    try {
+      this.inputController.stopEditing();
+    } catch (_e) {
+    }
     const url = this.inputUrl.trim();
-    const ok = /^https?:\/\/[^\s]+\.(m3u8|mp4)(\?.*)?$/i.test(url);
-    if (!ok) {
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
       promptAction.showToast({ message: '请输入正确的 mp4 或 m3u8 地址' });
       return;
     }
@@ -81,7 +85,7 @@ struct CustomPlayerPage {
         Row() {
         Row() {
           AppIcon({ src: $r('sys.symbol.link'), iconSize: 16, color: AppTheme.TEXT_MUTED })
-          TextInput({ text: this.inputUrl, placeholder: '输入 mp4 或 m3u8 播放地址' })
+          TextInput({ text: this.inputUrl, placeholder: '输入 mp4 或 m3u8 播放地址', controller: this.inputController })
             .layoutWeight(1)
             .height(44)
             .fontSize(13)
@@ -90,6 +94,7 @@ struct CustomPlayerPage {
             .caretColor(AppTheme.ACCENT)
             .backgroundColor(Color.Transparent)
             .padding({ left: 8, right: 8 })
+            .enterKeyType(EnterKeyType.Go)
             .onChange((val: string) => {
               this.inputUrl = val;
             })

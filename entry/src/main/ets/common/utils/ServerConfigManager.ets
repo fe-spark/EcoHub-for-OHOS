@@ -3,6 +3,8 @@ import { preferences } from '@kit.ArkData';
 
 const PREF_NAME = 'ecohub_settings';
 const KEY_SERVER_URL = 'server_base_url';
+const KEY_SERVER_HISTORY = 'server_url_history';
+const MAX_SERVER_HISTORY = 10;
 
 export class ServerConfigManager {
   private static instance: ServerConfigManager;
@@ -106,6 +108,67 @@ export class ServerConfigManager {
     return path.startsWith('/') ? `${origin}${path}` : `${origin}/${path}`;
   }
 
+  public async getServerHistory(): Promise<string[]> {
+    if (!this.pref) {
+      return this.cachedUrl ? [this.cachedUrl] : [];
+    }
+    try {
+      const raw = (await this.pref.get(KEY_SERVER_HISTORY, '[]')) as string;
+      const list = JSON.parse(raw) as string[];
+      if (Array.isArray(list) && list.length > 0) {
+        return list;
+      }
+      if (this.cachedUrl) {
+        return [this.cachedUrl];
+      }
+      return [];
+    } catch (_err) {
+      return this.cachedUrl ? [this.cachedUrl] : [];
+    }
+  }
+
+  public async addServerHistory(url: string): Promise<void> {
+    const cleanUrl = this.normalizeRaw(url);
+    if (!cleanUrl || !this.pref) {
+      return;
+    }
+    try {
+      const current = await this.getServerHistory();
+      const filtered = current.filter((item: string) => item !== cleanUrl);
+      filtered.unshift(cleanUrl);
+      if (filtered.length > MAX_SERVER_HISTORY) {
+        filtered.length = MAX_SERVER_HISTORY;
+      }
+      await this.pref.put(KEY_SERVER_HISTORY, JSON.stringify(filtered));
+      await this.pref.flush();
+    } catch (_err) {
+    }
+  }
+
+  public async removeServerHistory(url: string): Promise<void> {
+    if (!this.pref) {
+      return;
+    }
+    try {
+      const current = await this.getServerHistory();
+      const filtered = current.filter((item: string) => item !== url);
+      await this.pref.put(KEY_SERVER_HISTORY, JSON.stringify(filtered));
+      await this.pref.flush();
+    } catch (_err) {
+    }
+  }
+
+  public async clearServerHistory(): Promise<void> {
+    if (!this.pref) {
+      return;
+    }
+    try {
+      await this.pref.put(KEY_SERVER_HISTORY, '[]');
+      await this.pref.flush();
+    } catch (_err) {
+    }
+  }
+
   public async setServerUrl(url: string): Promise<void> {
     const cleanUrl = this.normalizeRaw(url);
     this.cachedUrl = cleanUrl;
@@ -114,6 +177,7 @@ export class ServerConfigManager {
     }
     await this.pref.put(KEY_SERVER_URL, cleanUrl);
     await this.pref.flush();
+    await this.addServerHistory(cleanUrl);
   }
 
   public async clearServerUrl(): Promise<void> {

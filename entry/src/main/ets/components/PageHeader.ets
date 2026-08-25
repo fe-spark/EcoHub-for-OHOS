@@ -7,6 +7,7 @@ export struct PageHeader {
   @Prop title: string = '';
   @Prop showBack: boolean = true;
   @Prop rightText: string = '';
+  @Prop rightTextColor: string = AppTheme.ACCENT;
   onRight?: () => void;
 
   build() {
@@ -29,7 +30,7 @@ export struct PageHeader {
       if (this.rightText) {
         Text(this.rightText)
           .fontSize(13)
-          .fontColor(AppTheme.ACCENT)
+          .fontColor(this.rightTextColor)
           .onClick(() => {
             if (this.onRight) {
               this.onRight();

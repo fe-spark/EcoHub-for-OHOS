@@ -52,11 +52,17 @@ export class FormatUtil {
   }
 
   static progress(current: number, duration: number): string {
-    if (!current || !duration) {
+    if (!current || current <= 0) {
       return '未观看';
     }
-    const percent = Math.min(99, Math.floor((current / duration) * 100));
-    return `已观看 ${percent}%`;
+    if (!duration || duration <= 0) {
+      return `观看至 ${FormatUtil.duration(current)}`;
+    }
+    if (current >= duration - 2) {
+      return '已看完';
+    }
+    const percent = Math.max(1, Math.min(99, Math.floor((current / duration) * 100)));
+    return `观看至 ${FormatUtil.duration(current)} (${percent}%)`;
   }
 
   static dateTime(stamp: number): string {

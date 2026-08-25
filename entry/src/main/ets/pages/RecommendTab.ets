@@ -389,6 +389,8 @@ export struct RecommendTab {
         .onClick(() => {
           if (this.onOpenSearch) {
             this.onOpenSearch();
+          } else {
+            NavUtil.openSearch();
           }
         })
       }

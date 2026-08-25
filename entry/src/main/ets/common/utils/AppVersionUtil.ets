@@ -1,7 +1,7 @@
 import { bundleManager } from '@kit.AbilityKit';
 
 export class AppVersionUtil {
-  public static readonly APP_VERSION: string = '1.0.4';
+  public static readonly APP_VERSION: string = '1.0.5';
   private static cachedVersionName: string = '';
 
   /**

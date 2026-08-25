@@ -93,6 +93,9 @@ export struct VideoPlayer {
     this.clearOpenWatch();
     this.closeSpeedDialog();
     this.bootGen++;
+    if (this.currentTime > 0) {
+      this.emitProgress(this.currentTime, this.duration, true);
+    }
     const ctx = this.ctx();
     PlayerWindow.resetBrightness(ctx);
     PlayerWindow.setKeepScreenOn(ctx, false);
@@ -149,6 +152,7 @@ export struct VideoPlayer {
     this.seeking = false;
     this.resetStallWatch();
     this.ready = false;
+    this.clearTip();
     this.closeSpeedDialog();
     this.dragging = false;
     this.seekTarget = -1;
@@ -160,11 +164,24 @@ export struct VideoPlayer {
   }
 
   onPageActiveChange(): void {
-    if (!this.pageActive) {
-      this.enterBackground();
-      return;
+    if (this.pageActive) {
+      this.enterForeground();
+    } else {
+      this.leaveBackground();
     }
-    this.enterForeground();
+  }
+
+  private leaveBackground(): void {
+    this.pageWasHidden = true;
+    this.clearStallWatch();
+    this.clearHide();
+    this.closeSpeedDialog();
+    if (this.currentTime > 0) {
+      this.emitProgress(this.currentTime, this.duration, true);
+    }
+    if (this.controller && this.isPlaying) {
+      this.controller.pause();
+    }
   }
 
   private ctx(): common.UIAbilityContext | undefined {
@@ -178,27 +195,6 @@ export struct VideoPlayer {
       return this.currentTime;
     }
     return this.initialTime;
-  }
-
-  private enterBackground(): void {
-    this.pageWasHidden = true;
-    this.resetStallWatch();
-    this.seeking = false;
-    this.seekTarget = -1;
-    if (this.longPressing) {
-      this.endSpeed();
-    }
-    if (this.dragging) {
-      this.dragging = false;
-      this.pan.reset();
-      this.feedback = '';
-      this.feedbackKind = PlayerTipKind.NONE;
-    }
-    this.showSpeed = false;
-    PlayerWindow.setKeepScreenOn(this.ctx(), false);
-    if (this.ready) {
-      this.controller.pause();
-    }
   }
 
   private enterForeground(): void {
@@ -215,12 +211,12 @@ export struct VideoPlayer {
 
   private canPlay(): boolean { return this.ready && !this.opening && !this.errorText; }
 
-  private emitProgress(current: number, duration: number): void {
+  private emitProgress(current: number, duration: number, force: boolean = false): void {
     if (!this.onProgress) {
       return;
     }
     const now = Date.now();
-    if (now - this.lastPersist < 5000 && current < duration - 1) {
+    if (!force && now - this.lastPersist < 3000 && current < duration - 1) {
       return;
     }
     this.lastPersist = now;
@@ -829,7 +825,7 @@ export struct VideoPlayer {
               this.showHud = true;
               this.clearHide();
             }
-            this.emitProgress(this.currentTime, this.duration);
+            this.emitProgress(this.currentTime, this.duration, true);
           })
           .onUpdate((info: PlaybackInfo) => {
             if (!this.live()) {

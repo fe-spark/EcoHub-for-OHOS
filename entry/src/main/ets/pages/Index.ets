@@ -7,9 +7,9 @@ import { BasicConfig } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { RecommendTab } from './RecommendTab';
 import { DailyUpdatesTab } from './DailyUpdatesTab';
-import { SearchTab } from './SearchTab';
 import { ProfileTab } from './ProfileTab';
 import { AppIcon } from '../components/AppIcon';
+import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 import { AppVersionUtil } from '../common/utils/AppVersionUtil';
@@ -27,7 +27,7 @@ struct Index {
   @State noticeTitle: string = '站点公告';
   @State noticeContent: string = '';
   private hasDismissedNotice: boolean = false;
-  @State private tabReady: boolean[] = [true, false, false, false];
+  @State private tabReady: boolean[] = [true, false, false];
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
   private reconnectCb: () => void = () => {};
@@ -36,7 +36,7 @@ struct Index {
   private selectTab(index: number): void {
     this.currentTabIndex = index;
     if (!this.tabReady[index]) {
-      const next: boolean[] = [this.tabReady[0], this.tabReady[1], this.tabReady[2], this.tabReady[3]];
+      const next: boolean[] = [this.tabReady[0], this.tabReady[1], this.tabReady[2]];
       next[index] = true;
       this.tabReady = next;
     }
@@ -241,7 +241,7 @@ struct Index {
               RecommendTab({
                 siteName: this.siteName,
                 onOpenSearch: () => {
-                  this.selectTab(2);
+                  NavUtil.openSearch();
                 }
               })
                 .visibility(this.currentTabIndex === 0 ? Visibility.Visible : Visibility.None)
@@ -251,12 +251,8 @@ struct Index {
                 .visibility(this.currentTabIndex === 1 ? Visibility.Visible : Visibility.None)
             }
             if (this.tabReady[2]) {
-              SearchTab()
-                .visibility(this.currentTabIndex === 2 ? Visibility.Visible : Visibility.None)
-            }
-            if (this.tabReady[3]) {
               ProfileTab()
-                .visibility(this.currentTabIndex === 3 ? Visibility.Visible : Visibility.None)
+                .visibility(this.currentTabIndex === 2 ? Visibility.Visible : Visibility.None)
             }
           }
           .width('100%')
@@ -266,8 +262,7 @@ struct Index {
             Row() {
               this.tabItem(0, '推荐', $r('sys.symbol.house'), $r('sys.symbol.house_fill'))
               this.tabItem(1, '更新', $r('sys.symbol.flame'), $r('sys.symbol.flame_fill'))
-              this.tabItem(2, '搜索', $r('sys.symbol.magnifyingglass'), $r('sys.symbol.magnifyingglass'))
-              this.tabItem(3, '我的', $r('sys.symbol.person'), $r('sys.symbol.person_fill'))
+              this.tabItem(2, '我的', $r('sys.symbol.person'), $r('sys.symbol.person_fill'))
             }
             .width('100%')
             .height(AppTheme.TAB_HEIGHT)

@@ -52,6 +52,8 @@ struct PlayPage {
   private relateToken: number = 0;
   private historySeq: number = 0;
   private persistEnabled: boolean = true;
+  private lastCurrentTime: number = 0;
+  private lastDuration: number = 0;
 
   aboutToAppear() {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
@@ -66,10 +68,31 @@ struct PlayPage {
     const params = router.getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
     const sourceId = NavUtil.param(params, 'sourceId');
+    const hasEpisodeParam = NavUtil.param(params, 'episodeIndex') !== '';
+    const hasCurrentTimeParam = NavUtil.param(params, 'currentTime') !== '';
     this.episodeIndex = Number(NavUtil.param(params, 'episodeIndex', '0')) || 0;
     this.initialTime = Number(NavUtil.param(params, 'currentTime', '0')) || 0;
-    this.loadPlay(sourceId);
-    this.loadRelate();
+    this.lastCurrentTime = this.initialTime;
+
+    if (!sourceId && !hasEpisodeParam && !hasCurrentTimeParam && this.filmId) {
+      HistoryManager.find(this.filmId).then((prev: HistoryItem | null) => {
+        let sid = sourceId;
+        if (prev) {
+          sid = prev.sourceId || '';
+          this.episodeIndex = prev.episodeIndex || 0;
+          const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
+          this.initialTime = isEnded ? 0 : (prev.currentTime || 0);
+          this.lastCurrentTime = this.initialTime;
+          this.lastDuration = prev.duration || 0;
+        }
+        this.loadPlay(sid);
+        this.loadRelate();
+      });
+    } else {
+      this.loadPlay(sourceId);
+      this.loadRelate();
+    }
+
     this.reconnectCb = () => {
       this.persistEnabled = false;
       this.historySeq++;
@@ -89,6 +112,9 @@ struct PlayPage {
 
   onPageHide(): void {
     this.playerActive = false;
+    if (this.lastCurrentTime > 0) {
+      this.persistHistory(this.lastCurrentTime, this.lastDuration);
+    }
   }
 
   onBackPress(): boolean {
@@ -102,6 +128,9 @@ struct PlayPage {
   aboutToDisappear(): void {
     if (this.playerFull) {
       this.setPlayerFull(false);
+    }
+    if (this.lastCurrentTime > 0) {
+      this.persistHistory(this.lastCurrentTime, this.lastDuration);
     }
     SourceGuard.offReconnect(this.reconnectCb);
   }
@@ -206,6 +235,8 @@ struct PlayPage {
     this.viewingSourceId = sourceId;
     this.episodeIndex = index;
     this.initialTime = 0;
+    this.lastCurrentTime = 0;
+    this.lastDuration = 0;
     this.playUrl = episode.link;
     this.playToken += 1;
     this.playTitle = `${this.name} · ${episode.episode}`;
@@ -261,9 +292,9 @@ struct PlayPage {
     const name = this.name;
     const picture = this.picture;
     const sourceId = this.playingSourceId;
-    const sourceName = this.sourceName;
-    const episodeIndex = this.episodeIndex;
     const source = this.findSource(sourceId);
+    const sourceName = source ? source.name : this.sourceName;
+    const episodeIndex = this.episodeIndex;
     const fallback: MovieUrlInfo = { episode: this.playTitle, link: this.playUrl };
     const episode: MovieUrlInfo = source && source.linkList.length > episodeIndex ?
       source.linkList[episodeIndex] : fallback;
@@ -271,6 +302,8 @@ struct PlayPage {
       if (seq !== this.historySeq || !this.persistEnabled) {
         return;
       }
+      const cur = currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0);
+      const dur = duration !== undefined ? duration : (previous ? previous.duration : 0);
       const item: HistoryItem = {
         id: filmId,
         name: name,
@@ -279,8 +312,8 @@ struct PlayPage {
         sourceName: sourceName,
         episodeIndex: episodeIndex,
         episode: episode.episode,
-        currentTime: currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0),
-        duration: duration !== undefined ? duration : (previous ? previous.duration : 0),
+        currentTime: cur,
+        duration: dur,
         timeStamp: Date.now()
       };
       HistoryManager.save(item);
@@ -295,6 +328,8 @@ struct PlayPage {
     this.filmId = id;
     this.episodeIndex = 0;
     this.initialTime = 0;
+    this.lastCurrentTime = 0;
+    this.lastDuration = 0;
     this.activeTab = 0;
     this.loadPlay('');
     this.loadRelate();
@@ -334,7 +369,7 @@ struct PlayPage {
         VideoPlayer({
           videoUrl: this.playUrl,
           reloadToken: this.playToken,
-          title: `${this.name} ${this.currentEpisodeName()}`,
+          title: this.playTitle,
           poster: this.picture,
           initialTime: this.initialTime,
           showBack: true,
@@ -358,6 +393,8 @@ struct PlayPage {
           onNext: () => this.playNext(),
           onFullscreenChange: (full: boolean) => this.setPlayerFull(full),
           onProgress: (current: number, duration: number) => {
+            this.lastCurrentTime = current;
+            this.lastDuration = duration;
             this.persistHistory(current, duration);
           }
         })

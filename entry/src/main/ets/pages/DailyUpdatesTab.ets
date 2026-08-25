@@ -5,6 +5,7 @@ import { FilmGrid } from '../components/FilmGrid';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { AppIcon } from '../components/AppIcon';
+import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 
@@ -176,12 +177,28 @@ export struct DailyUpdatesTab {
     Column() {
       Column() {
         Row() {
-          AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 22, color: AppTheme.ACCENT })
-          Text('每日更新')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .margin({ left: AppTheme.SPACE_SM })
+          Row() {
+            AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 22, color: AppTheme.ACCENT })
+            Text('每日更新')
+              .fontSize(22)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .margin({ left: AppTheme.SPACE_SM })
+          }
+          .layoutWeight(1)
+          .alignItems(VerticalAlign.Center)
+
+          Row() {
+            AppIcon({ src: $r('sys.symbol.magnifyingglass'), iconSize: 18, color: AppTheme.TEXT_SECONDARY })
+          }
+          .width(36)
+          .height(36)
+          .justifyContent(FlexAlign.Center)
+          .backgroundColor(AppTheme.BG_CARD)
+          .borderRadius(18)
+          .onClick(() => {
+            NavUtil.openSearch();
+          })
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)

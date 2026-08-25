@@ -1,18 +1,23 @@
+import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
+import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
 import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { NavUtil } from '../common/utils/NavUtil';
+import { WindowBar } from '../common/utils/WindowBar';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingView } from '../components/LoadingView';
 import { AppIcon } from '../components/AppIcon';
+import { BackIcon } from '../components/BackIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { SearchHistoryManager } from '../common/utils/SearchHistoryManager';
-import promptAction from '@ohos.promptAction';
 
+@Entry
 @Component
-export struct SearchTab {
+struct SearchPage {
   @State keyword: string = '';
   @State submitted: string = '';
   @State list: MovieBasicInfo[] = [];
@@ -22,9 +27,29 @@ export struct SearchTab {
   @State searchHistory: string[] = [];
   @State private refreshing: boolean = false;
   @State private fetchLock: boolean = false;
+  @State private topInset: number = 0;
+  @State private bottomInset: number = 16;
   private reconnectCb: () => void = () => {};
+  private inputController: TextInputController = new TextInputController();
+
+  private hideKeyboard(): void {
+    try {
+      this.inputController.stopEditing();
+    } catch (_e) {
+    }
+    setTimeout(() => {
+      try {
+        this.inputController.stopEditing();
+      } catch (_e) {
+      }
+    }, 50);
+  }
 
   aboutToAppear() {
+    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+      this.topInset = top;
+      this.bottomInset = bottom;
+    });
     this.loadHistory();
     this.reconnectCb = () => {
       this.loadHistory();
@@ -33,6 +58,11 @@ export struct SearchTab {
       }
     };
     SourceGuard.onReconnect(this.reconnectCb);
+  }
+
+  onBackPress(): boolean {
+    this.hideKeyboard();
+    return false;
   }
 
   aboutToDisappear(): void {
@@ -49,7 +79,7 @@ export struct SearchTab {
       message: '确定要清空全部搜索记录吗？',
       primaryButton: {
         value: '清空',
-        fontColor: AppTheme.ACCENT,
+        fontColor: AppTheme.DANGER,
         action: () => {
           SearchHistoryManager.clear().then(() => {
             this.loadHistory();
@@ -103,19 +133,27 @@ export struct SearchTab {
       if (fromPull && ok) {
         RefreshHint.succeed();
       }
+      this.hideKeyboard();
     }
   }
 
   build() {
     Column() {
+      // Top search bar with Back button
       Row() {
+        BackIcon({ color: AppTheme.TEXT_PRIMARY })
+          .onClick(() => {
+            this.hideKeyboard();
+            router.back();
+          })
+
         Row() {
           AppIcon({
             src: $r('sys.symbol.magnifyingglass'),
             iconSize: 18,
             color: AppTheme.TEXT_MUTED
           })
-          TextInput({ text: this.keyword, placeholder: '搜索电影、剧集、动漫' })
+          TextInput({ text: this.keyword, placeholder: '搜索电影、剧集、动漫', controller: this.inputController })
             .layoutWeight(1)
             .height(40)
             .fontSize(14)
@@ -125,6 +163,7 @@ export struct SearchTab {
             .backgroundColor(Color.Transparent)
             .cancelButton({ style: CancelButtonStyle.INVISIBLE })
             .padding({ left: 8, right: 8 })
+            .enterKeyType(EnterKeyType.Search)
             .onChange((val: string) => {
               this.keyword = val;
               if (!val.trim() && this.submitted) {
@@ -151,6 +190,7 @@ export struct SearchTab {
               this.keyword = '';
               this.submitted = '';
               this.list = [];
+              this.hideKeyboard();
             })
           }
         }
@@ -159,6 +199,7 @@ export struct SearchTab {
         .padding({ left: 12, right: 8 })
         .backgroundColor(AppTheme.BG_CARD)
         .borderRadius(AppTheme.RADIUS_PILL)
+        .margin({ left: 4 })
 
         Row() {
           AppIcon({
@@ -178,7 +219,8 @@ export struct SearchTab {
         })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+      .padding({ left: 8, right: 16, top: 8, bottom: 12 })
+      .alignItems(VerticalAlign.Center)
 
       if (this.loading) {
         LoadingView({ label: '正在搜索' })
@@ -211,12 +253,20 @@ export struct SearchTab {
             Flex({ wrap: FlexWrap.Wrap }) {
               ForEach(this.searchHistory, (item: string) => {
                 Row() {
-                  Text(item)
-                    .fontSize(13)
-                    .fontColor(AppTheme.TEXT_SECONDARY)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .constraintSize({ maxWidth: 200 })
+                  Row() {
+                    Text(item)
+                      .fontSize(13)
+                      .fontColor(AppTheme.TEXT_SECONDARY)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .constraintSize({ maxWidth: 200 })
+                  }
+                  .padding({ left: 12, right: 4, top: 6, bottom: 6 })
+                  .onClick(() => {
+                    this.hideKeyboard();
+                    this.keyword = item;
+                    this.doSearch(true);
+                  })
 
                   Row() {
                     AppIcon({
@@ -225,30 +275,28 @@ export struct SearchTab {
                       color: AppTheme.TEXT_MUTED
                     })
                   }
-                  .width(16)
-                  .height(16)
+                  .width(22)
+                  .height(28)
                   .justifyContent(FlexAlign.Center)
-                  .margin({ left: 4 })
+                  .padding({ right: 6 })
                   .onClick(() => {
                     SearchHistoryManager.remove(item).then(() => {
                       this.loadHistory();
                     });
                   })
                 }
-                .padding({ left: 12, right: 8, top: 6, bottom: 6 })
                 .margin({ right: 8, bottom: 8 })
                 .backgroundColor(AppTheme.BG_CARD)
                 .borderRadius(AppTheme.RADIUS_PILL)
-                .onClick(() => {
-                  this.keyword = item;
-                  this.doSearch(true);
-                })
               }, (item: string) => item)
             }
             .padding({ left: 16, right: 16 })
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
+          .onClick(() => {
+            this.hideKeyboard();
+          })
         } else {
           EmptyState({
             title: '搜索影片',
@@ -270,104 +318,109 @@ export struct SearchTab {
             .width('100%')
             .height('100%')
           } else {
-        List({ space: 16 }) {
-          ListItem() {
-            Text(`共 ${this.page.total} 部与「${this.submitted}」相关`)
-              .fontSize(12)
-              .fontColor(AppTheme.TEXT_MUTED)
-              .width('100%')
-              .padding({ bottom: 8 })
-          }
-          ForEach(this.list, (film: MovieBasicInfo) => {
-            ListItem() {
-              Row() {
-                Stack({ alignContent: Alignment.Center }) {
-                  Image(FormatUtil.poster(film))
-                    .width(86)
-                    .height(128)
-                    .objectFit(ImageFit.Cover)
-                    .borderRadius(AppTheme.RADIUS_MD)
-                    .backgroundColor(AppTheme.BG_CARD)
-                  Row() {
-                    AppIcon({
-                      src: $r('sys.symbol.play_fill'),
-                      iconSize: 12,
-                      color: AppTheme.TEXT_PRIMARY
-                    })
-                  }
-                  .width(28)
-                  .height(28)
-                  .justifyContent(FlexAlign.Center)
-                  .backgroundColor('rgba(0,0,0,0.55)')
-                  .borderRadius(14)
-                }
-                Column() {
-                  Text(film.name)
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(FormatUtil.joinMeta([film.cName, film.year, film.area, film.remarks]))
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_SECONDARY)
-                    .margin({ top: 8 })
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(`导演 ${film.director || '未知'}`)
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_MUTED)
-                    .margin({ top: 6 })
-                    .maxLines(1)
-                  Text(`主演 ${film.actor || '未知'}`)
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_MUTED)
-                    .margin({ top: 4 })
-                    .maxLines(1)
-                  Text(film.blurb || '暂无简介')
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_SECONDARY)
-                    .margin({ top: 8 })
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
-                .margin({ left: 12 })
+            List({ space: 16 }) {
+              ListItem() {
+                Text(`共 ${this.page.total} 部与「${this.submitted}」相关`)
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                  .width('100%')
+                  .padding({ bottom: 8 })
               }
-              .width('100%')
-              .onClick(() => {
-                NavUtil.openPlay(film.id);
-              })
-            }
-          }, (film: MovieBasicInfo) => `${film.id}`)
+              ForEach(this.list, (film: MovieBasicInfo) => {
+                ListItem() {
+                  Row() {
+                    Stack({ alignContent: Alignment.Center }) {
+                      Image(FormatUtil.poster(film))
+                        .width(86)
+                        .height(128)
+                        .objectFit(ImageFit.Cover)
+                        .borderRadius(AppTheme.RADIUS_MD)
+                        .backgroundColor(AppTheme.BG_CARD)
+                      Row() {
+                        AppIcon({
+                          src: $r('sys.symbol.play_fill'),
+                          iconSize: 12,
+                          color: AppTheme.TEXT_PRIMARY
+                        })
+                      }
+                      .width(28)
+                      .height(28)
+                      .justifyContent(FlexAlign.Center)
+                      .backgroundColor('rgba(0,0,0,0.55)')
+                      .borderRadius(14)
+                    }
+                    Column() {
+                      Text(film.name)
+                        .fontSize(16)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(AppTheme.TEXT_PRIMARY)
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      Text(FormatUtil.joinMeta([film.cName, film.year, film.area, film.remarks]))
+                        .fontSize(12)
+                        .fontColor(AppTheme.TEXT_SECONDARY)
+                        .margin({ top: 8 })
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      Text(`导演 ${film.director || '未知'}`)
+                        .fontSize(12)
+                        .fontColor(AppTheme.TEXT_MUTED)
+                        .margin({ top: 6 })
+                        .maxLines(1)
+                      Text(`主演 ${film.actor || '未知'}`)
+                        .fontSize(12)
+                        .fontColor(AppTheme.TEXT_MUTED)
+                        .margin({ top: 4 })
+                        .maxLines(1)
+                      Text(film.blurb || '暂无简介')
+                        .fontSize(12)
+                        .fontColor(AppTheme.TEXT_SECONDARY)
+                        .margin({ top: 8 })
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    }
+                    .layoutWeight(1)
+                    .alignItems(HorizontalAlign.Start)
+                    .margin({ left: 12 })
+                  }
+                  .width('100%')
+                  .onClick(() => {
+                    this.hideKeyboard();
+                    NavUtil.openPlay(film.id);
+                  })
+                }
+              }, (film: MovieBasicInfo) => `${film.id}`)
 
-          ListItem() {
-            if (this.page.current < this.page.pageCount) {
-              Text(this.loadingMore ? '加载中...' : '加载更多')
-                .fontSize(13)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .padding({ top: 8, bottom: 80 })
-                .onClick(() => this.doSearch(false))
-            } else {
-              Text('没有更多了')
-                .fontSize(12)
-                .fontColor(AppTheme.TEXT_MUTED)
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .padding({ top: 8, bottom: 80 })
+              ListItem() {
+                if (this.page.current < this.page.pageCount) {
+                  Text(this.loadingMore ? '加载中...' : '加载更多')
+                    .fontSize(13)
+                    .fontColor(AppTheme.TEXT_SECONDARY)
+                    .width('100%')
+                    .textAlign(TextAlign.Center)
+                    .padding({ top: 8, bottom: this.bottomInset + 32 })
+                    .onClick(() => this.doSearch(false))
+                } else {
+                  Text('没有更多了')
+                    .fontSize(12)
+                    .fontColor(AppTheme.TEXT_MUTED)
+                    .width('100%')
+                    .textAlign(TextAlign.Center)
+                    .padding({ top: 8, bottom: this.bottomInset + 32 })
+                }
+              }
             }
-          }
-        }
-        .width('100%')
-        .height('100%')
-        .padding({ left: 16, right: 16 })
-        .scrollBar(BarState.Off)
-        .onReachEnd(() => {
-          this.doSearch(false);
-        })
+            .width('100%')
+            .height('100%')
+            .padding({ left: 16, right: 16 })
+            .scrollBar(BarState.Off)
+            .onScrollFrameBegin((offset: number, _state: ScrollState) => {
+              this.hideKeyboard();
+              return { offsetRemain: offset };
+            })
+            .onReachEnd(() => {
+              this.doSearch(false);
+            })
           }
         }
         .onRefreshing(() => {
@@ -382,6 +435,7 @@ export struct SearchTab {
     }
     .width('100%')
     .height('100%')
+    .padding({ top: this.topInset })
     .backgroundColor(AppTheme.BG)
   }
 }

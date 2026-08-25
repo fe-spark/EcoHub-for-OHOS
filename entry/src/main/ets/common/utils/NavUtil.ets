@@ -28,6 +28,12 @@ export class NavUtil {
     });
   }
 
+  static openSearch(): void {
+    router.pushUrl({
+      url: 'pages/SearchPage'
+    });
+  }
+
   static param(params: Object | undefined | null, key: string, fallback: string = ''): string {
     if (!params) {
       return fallback;

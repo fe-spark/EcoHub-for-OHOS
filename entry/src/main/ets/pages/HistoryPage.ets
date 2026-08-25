@@ -35,6 +35,10 @@ struct HistoryPage {
     this.reload(false);
   }
 
+  onPageShow(): void {
+    this.reload(false);
+  }
+
   aboutToDisappear(): void {
     SourceGuard.offReconnect(this.sourceCb);
   }
@@ -58,7 +62,7 @@ struct HistoryPage {
       message: '确定删除当前软件源的全部观看记录吗？',
       primaryButton: {
         value: '清空',
-        fontColor: AppTheme.ACCENT,
+        fontColor: AppTheme.DANGER,
         action: () => {
           HistoryManager.clear().then(() => {
             this.reload(false);
@@ -76,7 +80,7 @@ struct HistoryPage {
       message: `确定删除「${item.name}」吗？`,
       primaryButton: {
         value: '删除',
-        fontColor: AppTheme.ACCENT,
+        fontColor: AppTheme.DANGER,
         action: () => {
           HistoryManager.remove(item.id).then(() => {
             this.reload(false);
@@ -92,6 +96,7 @@ struct HistoryPage {
       PageHeader({
         title: '观看历史',
         rightText: this.list.length > 0 ? '清空' : '',
+        rightTextColor: AppTheme.DANGER,
         onRight: () => this.confirmClear()
       })
 
@@ -108,62 +113,100 @@ struct HistoryPage {
         .width('100%')
         .height('100%')
       } else {
-        List({ space: 16 }) {
+        List({ space: 12 }) {
           ForEach(this.list, (item: HistoryItem) => {
             ListItem() {
               Row() {
+                // Poster
                 Image(ServerConfigManager.getInstance().resolveMediaUrl(item.picture))
-                  .width(86)
-                  .height(128)
+                  .width(80)
+                  .height(116)
                   .objectFit(ImageFit.Cover)
                   .borderRadius(AppTheme.RADIUS_MD)
-                  .backgroundColor(AppTheme.BG_CARD)
+                  .backgroundColor(AppTheme.BG_ELEVATED)
                   .onClick(() => {
                     NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
                   })
+
+                // Info & Actions Column
                 Column() {
-                  Text(item.name)
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Row() {
-                    AppIcon({ src: $r('sys.symbol.clock_fill'), iconSize: 12, color: AppTheme.TEXT_MUTED })
-                    Text(FormatUtil.dateTime(item.timeStamp))
+                  // Top section: Name + Source/Episode + Timestamp
+                  Column() {
+                    Text(item.name)
+                      .fontSize(16)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppTheme.TEXT_PRIMARY)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                    Text(`${item.sourceName} · ${item.episode}`)
                       .fontSize(12)
-                      .fontColor(AppTheme.TEXT_MUTED)
-                      .margin({ left: 4 })
+                      .fontColor(AppTheme.TEXT_SECONDARY)
+                      .margin({ top: 4 })
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                    Row() {
+                      AppIcon({ src: $r('sys.symbol.clock_fill'), iconSize: 11, color: AppTheme.TEXT_MUTED })
+                      Text(FormatUtil.dateTime(item.timeStamp))
+                        .fontSize(11)
+                        .fontColor(AppTheme.TEXT_MUTED)
+                        .margin({ left: 4 })
+                    }
+                    .margin({ top: 4 })
                   }
-                  .margin({ top: 8 })
-                  Text(`${item.sourceName} · ${item.episode}`)
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_SECONDARY)
-                    .margin({ top: 6 })
-                  Text(FormatUtil.progress(item.currentTime, item.duration))
-                    .fontSize(12)
-                    .fontColor(AppTheme.ACCENT)
-                    .margin({ top: 8 })
+                  .width('100%')
+                  .alignItems(HorizontalAlign.Start)
+                  .onClick(() => {
+                    NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
+                  })
+
+                  // Bottom section: Progress (Left) & Delete Button (Right)
                   Row() {
-                    AppIcon({ src: $r('sys.symbol.trash'), iconSize: 14, color: AppTheme.TEXT_MUTED })
-                    Text('删除')
-                      .fontSize(12)
-                      .fontColor(AppTheme.TEXT_MUTED)
-                      .margin({ left: 4 })
+                    Row() {
+                      Text(FormatUtil.progress(item.currentTime, item.duration))
+                        .fontSize(12)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor(AppTheme.ACCENT)
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    }
+                    .layoutWeight(1)
+                    .alignItems(VerticalAlign.Center)
+                    .onClick(() => {
+                      NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
+                    })
+
+                    Row() {
+                      AppIcon({ src: $r('sys.symbol.trash'), iconSize: 12, color: AppTheme.DANGER })
+                      Text('删除')
+                        .fontSize(11)
+                        .fontColor(AppTheme.DANGER)
+                        .margin({ left: 3 })
+                    }
+                    .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                    .backgroundColor(AppTheme.DANGER_SOFT)
+                    .borderRadius(AppTheme.RADIUS_SM)
+                    .margin({ left: 8 })
+                    .onClick(() => {
+                      this.confirmDelete(item);
+                    })
                   }
-                  .margin({ top: 12 })
-                  .onClick(() => this.confirmDelete(item))
+                  .width('100%')
+                  .alignItems(VerticalAlign.Center)
                 }
-                .alignItems(HorizontalAlign.Start)
-                .margin({ left: 12 })
+                .height(116)
                 .layoutWeight(1)
-                .onClick(() => {
-                  NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
-                })
+                .margin({ left: 12 })
+                .justifyContent(FlexAlign.SpaceBetween)
+                .alignItems(HorizontalAlign.Start)
               }
               .width('100%')
+              .padding(12)
+              .backgroundColor(AppTheme.BG_CARD)
+              .borderRadius(AppTheme.RADIUS_LG)
             }
-          }, (item: HistoryItem) => item.id)
+          }, (item: HistoryItem) => `${item.id}_${item.timeStamp}_${Math.floor(item.currentTime)}_${item.sourceId}_${item.episodeIndex}`)
         }
         .width('100%')
         .height('100%')
