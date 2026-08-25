@@ -1,3 +1,4 @@
+import router from '@ohos.router';
 import { FilmApi } from '../api/FilmApi';
 import { BannerItem, HomeSection } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -51,6 +52,7 @@ export struct RecommendTab {
     this.errorText = '';
     let ok = false;
     try {
+      FilmApi.getSiteConfig(true).catch(() => {});
       const home = await FilmApi.getHome();
       this.banners = home.banners;
       this.sections = home.content;
@@ -169,11 +171,102 @@ export struct RecommendTab {
       if (this.loading) {
         LoadingView({ label: '正在加载推荐' })
       } else if (this.errorText) {
-        EmptyState({
-          title: '加载失败',
-          subtitle: this.errorText,
-          icon: $r('sys.symbol.info_circle')
+        Refresh({ refreshing: $$this.refreshing }) {
+          Scroll() {
+            Column() {
+              Blank().height(80)
+              EmptyState({
+                title: '加载失败',
+                subtitle: this.errorText,
+                icon: $r('sys.symbol.info_circle')
+              })
+              Button('重试')
+                .margin({ top: 16 })
+                .backgroundColor(AppTheme.BG_CARD)
+                .fontColor(AppTheme.TEXT_PRIMARY)
+                .onClick(() => {
+                  this.loadHome(true, true);
+                })
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
+          }
+          .scrollBar(BarState.Off)
+          .width('100%')
+          .height('100%')
+        }
+        .onRefreshing(() => {
+          if (this.fetchLock) {
+            return;
+          }
+          this.loadHome(true, true);
         })
+        .pullToRefresh(!this.fetchLock)
+        .width('100%')
+        .height('100%')
+      } else if (this.banners.length === 0 && this.visibleSections().length === 0) {
+        Refresh({ refreshing: $$this.refreshing }) {
+          Scroll() {
+            Column() {
+              Blank().height(100)
+              EmptyState({
+                title: '暂无影片数据',
+                subtitle: '当前软件源内暂无影片或尚未采集，可下拉刷新或更换软件源',
+                icon: $r('sys.symbol.film')
+              })
+              Row({ space: 12 }) {
+                Button() {
+                  Row() {
+                    AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
+                    Text('刷新')
+                      .fontSize(13)
+                      .fontColor(AppTheme.TEXT_PRIMARY)
+                      .margin({ left: 4 })
+                  }
+                }
+                .height(36)
+                .padding({ left: 16, right: 16 })
+                .backgroundColor(AppTheme.BG_CARD)
+                .borderRadius(AppTheme.RADIUS_PILL)
+                .onClick(() => {
+                  this.loadHome(true, true);
+                })
+
+                Button() {
+                  Row() {
+                    AppIcon({ src: $r('sys.symbol.link'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
+                    Text('更换软件源')
+                      .fontSize(13)
+                      .fontColor(AppTheme.TEXT_PRIMARY)
+                      .margin({ left: 4 })
+                  }
+                }
+                .height(36)
+                .padding({ left: 16, right: 16 })
+                .backgroundColor(AppTheme.ACCENT)
+                .borderRadius(AppTheme.RADIUS_PILL)
+                .onClick(() => {
+                  router.pushUrl({ url: 'pages/ServerConfigPage' });
+                })
+              }
+              .margin({ top: 16 })
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
+          }
+          .scrollBar(BarState.Off)
+          .width('100%')
+          .height('100%')
+        }
+        .onRefreshing(() => {
+          if (this.fetchLock) {
+            return;
+          }
+          this.loadHome(true, true);
+        })
+        .pullToRefresh(!this.fetchLock)
+        .width('100%')
+        .height('100%')
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll(this.scroller) {

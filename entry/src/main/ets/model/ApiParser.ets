@@ -338,6 +338,7 @@ export class ApiParser {
   static parseBasicConfig(raw: Object): BasicConfig {
     const record = ApiParser.asRecord(raw);
     const tip = ApiParser.obj(record, 'tip');
+    const notice = ApiParser.obj(record, 'notice');
     const channelRaw = ApiParser.list(tip, 'channels');
     const channels: TipChannel[] = [];
     for (let i = 0; i < channelRaw.length; i++) {
@@ -361,7 +362,11 @@ export class ApiParser {
       tipEnabled: ApiParser.bool(tip, 'enabled'),
       tipTitle: ApiParser.str(tip, 'title', '赞赏支持'),
       tipMessage: ApiParser.str(tip, 'message'),
-      tipChannels: channels
+      tipChannels: channels,
+      noticeEnabled: ApiParser.bool(notice, 'enabled'),
+      noticeTitle: ApiParser.str(notice, 'title', '站点公告'),
+      noticeContent: ApiParser.str(notice, 'content'),
+      noticeVersion: ApiParser.str(notice, 'version', '')
     };
     return config;
   }

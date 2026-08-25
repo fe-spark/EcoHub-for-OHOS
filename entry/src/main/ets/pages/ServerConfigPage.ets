@@ -9,6 +9,7 @@ import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { common } from '@kit.AbilityKit';
 import { AppIcon } from '../components/AppIcon';
+import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 
 @Entry
 @Component
@@ -51,6 +52,7 @@ struct ServerConfigPage {
     }
     await ServerConfigManager.getInstance().setServerUrl(this.serverUrl);
     FilmApi.clearSiteConfig();
+    SiteHeartbeat.getInstance().resetFailures();
     if (this.reconnect) {
       promptAction.showToast({ message: '已重新接入' });
       SourceGuard.markClosed();

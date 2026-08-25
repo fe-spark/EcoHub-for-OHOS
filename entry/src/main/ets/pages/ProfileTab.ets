@@ -19,7 +19,11 @@ export struct ProfileTab {
     tipEnabled: false,
     tipTitle: '赞赏支持',
     tipMessage: '',
-    tipChannels: []
+    tipChannels: [],
+    noticeEnabled: false,
+    noticeTitle: '站点公告',
+    noticeContent: '',
+    noticeVersion: '1'
   };
   @State private sourceUrl: string = '';
   private hasLoaded: boolean = false;

@@ -8,6 +8,8 @@ import { LoadingView } from '../components/LoadingView';
 import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
+import { SearchHistoryManager } from '../common/utils/SearchHistoryManager';
+import promptAction from '@ohos.promptAction';
 
 @Component
 export struct SearchTab {
@@ -17,12 +19,15 @@ export struct SearchTab {
   @State page: PageInfo = { pageSize: 10, current: 1, pageCount: 0, total: 0 };
   @State loading: boolean = false;
   @State loadingMore: boolean = false;
+  @State searchHistory: string[] = [];
   @State private refreshing: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
 
   aboutToAppear() {
+    this.loadHistory();
     this.reconnectCb = () => {
+      this.loadHistory();
       if (this.submitted) {
         this.doSearch(true, false);
       }
@@ -32,6 +37,28 @@ export struct SearchTab {
 
   aboutToDisappear(): void {
     SourceGuard.offReconnect(this.reconnectCb);
+  }
+
+  private async loadHistory(): Promise<void> {
+    this.searchHistory = await SearchHistoryManager.list();
+  }
+
+  private confirmClearHistory(): void {
+    AlertDialog.show({
+      title: '清空搜索历史',
+      message: '确定要清空全部搜索记录吗？',
+      primaryButton: {
+        value: '清空',
+        fontColor: AppTheme.ACCENT,
+        action: () => {
+          SearchHistoryManager.clear().then(() => {
+            this.loadHistory();
+            promptAction.showToast({ message: '已清空搜索历史' });
+          });
+        }
+      },
+      secondaryButton: { value: '取消', action: () => {} }
+    });
   }
 
   private async doSearch(reset: boolean, fromPull: boolean = false): Promise<void> {
@@ -53,6 +80,9 @@ export struct SearchTab {
         this.loading = true;
         this.list = [];
       }
+      SearchHistoryManager.add(kw).then(() => {
+        this.loadHistory();
+      });
     } else {
       this.loadingMore = true;
     }
@@ -93,13 +123,36 @@ export struct SearchTab {
             .placeholderColor(AppTheme.TEXT_MUTED)
             .caretColor(AppTheme.ACCENT)
             .backgroundColor(Color.Transparent)
+            .cancelButton({ style: CancelButtonStyle.INVISIBLE })
             .padding({ left: 8, right: 8 })
             .onChange((val: string) => {
               this.keyword = val;
+              if (!val.trim() && this.submitted) {
+                this.submitted = '';
+                this.list = [];
+              }
             })
             .onSubmit(() => {
               this.doSearch(true);
             })
+
+          if (this.keyword.length > 0) {
+            Row() {
+              AppIcon({
+                src: $r('sys.symbol.xmark_circle_fill'),
+                iconSize: 16,
+                color: AppTheme.TEXT_MUTED
+              })
+            }
+            .width(28)
+            .height(28)
+            .justifyContent(FlexAlign.Center)
+            .onClick(() => {
+              this.keyword = '';
+              this.submitted = '';
+              this.list = [];
+            })
+          }
         }
         .layoutWeight(1)
         .height(40)
@@ -130,11 +183,79 @@ export struct SearchTab {
       if (this.loading) {
         LoadingView({ label: '正在搜索' })
       } else if (!this.submitted) {
-        EmptyState({
-          title: '搜索影片',
-          subtitle: '输入片名、演员或关键词',
-          icon: $r('sys.symbol.magnifyingglass')
-        })
+        if (this.searchHistory.length > 0) {
+          Column() {
+            Row() {
+              Text('搜索历史')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.TEXT_PRIMARY)
+
+              Row() {
+                AppIcon({
+                  src: $r('sys.symbol.trash'),
+                  iconSize: 14,
+                  color: AppTheme.TEXT_MUTED
+                })
+                Text('清空')
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                  .margin({ left: 4 })
+              }
+              .onClick(() => this.confirmClearHistory())
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.SpaceBetween)
+            .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+
+            Flex({ wrap: FlexWrap.Wrap }) {
+              ForEach(this.searchHistory, (item: string) => {
+                Row() {
+                  Text(item)
+                    .fontSize(13)
+                    .fontColor(AppTheme.TEXT_SECONDARY)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .constraintSize({ maxWidth: 200 })
+
+                  Row() {
+                    AppIcon({
+                      src: $r('sys.symbol.xmark'),
+                      iconSize: 10,
+                      color: AppTheme.TEXT_MUTED
+                    })
+                  }
+                  .width(16)
+                  .height(16)
+                  .justifyContent(FlexAlign.Center)
+                  .margin({ left: 4 })
+                  .onClick(() => {
+                    SearchHistoryManager.remove(item).then(() => {
+                      this.loadHistory();
+                    });
+                  })
+                }
+                .padding({ left: 12, right: 8, top: 6, bottom: 6 })
+                .margin({ right: 8, bottom: 8 })
+                .backgroundColor(AppTheme.BG_CARD)
+                .borderRadius(AppTheme.RADIUS_PILL)
+                .onClick(() => {
+                  this.keyword = item;
+                  this.doSearch(true);
+                })
+              }, (item: string) => item)
+            }
+            .padding({ left: 16, right: 16 })
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Start)
+        } else {
+          EmptyState({
+            title: '搜索影片',
+            subtitle: '输入片名、演员或关键词',
+            icon: $r('sys.symbol.magnifyingglass')
+          })
+        }
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
           if (this.list.length === 0) {

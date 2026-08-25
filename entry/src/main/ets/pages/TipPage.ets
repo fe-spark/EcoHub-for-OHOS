@@ -69,7 +69,11 @@ struct TipPage {
     tipEnabled: false,
     tipTitle: '赞赏支持',
     tipMessage: '',
-    tipChannels: []
+    tipChannels: [],
+    noticeEnabled: false,
+    noticeTitle: '站点公告',
+    noticeContent: '',
+    noticeVersion: '1'
   };
 
   @State private loading: boolean = true;

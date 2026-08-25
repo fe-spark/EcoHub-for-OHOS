@@ -17,6 +17,10 @@ export interface BasicConfig {
   tipTitle: string;
   tipMessage: string;
   tipChannels: TipChannel[];
+  noticeEnabled?: boolean;
+  noticeTitle?: string;
+  noticeContent?: string;
+  noticeVersion?: string;
 }
 
 export interface CategoryItem {

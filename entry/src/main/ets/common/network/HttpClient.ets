@@ -78,7 +78,6 @@ export class HttpClient {
       return body;
     } catch (err) {
       httpRequest.destroy();
-      SourceGuard.intercept();
       if (err instanceof Error) {
         throw err;
       }

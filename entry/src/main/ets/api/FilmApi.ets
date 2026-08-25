@@ -14,6 +14,23 @@ import {
 
 export class FilmApi {
   private static siteConfig: BasicConfig | null = null;
+  private static configListeners: Array<(config: BasicConfig) => void> = [];
+
+  public static onConfigChange(listener: (config: BasicConfig) => void): void {
+    if (FilmApi.configListeners.indexOf(listener) < 0) {
+      FilmApi.configListeners.push(listener);
+    }
+  }
+
+  public static offConfigChange(listener: (config: BasicConfig) => void): void {
+    const next: Array<(config: BasicConfig) => void> = [];
+    for (let i = 0; i < FilmApi.configListeners.length; i++) {
+      if (FilmApi.configListeners[i] !== listener) {
+        next.push(FilmApi.configListeners[i]);
+      }
+    }
+    FilmApi.configListeners = next;
+  }
 
   static async getHome(): Promise<HomeData> {
     const res = await HttpClient.getInstance().get('/index');
@@ -60,8 +77,12 @@ export class FilmApi {
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '站点配置获取失败');
     }
-    FilmApi.siteConfig = ApiParser.parseBasicConfig(res.data as Object);
-    return FilmApi.siteConfig;
+    const config = ApiParser.parseBasicConfig(res.data as Object);
+    FilmApi.siteConfig = config;
+    for (let i = 0; i < FilmApi.configListeners.length; i++) {
+      FilmApi.configListeners[i](config);
+    }
+    return config;
   }
 
   static clearSiteConfig(): void {
