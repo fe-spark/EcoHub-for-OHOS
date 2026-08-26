@@ -30,7 +30,7 @@ export class SiteHeartbeat {
     }
     this.running = true;
     this.consecutiveFailures = 0;
-    this.runProbe();
+    this.scheduleNext(HEARTBEAT_INTERVAL_MS);
   }
 
   /**

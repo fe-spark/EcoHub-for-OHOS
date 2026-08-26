@@ -1,4 +1,5 @@
 import router from '@ohos.router';
+import { common, Want } from '@kit.AbilityKit';
 
 export class NavUtil {
   static openPlay(id: string | number, sourceId: string = '', episodeIndex: number = 0,
@@ -32,6 +33,28 @@ export class NavUtil {
     router.pushUrl({
       url: 'pages/SearchPage'
     });
+  }
+
+  static openBrowser(context: common.UIAbilityContext, url: string): void {
+    if (!url) {
+      return;
+    }
+    const want: Want = {
+      action: 'ohos.want.action.viewData',
+      entities: ['entity.system.browsable'],
+      uri: url
+    };
+    try {
+      context.startAbility(want).catch((_err: Object) => {
+        try {
+          context.openLink(url).catch((_e: Object) => {});
+        } catch (_e) {}
+      });
+    } catch (_err) {
+      try {
+        context.openLink(url).catch((_e: Object) => {});
+      } catch (_e) {}
+    }
   }
 
   static param(params: Object | undefined | null, key: string, fallback: string = ''): string {

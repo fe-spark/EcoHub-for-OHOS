@@ -100,7 +100,7 @@ struct TipPage {
   private async loadConfig(): Promise<void> {
     this.loading = true;
     try {
-      this.config = await FilmApi.getSiteConfig(true);
+      this.config = await FilmApi.getSiteConfig(false);
     } catch (err) {
       console.error('load tip config failed');
     }

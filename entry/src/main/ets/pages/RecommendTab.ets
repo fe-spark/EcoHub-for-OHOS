@@ -52,7 +52,6 @@ export struct RecommendTab {
     this.errorText = '';
     let ok = false;
     try {
-      FilmApi.getSiteConfig(true).catch(() => {});
       const home = await FilmApi.getHome();
       this.banners = home.banners;
       this.sections = home.content;

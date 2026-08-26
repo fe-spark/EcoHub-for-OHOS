@@ -164,5 +164,26 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" dist/*.hap --clobber
           else
-            gh release create "$tag" dist/*.hap --title "$tag" --generate-notes
+            notes_flag=()
+            if [ -f "RELEASE.md" ] && [ -s "RELEASE.md" ]; then
+              notes_flag=(--notes-file RELEASE.md)
+            else
+              tag_msg=$(git tag -l --format='%(contents)' "$tag" | sed '/^[[:space:]]*$/d')
+              if [ -n "$tag_msg" ]; then
+                notes_flag=(--notes "$tag_msg")
+              else
+                prev_tag=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
+                if [ -n "$prev_tag" ]; then
+                  commit_logs=$(git log "${prev_tag}..${tag}" --pretty=format:"- %s" --no-merges)
+                else
+                  commit_logs=$(git log -n 10 --pretty=format:"- %s" --no-merges)
+                fi
+                if [ -n "$commit_logs" ]; then
+                  notes_flag=(--notes "$commit_logs")
+                else
+                  notes_flag=(--generate-notes)
+                fi
+              fi
+            fi
+            gh release create "$tag" dist/*.hap --title "$tag" "${notes_flag[@]}"
           fi

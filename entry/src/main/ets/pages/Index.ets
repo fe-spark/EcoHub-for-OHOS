@@ -85,7 +85,9 @@ struct Index {
   }
 
   onPageShow(): void {
-    this.loadSite(false);
+    if (this.ready) {
+      this.loadSite(false);
+    }
     SiteHeartbeat.getInstance().start();
   }
 
@@ -104,7 +106,7 @@ struct Index {
       this.ready = false;
     }
     try {
-      const config = await FilmApi.getSiteConfig(true);
+      const config = await FilmApi.getSiteConfig(first);
       this.siteName = config.siteName || 'EcoHub';
       this.siteOpen = config.state !== false;
       this.siteHint = config.hint;

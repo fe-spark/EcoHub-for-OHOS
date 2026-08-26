@@ -14,6 +14,7 @@ import {
 
 export class FilmApi {
   private static siteConfig: BasicConfig | null = null;
+  private static configPromise: Promise<BasicConfig> | null = null;
   private static configListeners: Array<(config: BasicConfig) => void> = [];
 
   public static onConfigChange(listener: (config: BasicConfig) => void): void {
@@ -73,20 +74,31 @@ export class FilmApi {
     if (!force && FilmApi.siteConfig) {
       return FilmApi.siteConfig;
     }
-    const res = await HttpClient.getInstance().get('/config/basic');
-    if (res.code !== 0 || !res.data) {
-      throw new Error(res.msg || '站点配置获取失败');
+    if (FilmApi.configPromise) {
+      return FilmApi.configPromise;
     }
-    const config = ApiParser.parseBasicConfig(res.data as Object);
-    FilmApi.siteConfig = config;
-    for (let i = 0; i < FilmApi.configListeners.length; i++) {
-      FilmApi.configListeners[i](config);
-    }
-    return config;
+    FilmApi.configPromise = (async () => {
+      try {
+        const res = await HttpClient.getInstance().get('/config/basic');
+        if (res.code !== 0 || !res.data) {
+          throw new Error(res.msg || '站点配置获取失败');
+        }
+        const config = ApiParser.parseBasicConfig(res.data as Object);
+        FilmApi.siteConfig = config;
+        for (let i = 0; i < FilmApi.configListeners.length; i++) {
+          FilmApi.configListeners[i](config);
+        }
+        return config;
+      } finally {
+        FilmApi.configPromise = null;
+      }
+    })();
+    return FilmApi.configPromise;
   }
 
   static clearSiteConfig(): void {
     FilmApi.siteConfig = null;
+    FilmApi.configPromise = null;
   }
 
   static async searchFilm(keyword: string, current: number = 1): Promise<SearchResult> {

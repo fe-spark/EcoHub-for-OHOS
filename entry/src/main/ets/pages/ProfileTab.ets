@@ -1,10 +1,13 @@
 import router from '@ohos.router';
+import promptAction from '@ohos.promptAction';
 import { FilmApi } from '../api/FilmApi';
 import { BasicConfig } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
+import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
+import { VersionUpdateDialog } from '../components/VersionUpdateDialog';
 
 @Component
 export struct ProfileTab {
@@ -26,6 +29,18 @@ export struct ProfileTab {
     noticeVersion: '1'
   };
   @State private sourceUrl: string = '';
+  @State private appVersion: string = '1.0.5';
+  @State private isCheckingVersion: boolean = false;
+  @State private showUpdateDialog: boolean = false;
+  @State private updateInfo: AppUpdateInfo = {
+    currentVersion: '',
+    latestVersion: '',
+    hasUpdate: false,
+    releaseName: '',
+    releaseNotes: '',
+    releaseUrl: '',
+    downloadUrl: ''
+  };
   private hasLoaded: boolean = false;
   private reconnectCb: () => void = () => {};
 
@@ -34,6 +49,7 @@ export struct ProfileTab {
       this.reload();
     };
     SourceGuard.onReconnect(this.reconnectCb);
+    this.appVersion = await AppVersionUtil.getVersionName();
     if (this.hasLoaded) {
       return;
     }
@@ -48,9 +64,30 @@ export struct ProfileTab {
   private async reload(): Promise<void> {
     this.sourceUrl = await ServerConfigManager.getInstance().getServerUrl();
     try {
-      this.config = await FilmApi.getSiteConfig(true);
+      this.config = await FilmApi.getSiteConfig(false);
     } catch (err) {
       console.error('load site config failed');
+    }
+  }
+
+  private async handleCheckVersion(): Promise<void> {
+    if (this.isCheckingVersion) {
+      return;
+    }
+    this.isCheckingVersion = true;
+    promptAction.showToast({ message: '正在检查版本更新...' });
+    try {
+      const info = await AppVersionUtil.checkUpdate();
+      if (info.hasUpdate) {
+        this.updateInfo = info;
+        this.showUpdateDialog = true;
+      } else {
+        promptAction.showToast({ message: `当前已是最新版本 (v${this.appVersion})` });
+      }
+    } catch (err) {
+      promptAction.showToast({ message: '检查版本失败，请稍后重试' });
+    } finally {
+      this.isCheckingVersion = false;
     }
   }
 
@@ -75,7 +112,7 @@ export struct ProfileTab {
   }
 
   @Builder
-  menuRow(icon: Resource, title: string) {
+  menuRow(icon: Resource, title: string, extra: string = '') {
     Row() {
       Row() {
         AppIcon({ src: icon, iconSize: 18, color: AppTheme.ACCENT })
@@ -91,6 +128,13 @@ export struct ProfileTab {
         .fontColor(AppTheme.TEXT_PRIMARY)
         .margin({ left: AppTheme.SPACE_MD })
         .layoutWeight(1)
+
+      if (extra) {
+        Text(extra)
+          .fontSize(13)
+          .fontColor(AppTheme.TEXT_MUTED)
+          .margin({ right: AppTheme.SPACE_SM })
+      }
 
       AppIcon({
         src: $r('sys.symbol.chevron_right'),
@@ -117,120 +161,144 @@ export struct ProfileTab {
   }
 
   build() {
-    Column() {
-      Row() {
-        AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 22, color: AppTheme.ACCENT })
-        Text('我的')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.TEXT_PRIMARY)
-          .margin({ left: AppTheme.SPACE_SM })
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
-
-      Row() {
-        if (this.config.logo) {
-          Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo))
-            .width(56)
-            .height(56)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(AppTheme.RADIUS_LG)
-            .backgroundColor(AppTheme.BG_CARD)
-        } else {
-          Stack({ alignContent: Alignment.Center }) {
-            Column()
-              .width(56)
-              .height(56)
-              .borderRadius(AppTheme.RADIUS_LG)
-              .backgroundColor(AppTheme.ACCENT)
-            Text(this.logoLetter())
-              .fontSize(22)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-          }
-        }
-
-        Column() {
-          Text(this.config.siteName)
-            .width('100%')
-            .fontSize(18)
+    Stack({ alignContent: Alignment.Center }) {
+      Column() {
+        Row() {
+          AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 22, color: AppTheme.ACCENT })
+          Text('我的')
+            .fontSize(22)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.TEXT_PRIMARY)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text('当前软件源')
-            .width('100%')
-            .fontSize(12)
-            .fontColor(AppTheme.TEXT_SECONDARY)
-            .margin({ top: AppTheme.SPACE_XS })
-          Text(this.sourceHost())
-            .width('100%')
-            .fontSize(13)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .margin({ top: AppTheme.SPACE_XS })
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ left: AppTheme.SPACE_SM })
         }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        .constraintSize({ minWidth: 0 })
-        .margin({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_SM })
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
 
-        AppIcon({
-          src: $r('sys.symbol.chevron_right'),
-          iconSize: 16,
-          color: AppTheme.TEXT_SECONDARY
-        })
-      }
-      .width('100%')
-      .padding(AppTheme.SPACE_LG)
-      .alignItems(VerticalAlign.Center)
-      .clip(true)
-      .linearGradient({
-        angle: 135,
-        colors: [['rgba(250, 140, 22, 0.28)', 0], [AppTheme.BG_CARD, 1]]
-      })
-      .borderRadius(AppTheme.RADIUS_LG)
-      .margin({ bottom: AppTheme.SPACE_LG })
-      .onClick(() => {
-        router.pushUrl({ url: 'pages/ServerConfigPage' });
-      })
-
-      Column() {
-        Column() {
-          this.menuRow($r('sys.symbol.clock_fill'), '观看历史')
-        }
-        .onClick(() => {
-          router.pushUrl({ url: 'pages/HistoryPage' });
-        })
-        this.menuLine()
-        Column() {
-          this.menuRow($r('sys.symbol.play_circle_fill'), '自定义播放')
-        }
-        .onClick(() => {
-          router.pushUrl({ url: 'pages/CustomPlayerPage' });
-        })
-        if (this.config.tipEnabled) {
-          this.menuLine()
-          Column() {
-            this.menuRow($r('sys.symbol.gift'), this.config.tipTitle || '赞赏支持')
+        Row() {
+          if (this.config.logo) {
+            Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo))
+              .width(56)
+              .height(56)
+              .objectFit(ImageFit.Cover)
+              .borderRadius(AppTheme.RADIUS_LG)
+              .backgroundColor(AppTheme.BG_CARD)
+          } else {
+            Stack({ alignContent: Alignment.Center }) {
+              Column()
+                .width(56)
+                .height(56)
+                .borderRadius(AppTheme.RADIUS_LG)
+                .backgroundColor(AppTheme.ACCENT)
+              Text(this.logoLetter())
+                .fontSize(22)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.TEXT_PRIMARY)
+            }
           }
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/TipPage' });
+
+          Column() {
+            Text(this.config.siteName)
+              .width('100%')
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text('当前软件源')
+              .width('100%')
+              .fontSize(12)
+              .fontColor(AppTheme.TEXT_SECONDARY)
+              .margin({ top: AppTheme.SPACE_XS })
+            Text(this.sourceHost())
+              .width('100%')
+              .fontSize(13)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .margin({ top: AppTheme.SPACE_XS })
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+          .constraintSize({ minWidth: 0 })
+          .margin({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_SM })
+
+          AppIcon({
+            src: $r('sys.symbol.chevron_right'),
+            iconSize: 16,
+            color: AppTheme.TEXT_SECONDARY
           })
         }
+        .width('100%')
+        .padding(AppTheme.SPACE_LG)
+        .alignItems(VerticalAlign.Center)
+        .clip(true)
+        .linearGradient({
+          angle: 135,
+          colors: [['rgba(250, 140, 22, 0.28)', 0], [AppTheme.BG_CARD, 1]]
+        })
+        .borderRadius(AppTheme.RADIUS_LG)
+        .margin({ bottom: AppTheme.SPACE_LG })
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/ServerConfigPage' });
+        })
+
+        Column() {
+          Column() {
+            this.menuRow($r('sys.symbol.clock_fill'), '观看历史')
+          }
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/HistoryPage' });
+          })
+          this.menuLine()
+          Column() {
+            this.menuRow($r('sys.symbol.play_circle_fill'), '自定义播放')
+          }
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/CustomPlayerPage' });
+          })
+          if (this.config.tipEnabled) {
+            this.menuLine()
+            Column() {
+              this.menuRow($r('sys.symbol.gift'), this.config.tipTitle || '赞赏支持')
+            }
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/TipPage' });
+            })
+          }
+          this.menuLine()
+          Column() {
+            this.menuRow(
+              $r('sys.symbol.arrow_counterclockwise'),
+              '版本检查',
+              this.isCheckingVersion ? '检查中...' : `v${this.appVersion}`
+            )
+          }
+          .onClick(() => {
+            this.handleCheckVersion();
+          })
+        }
+        .width('100%')
+        .backgroundColor(AppTheme.BG_ELEVATED)
+        .borderRadius(AppTheme.RADIUS_LG)
+        .clip(true)
       }
       .width('100%')
-      .backgroundColor(AppTheme.BG_ELEVATED)
-      .borderRadius(AppTheme.RADIUS_LG)
-      .clip(true)
+      .height('100%')
+      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+      .alignItems(HorizontalAlign.Start)
+      .backgroundColor(AppTheme.BG)
+
+      if (this.showUpdateDialog) {
+        VersionUpdateDialog({
+          updateInfo: this.updateInfo,
+          onClose: () => {
+            this.showUpdateDialog = false;
+          }
+        })
+      }
     }
     .width('100%')
     .height('100%')
-    .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-    .alignItems(HorizontalAlign.Start)
-    .backgroundColor(AppTheme.BG)
   }
 }
