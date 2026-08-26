@@ -20,6 +20,9 @@ export interface BasicConfig {
   noticeEnabled?: boolean;
   noticeTitle?: string;
   noticeContent?: string;
+  noticeShowInWeb?: boolean;
+  noticeShowInApp?: boolean;
+  noticeAppVersion?: string;
   noticeVersion?: string;
 }
 

@@ -12,7 +12,7 @@ export interface AppUpdateInfo {
 }
 
 export class AppVersionUtil {
-  public static readonly APP_VERSION: string = '1.0.5';
+  public static readonly APP_VERSION: string = '1.0.6';
   private static cachedVersionName: string = '';
 
   /**
@@ -91,6 +91,10 @@ export class AppVersionUtil {
     return 0;
   }
 
+  private static cachedUpdateInfo: AppUpdateInfo | null = null;
+  private static lastCheckTime: number = 0;
+  private static readonly CACHE_EXPIRE_MS: number = 10 * 60 * 1000; // 10分钟缓存
+
   /**
    * 判定最新版本是否严格高于当前版本
    */
@@ -99,9 +103,21 @@ export class AppVersionUtil {
   }
 
   /**
-   * 检查 GitHub Release 最新版本
+   * 获取当前缓存的更新信息
    */
-  static async checkUpdate(): Promise<AppUpdateInfo> {
+  static getCachedUpdateInfo(): AppUpdateInfo | null {
+    return AppVersionUtil.cachedUpdateInfo;
+  }
+
+  /**
+   * 检查 GitHub Release 最新版本
+   * @param force 是否强制跳过缓存重新请求网络
+   */
+  static async checkUpdate(force: boolean = false): Promise<AppUpdateInfo> {
+    const now = Date.now();
+    if (!force && AppVersionUtil.cachedUpdateInfo && (now - AppVersionUtil.lastCheckTime < AppVersionUtil.CACHE_EXPIRE_MS)) {
+      return AppVersionUtil.cachedUpdateInfo;
+    }
     const currentVersion = await AppVersionUtil.getVersionName();
     const info: AppUpdateInfo = {
       currentVersion: currentVersion,
@@ -135,6 +151,8 @@ export class AppVersionUtil {
 
       const releases = JSON.parse(response.result as string) as Array<Record<string, Object>>;
       if (!Array.isArray(releases) || releases.length === 0) {
+        AppVersionUtil.cachedUpdateInfo = info;
+        AppVersionUtil.lastCheckTime = now;
         return info;
       }
 
@@ -172,9 +190,14 @@ export class AppVersionUtil {
         info.hasUpdate = AppVersionUtil.isNewerVersion(normalizedTag, currentVersion);
         break;
       }
+      AppVersionUtil.cachedUpdateInfo = info;
+      AppVersionUtil.lastCheckTime = now;
       return info;
     } catch (err) {
       httpRequest.destroy();
+      if (AppVersionUtil.cachedUpdateInfo && !force) {
+        return AppVersionUtil.cachedUpdateInfo;
+      }
       if (err instanceof Error) {
         throw err;
       }

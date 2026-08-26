@@ -26,6 +26,7 @@ struct Index {
   @State showNotice: boolean = false;
   @State noticeTitle: string = '站点公告';
   @State noticeContent: string = '';
+  @State private hasAppUpdate: boolean = false;
   private hasDismissedNotice: boolean = false;
   @State private tabReady: boolean[] = [true, false, false];
   @State private topInset: number = 0;
@@ -43,12 +44,13 @@ struct Index {
   }
 
   private async checkNotice(config: BasicConfig): Promise<void> {
-    if (!config.noticeEnabled || !config.noticeContent || !config.noticeContent.trim()) {
+    if (!config.noticeEnabled || config.noticeShowInApp === false || !config.noticeContent || !config.noticeContent.trim()) {
       this.showNotice = false;
       return;
     }
+    const targetVersion = config.noticeAppVersion || config.noticeVersion;
     const appVersion = await AppVersionUtil.getVersionName();
-    const isMatched = AppVersionUtil.isVersionMatched(appVersion, config.noticeVersion);
+    const isMatched = AppVersionUtil.isVersionMatched(appVersion, targetVersion);
     // 版本号匹配且本次启动会话未关闭过时，弹出开屏公告
     if (isMatched && !this.hasDismissedNotice) {
       this.noticeTitle = config.noticeTitle || '站点公告';
@@ -71,6 +73,9 @@ struct Index {
       this.checkNotice(config);
     };
     FilmApi.onConfigChange(this.configCb);
+    AppVersionUtil.checkUpdate(false).then((info) => {
+      this.hasAppUpdate = info.hasUpdate;
+    }).catch(() => {});
     const url = await ServerConfigManager.getInstance().getServerUrl();
     if (!url) {
       router.replaceUrl({ url: 'pages/ServerConfigPage' });
@@ -118,13 +123,23 @@ struct Index {
   }
 
   @Builder
-  tabItem(index: number, label: string, icon: Resource, iconActive: Resource) {
+  tabItem(index: number, label: string, icon: Resource, iconActive: Resource, hasBadge: boolean = false) {
     Column() {
-      AppIcon({
-        src: this.currentTabIndex === index ? iconActive : icon,
-        iconSize: 22,
-        color: this.currentTabIndex === index ? AppTheme.ACCENT : AppTheme.TEXT_MUTED
-      })
+      Stack({ alignContent: Alignment.TopEnd }) {
+        AppIcon({
+          src: this.currentTabIndex === index ? iconActive : icon,
+          iconSize: 22,
+          color: this.currentTabIndex === index ? AppTheme.ACCENT : AppTheme.TEXT_MUTED
+        })
+        if (hasBadge) {
+          Column()
+            .width(8)
+            .height(8)
+            .borderRadius(4)
+            .backgroundColor(AppTheme.DANGER)
+            .margin({ top: -2, right: -4 })
+        }
+      }
       Text(label)
         .fontSize(10)
         .fontWeight(this.currentTabIndex === index ? FontWeight.Bold : FontWeight.Regular)
@@ -264,7 +279,7 @@ struct Index {
             Row() {
               this.tabItem(0, '推荐', $r('sys.symbol.house'), $r('sys.symbol.house_fill'))
               this.tabItem(1, '更新', $r('sys.symbol.flame'), $r('sys.symbol.flame_fill'))
-              this.tabItem(2, '我的', $r('sys.symbol.person'), $r('sys.symbol.person_fill'))
+              this.tabItem(2, '我的', $r('sys.symbol.person'), $r('sys.symbol.person_fill'), this.hasAppUpdate)
             }
             .width('100%')
             .height(AppTheme.TAB_HEIGHT)

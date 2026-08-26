@@ -213,28 +213,31 @@ export struct PlayDetailPanel {
         this.sourceRow()
       }
       if (this.needsGrouping()) {
-        Scroll() {
-          Row({ space: 4 }) {
-            ForEach(this.groupIndexesOf(), (index: number) => {
-              this.groupChip(index)
-            }, (index: number) => `group_${this.viewingSourceId}_${index}`)
+        Column() {
+          Scroll() {
+            Row({ space: 4 }) {
+              ForEach(this.groupIndexesOf(), (index: number) => {
+                this.groupChip(index)
+              }, (index: number) => `group_${this.viewingSourceId}_${index}`)
+            }
+            .justifyContent(FlexAlign.Start)
+            .padding({ left: 8, right: 12 })
+            .constraintSize({ minHeight: 32 })
           }
-          .justifyContent(FlexAlign.Start)
-          .padding({ left: 8, right: 12 })
-          .constraintSize({ minHeight: 32 })
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .align(Alignment.Start)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
+          .width('100%')
+          .height(40)
+          .backgroundColor(AppTheme.BG_ELEVATED)
+          .borderRadius(AppTheme.RADIUS_MD)
         }
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .align(Alignment.Start)
-        .nestedScroll({
-          scrollForward: NestedScrollMode.SELF_FIRST,
-          scrollBackward: NestedScrollMode.SELF_FIRST
-        })
         .width('100%')
-        .height(40)
-        .margin({ left: 12, right: 12, top: 8 })
-        .backgroundColor(AppTheme.BG_ELEVATED)
-        .borderRadius(AppTheme.RADIUS_MD)
+        .padding({ left: 12, right: 12, top: 8 })
       }
     }
     .width('100%')
@@ -349,15 +352,18 @@ export struct PlayDetailPanel {
           })
 
           if (this.plotOpen) {
-            Text(this.plotText())
-              .fontSize(13)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-              .lineHeight(22)
-              .width('100%')
-              .margin({ left: 12, right: 12, top: 12 })
-              .padding(12)
-              .backgroundColor(AppTheme.BG_CARD)
-              .borderRadius(AppTheme.RADIUS_MD)
+            Column() {
+              Text(this.plotText())
+                .fontSize(13)
+                .fontColor(AppTheme.TEXT_SECONDARY)
+                .lineHeight(22)
+                .width('100%')
+                .padding(12)
+                .backgroundColor(AppTheme.BG_CARD)
+                .borderRadius(AppTheme.RADIUS_MD)
+            }
+            .width('100%')
+            .padding({ left: 12, right: 12, top: 12 })
           }
 
           Divider()

@@ -366,7 +366,10 @@ export class ApiParser {
       noticeEnabled: ApiParser.bool(notice, 'enabled'),
       noticeTitle: ApiParser.str(notice, 'title', '站点公告'),
       noticeContent: ApiParser.str(notice, 'content'),
-      noticeVersion: ApiParser.str(notice, 'version', '')
+      noticeShowInWeb: notice['showInWeb'] === undefined ? true : ApiParser.bool(notice, 'showInWeb', true),
+      noticeShowInApp: notice['showInApp'] === undefined ? true : ApiParser.bool(notice, 'showInApp', true),
+      noticeAppVersion: ApiParser.str(notice, 'appVersion') || ApiParser.str(notice, 'version', ''),
+      noticeVersion: ApiParser.str(notice, 'appVersion') || ApiParser.str(notice, 'version', '')
     };
     return config;
   }

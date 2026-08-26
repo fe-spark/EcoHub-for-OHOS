@@ -29,7 +29,7 @@ export struct ProfileTab {
     noticeVersion: '1'
   };
   @State private sourceUrl: string = '';
-  @State private appVersion: string = '1.0.5';
+  @State private appVersion: string = '1.0.6';
   @State private isCheckingVersion: boolean = false;
   @State private showUpdateDialog: boolean = false;
   @State private updateInfo: AppUpdateInfo = {
@@ -50,6 +50,7 @@ export struct ProfileTab {
     };
     SourceGuard.onReconnect(this.reconnectCb);
     this.appVersion = await AppVersionUtil.getVersionName();
+    this.checkUpdateSilent();
     if (this.hasLoaded) {
       return;
     }
@@ -61,6 +62,17 @@ export struct ProfileTab {
     SourceGuard.offReconnect(this.reconnectCb);
   }
 
+  private async checkUpdateSilent(): Promise<void> {
+    try {
+      const info = await AppVersionUtil.checkUpdate(false);
+      if (info) {
+        this.updateInfo = info;
+      }
+    } catch (_err) {
+      // 静默检查失败不打扰用户
+    }
+  }
+
   private async reload(): Promise<void> {
     this.sourceUrl = await ServerConfigManager.getInstance().getServerUrl();
     try {
@@ -70,16 +82,21 @@ export struct ProfileTab {
     }
   }
 
-  private async handleCheckVersion(): Promise<void> {
+  private async handleCheckVersion(force: boolean = false): Promise<void> {
     if (this.isCheckingVersion) {
+      return;
+    }
+    // 如果已经获取到有新版本且不是强制刷新，直接弹出升级弹窗
+    if (!force && this.updateInfo.hasUpdate) {
+      this.showUpdateDialog = true;
       return;
     }
     this.isCheckingVersion = true;
     promptAction.showToast({ message: '正在检查版本更新...' });
     try {
-      const info = await AppVersionUtil.checkUpdate();
+      const info = await AppVersionUtil.checkUpdate(true);
+      this.updateInfo = info;
       if (info.hasUpdate) {
-        this.updateInfo = info;
         this.showUpdateDialog = true;
       } else {
         promptAction.showToast({ message: `当前已是最新版本 (v${this.appVersion})` });
@@ -112,7 +129,14 @@ export struct ProfileTab {
   }
 
   @Builder
-  menuRow(icon: Resource, title: string, extra: string = '') {
+  menuRow(
+    icon: Resource,
+    title: string,
+    extra: string = '',
+    hasBadge: boolean = false,
+    badgeText: string = '',
+    extraHighlight: boolean = false
+  ) {
     Row() {
       Row() {
         AppIcon({ src: icon, iconSize: 18, color: AppTheme.ACCENT })
@@ -123,16 +147,34 @@ export struct ProfileTab {
       .backgroundColor(AppTheme.ACCENT_SOFT)
       .borderRadius(18)
 
-      Text(title)
-        .fontSize(15)
-        .fontColor(AppTheme.TEXT_PRIMARY)
-        .margin({ left: AppTheme.SPACE_MD })
-        .layoutWeight(1)
+      Row() {
+        Text(title)
+          .fontSize(15)
+          .fontColor(AppTheme.TEXT_PRIMARY)
+
+        if (hasBadge) {
+          Row() {
+            Text(badgeText || 'NEW')
+              .fontSize(10)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+          }
+          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+          .backgroundColor(AppTheme.DANGER)
+          .borderRadius(AppTheme.RADIUS_PILL)
+          .margin({ left: AppTheme.SPACE_SM })
+          .justifyContent(FlexAlign.Center)
+        }
+      }
+      .layoutWeight(1)
+      .margin({ left: AppTheme.SPACE_MD })
+      .alignItems(VerticalAlign.Center)
 
       if (extra) {
         Text(extra)
           .fontSize(13)
-          .fontColor(AppTheme.TEXT_MUTED)
+          .fontColor(extraHighlight ? AppTheme.ACCENT : AppTheme.TEXT_MUTED)
+          .fontWeight(extraHighlight ? FontWeight.Medium : FontWeight.Normal)
           .margin({ right: AppTheme.SPACE_SM })
       }
 
@@ -271,7 +313,12 @@ export struct ProfileTab {
             this.menuRow(
               $r('sys.symbol.arrow_counterclockwise'),
               '版本检查',
-              this.isCheckingVersion ? '检查中...' : `v${this.appVersion}`
+              this.isCheckingVersion
+                ? '检查中...'
+                : (this.updateInfo.hasUpdate ? `发现新版本 v${this.updateInfo.latestVersion}` : `v${this.appVersion}`),
+              this.updateInfo.hasUpdate,
+              'NEW',
+              this.updateInfo.hasUpdate
             )
           }
           .onClick(() => {
