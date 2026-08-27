@@ -1,175 +1,117 @@
 import { FilmApi } from '../api/FilmApi';
-import { CategoryItem, MovieBasicInfo } from '../model/FilmModels';
+import { DailyUpdateCategory, MovieBasicInfo, PageInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { FilmGrid } from '../components/FilmGrid';
+import { AppIcon } from '../components/AppIcon';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
-import { AppIcon } from '../components/AppIcon';
-import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
-import { RefreshHint } from '../common/utils/RefreshHint';
+import { DailyUpdatePane } from './DailyUpdatePane';
 
-const FILTER_ALL = 0;
-const FILTER_OTHER = -1;
+const PAGE_SIZE = 21;
 
 @Component
 export struct DailyUpdatesTab {
-  @State private films: MovieBasicInfo[] = [];
-  @State private nav: CategoryItem[] = [];
-  @State private filterPid: number = FILTER_ALL;
+  @State private categories: DailyUpdateCategory[] = [];
+  @State private currentIndex: number = 0;
   @State private loading: boolean = true;
-  @State private refreshing: boolean = false;
   @State private errorText: string = '';
-
+  @State private ready: boolean = false;
+  @State private seedPid: number = 0;
+  @State private seedList: MovieBasicInfo[] = [];
+  @State private seedPage: PageInfo = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
+  @State private reloadToken: number = 0;
+  private swiperController: SwiperController = new SwiperController();
+  private chipsScroller: Scroller = new Scroller();
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
 
   aboutToAppear() {
     this.reconnectCb = () => {
-      this.loadData(false);
+      this.loadMeta();
     };
     SourceGuard.onReconnect(this.reconnectCb);
     if (this.hasLoaded) {
       return;
     }
     this.hasLoaded = true;
-    this.loadData(false);
+    this.loadMeta();
   }
 
   aboutToDisappear(): void {
     SourceGuard.offReconnect(this.reconnectCb);
   }
 
-  private async loadData(fromPull: boolean, showHint: boolean = false): Promise<void> {
+  private currentCategory(): DailyUpdateCategory {
+    if (this.currentIndex >= 0 && this.currentIndex < this.categories.length) {
+      return this.categories[this.currentIndex];
+    }
+    const fallback: DailyUpdateCategory = { pid: 0, name: '全部', count: 0 };
+    return fallback;
+  }
+
+  private async loadMeta(): Promise<void> {
     if (this.fetchLock) {
       return;
     }
     this.fetchLock = true;
-    if (!fromPull) {
-      this.loading = this.films.length === 0;
-    }
+    this.loading = this.categories.length === 0;
     this.errorText = '';
-    let ok = false;
     try {
-      const list = await FilmApi.getDailyUpdates();
-      const nav = await FilmApi.getNavCategory();
-      this.films = list;
-      this.nav = nav;
-      if (!this.filterStillValid()) {
-        this.filterPid = FILTER_ALL;
+      const result = await FilmApi.getDailyUpdates(0, 1, PAGE_SIZE);
+      let cats = result.categories;
+      if (cats.length === 0) {
+        cats = [{ pid: 0, name: '全部', count: result.page.total }];
       }
-      ok = true;
+      this.categories = cats;
+      this.seedPid = 0;
+      this.seedList = result.list;
+      this.seedPage = result.page;
+      if (this.currentIndex >= this.categories.length) {
+        this.currentIndex = 0;
+      }
+      this.reloadToken = this.reloadToken + 1;
+      this.ready = true;
     } catch (err) {
       this.errorText = err instanceof Error ? err.message : '每日更新加载失败';
+      this.ready = this.categories.length > 0;
     } finally {
       this.fetchLock = false;
       this.loading = false;
-      this.refreshing = false;
-      if (showHint && ok) {
-        RefreshHint.succeed();
-      }
     }
   }
 
-  private isKnownPid(pid: number): boolean {
-    for (let i = 0; i < this.nav.length; i++) {
-      if (this.nav[i].id === pid) {
-        return true;
-      }
+  private selectIndex(index: number): void {
+    if (index < 0 || index >= this.categories.length || index === this.currentIndex) {
+      return;
     }
-    return false;
+    this.currentIndex = index;
+    this.swiperController.changeIndex(index, true);
+    this.focusChip(index);
   }
 
-  private countOf(pid: number): number {
-    if (pid === FILTER_ALL) {
-      return this.films.length;
+  private focusChip(index: number): void {
+    if (index < 0) {
+      return;
     }
-    let n = 0;
-    for (let i = 0; i < this.films.length; i++) {
-      const filmPid = this.films[i].pid;
-      if (pid === FILTER_OTHER) {
-        if (!this.isKnownPid(filmPid)) {
-          n++;
-        }
-      } else if (filmPid === pid) {
-        n++;
-      }
+    try {
+      this.chipsScroller.scrollToIndex(index, true, ScrollAlign.START);
+    } catch (_err) {
     }
-    return n;
-  }
-
-  private visibleNav(): CategoryItem[] {
-    const list: CategoryItem[] = [];
-    for (let i = 0; i < this.nav.length; i++) {
-      const item = this.nav[i];
-      if (item.show === false) {
-        continue;
-      }
-      if (this.countOf(item.id) > 0) {
-        list.push(item);
-      }
-    }
-    return list;
-  }
-
-  private showNavFilter(): boolean {
-    const n = this.visibleNav().length + (this.countOf(FILTER_OTHER) > 0 ? 1 : 0);
-    return n > 1;
-  }
-
-  private filterStillValid(): boolean {
-    if (this.filterPid === FILTER_ALL) {
-      return true;
-    }
-    return this.countOf(this.filterPid) > 0;
-  }
-
-  private filterLabel(): string {
-    if (this.filterPid === FILTER_ALL) {
-      return `近 24 小时  ${this.films.length} 部`;
-    }
-    if (this.filterPid === FILTER_OTHER) {
-      return `其他  ${this.countOf(FILTER_OTHER)} 部`;
-    }
-    for (let i = 0; i < this.nav.length; i++) {
-      if (this.nav[i].id === this.filterPid) {
-        return `${this.nav[i].name}  ${this.countOf(this.filterPid)} 部`;
-      }
-    }
-    return `近 24 小时  ${this.films.length} 部`;
-  }
-
-  private shownFilms(): MovieBasicInfo[] {
-    if (this.filterPid === FILTER_ALL) {
-      return this.films;
-    }
-    const list: MovieBasicInfo[] = [];
-    for (let i = 0; i < this.films.length; i++) {
-      const filmPid = this.films[i].pid;
-      if (this.filterPid === FILTER_OTHER) {
-        if (!this.isKnownPid(filmPid)) {
-          list.push(this.films[i]);
-        }
-      } else if (filmPid === this.filterPid) {
-        list.push(this.films[i]);
-      }
-    }
-    return list;
   }
 
   @Builder
-  filterChip(pid: number, label: string) {
-    Text(label)
+  filterChip(index: number, item: DailyUpdateCategory) {
+    Text(item.name)
       .fontSize(13)
-      .fontWeight(this.filterPid === pid ? FontWeight.Medium : FontWeight.Regular)
-      .fontColor(this.filterPid === pid ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
+      .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Regular)
+      .fontColor(this.currentIndex === index ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
       .height(32)
       .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD })
-      .backgroundColor(this.filterPid === pid ? AppTheme.ACCENT : AppTheme.BG_CARD)
+      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : AppTheme.BG_CARD)
       .borderRadius(AppTheme.RADIUS_PILL)
       .onClick(() => {
-        this.filterPid = pid;
+        this.selectIndex(index);
       })
   }
 
@@ -177,112 +119,90 @@ export struct DailyUpdatesTab {
     Column() {
       Column() {
         Row() {
-          Row() {
-            AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 22, color: AppTheme.ACCENT })
-            Text('每日更新')
-              .fontSize(22)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .margin({ left: AppTheme.SPACE_SM })
-          }
-          .layoutWeight(1)
-          .alignItems(VerticalAlign.Center)
-
-          Row() {
-            AppIcon({ src: $r('sys.symbol.magnifyingglass'), iconSize: 18, color: AppTheme.TEXT_SECONDARY })
-          }
-          .width(36)
-          .height(36)
-          .justifyContent(FlexAlign.Center)
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(18)
-          .onClick(() => {
-            NavUtil.openSearch();
-          })
+          AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 26, color: AppTheme.ACCENT })
+          Text('每日更新')
+            .fontSize(26)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+            .margin({ left: AppTheme.SPACE_SM })
+            .layoutWeight(1)
+          Text(`近 24 小时  ${this.currentCategory().count} 部`)
+            .fontSize(12)
+            .fontColor(AppTheme.TEXT_MUTED)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
+        .padding({
+          left: AppTheme.SPACE_LG,
+          right: AppTheme.SPACE_LG,
+          top: AppTheme.SPACE_SM
+        })
 
-        Text(this.filterLabel())
-          .fontSize(12)
-          .fontColor(AppTheme.TEXT_MUTED)
+        if (this.categories.length > 1) {
+          List({ space: AppTheme.SPACE_SM, scroller: this.chipsScroller }) {
+            ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {
+              ListItem() {
+                this.filterChip(index, item)
+              }
+            }, (item: DailyUpdateCategory) => `chip_${item.pid}`)
+          }
+          .listDirection(Axis.Horizontal)
           .width('100%')
+          .height(32)
+          .contentEndOffset(AppTheme.SPACE_LG)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
+          .scrollBar(BarState.Off)
+          .alignListItem(ListItemAlign.Center)
           .margin({ top: AppTheme.SPACE_SM })
+          .padding({ left: AppTheme.SPACE_LG })
+        }
       }
       .width('100%')
-      .padding({
-        left: AppTheme.SPACE_LG,
-        right: AppTheme.SPACE_LG,
-        top: AppTheme.SPACE_SM,
-        bottom: AppTheme.SPACE_MD
-      })
+      .padding({ bottom: AppTheme.SPACE_MD })
 
-      if (this.showNavFilter()) {
-        Scroll() {
-          Row({ space: AppTheme.SPACE_SM }) {
-            this.filterChip(FILTER_ALL, '全部')
-            ForEach(this.visibleNav(), (item: CategoryItem) => {
-              this.filterChip(item.id, item.name)
-            }, (item: CategoryItem) => `${item.id}`)
-            if (this.countOf(FILTER_OTHER) > 0) {
-              this.filterChip(FILTER_OTHER, '其他')
-            }
-          }
-          .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-          .justifyContent(FlexAlign.Start)
-        }
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .align(Alignment.Start)
-        .width('100%')
-        .margin({ bottom: AppTheme.SPACE_MD })
-      }
-
-      if (this.loading) {
+      if (this.loading && !this.ready) {
         LoadingView({ label: '正在加载今日更新' })
-      } else if (this.films.length === 0) {
-        Refresh({ refreshing: $$this.refreshing }) {
-          Scroll() {
-            if (this.errorText) {
-              EmptyState({
-                title: '加载失败',
-                subtitle: this.errorText,
-                icon: $r('sys.symbol.info_circle')
-              })
-            } else {
-              EmptyState({
-                title: '暂无更新',
-                subtitle: '近 24 小时还没有新片入库',
-                icon: $r('sys.symbol.flame')
-              })
-            }
-          }
-          .scrollBar(BarState.Off)
-          .width('100%')
-          .height('100%')
+          .layoutWeight(1)
+      } else if (!this.ready && this.errorText) {
+        Column() {
+          EmptyState({
+            title: '加载失败',
+            subtitle: this.errorText,
+            icon: $r('sys.symbol.info_circle')
+          })
         }
-        .onRefreshing(() => {
-          if (this.fetchLock) {
-            return;
-          }
-          this.loadData(true, true);
-        })
-        .pullToRefresh(!this.fetchLock)
+        .width('100%')
         .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
       } else {
-        Refresh({ refreshing: $$this.refreshing }) {
-          FilmGrid({ films: this.shownFilms(), nestedRefresh: true })
-            .width('100%')
-            .height('100%')
-            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+        Swiper(this.swiperController) {
+          ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {
+            DailyUpdatePane({
+              pid: item.pid,
+              active: Math.abs(this.currentIndex - index) <= 1,
+              seedPid: this.seedPid,
+              seedList: this.seedList,
+              seedPage: this.seedPage,
+              reloadToken: this.reloadToken
+            })
+              .width('100%')
+              .height('100%')
+          }, (item: DailyUpdateCategory) => `pane_${item.pid}_${this.reloadToken}`)
         }
-        .onRefreshing(() => {
-          if (this.fetchLock) {
-            return;
-          }
-          this.loadData(true, true);
+        .index(this.currentIndex)
+        .indicator(false)
+        .loop(false)
+        .disableSwipe(this.categories.length <= 1)
+        .duration(280)
+        .onChange((index: number) => {
+          this.currentIndex = index;
+          this.focusChip(index);
         })
-        .pullToRefresh(!this.fetchLock)
         .width('100%')
         .layoutWeight(1)
       }

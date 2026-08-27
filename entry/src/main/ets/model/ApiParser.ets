@@ -3,6 +3,8 @@ import {
   BasicConfig,
   CategoryItem,
   ClassifyResult,
+  DailyUpdateCategory,
+  DailyUpdateResult,
   FilterResult,
   FilterSearchMeta,
   HomeData,
@@ -181,6 +183,26 @@ export class ApiParser {
       total: ApiParser.num(record, 'total')
     };
     return page;
+  }
+
+  static parseDailyUpdate(raw: Object): DailyUpdateResult {
+    const record = ApiParser.asRecord(raw);
+    const catsRaw = ApiParser.list(record, 'categories');
+    const categories: DailyUpdateCategory[] = [];
+    for (let i = 0; i < catsRaw.length; i++) {
+      const item = ApiParser.asRecord(catsRaw[i]);
+      categories.push({
+        pid: ApiParser.num(item, 'pid'),
+        name: ApiParser.str(item, 'name'),
+        count: ApiParser.num(item, 'count')
+      });
+    }
+    const result: DailyUpdateResult = {
+      list: ApiParser.parseMovies(ApiParser.list(record, 'list')),
+      page: ApiParser.parsePage(ApiParser.obj(record, 'page')),
+      categories: categories
+    };
+    return result;
   }
 
   static parseSearch(raw: Object): SearchResult {

@@ -12,10 +12,7 @@ export default class EntryAbility extends UIAbility {
     ServerConfigManager.getInstance().init(this.context).then(() => {
       return HistoryManager.migrateLegacy();
     }).then(() => {
-      return ServerConfigManager.getInstance().getServerUrl();
-    }).then((url: string) => {
-      const targetPage = url ? 'pages/Index' : 'pages/ServerConfigPage';
-      windowStage.loadContent(targetPage, (err) => {
+      windowStage.loadContent('pages/SplashPage', (err) => {
         if (err.code) {
           console.error('Failed to load content:', JSON.stringify(err));
           return;

@@ -5,6 +5,7 @@ import {
   BasicConfig,
   CategoryItem,
   ClassifyResult,
+  DailyUpdateResult,
   FilterResult,
   HomeData,
   MovieBasicInfo,
@@ -41,22 +42,16 @@ export class FilmApi {
     return ApiParser.parseHome(res.data as Object);
   }
 
-  static async getDailyUpdates(limit: number = 0, exclude: string = ''): Promise<MovieBasicInfo[]> {
-    const params = new QueryParams();
-    if (limit > 0) {
-      params.set('limit', limit);
+  static async getDailyUpdates(pid: number, current: number, pageSize: number = 21): Promise<DailyUpdateResult> {
+    const params = new QueryParams()
+      .set('pid', pid)
+      .set('current', current)
+      .set('pageSize', pageSize);
+    const res = await HttpClient.getInstance().get('/dailyUpdates', params);
+    if (res.code !== 0 || !res.data) {
+      throw new Error(res.msg || '每日更新获取失败');
     }
-    if (exclude) {
-      params.set('exclude', exclude);
-    }
-    const res = await HttpClient.getInstance().get('/index/dailyUpdates', params);
-    if (res.code !== 0) {
-      return [];
-    }
-    if (Array.isArray(res.data)) {
-      return ApiParser.parseMovies(res.data as Object[]);
-    }
-    return [];
+    return ApiParser.parseDailyUpdate(res.data as Object);
   }
 
   static async getNavCategory(): Promise<CategoryItem[]> {
