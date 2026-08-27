@@ -88,6 +88,18 @@ export interface PageInfo {
   total: number;
 }
 
+export interface DailyUpdateCategory {
+  pid: number;
+  name: string;
+  count: number;
+}
+
+export interface DailyUpdateResult {
+  list: MovieBasicInfo[];
+  page: PageInfo;
+  categories: DailyUpdateCategory[];
+}
+
 export interface SearchTag {
   Name: string;
   Value: string;

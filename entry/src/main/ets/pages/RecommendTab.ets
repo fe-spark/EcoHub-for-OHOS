@@ -20,7 +20,8 @@ export struct RecommendTab {
   @State private loading: boolean = true;
   @State private refreshing: boolean = false;
   @State private errorText: string = '';
-  @State private headerAlpha: number = 0;
+  private static readonly MIN_HEADER_ALPHA: number = 0.72;
+  @State private headerAlpha: number = RecommendTab.MIN_HEADER_ALPHA;
   private scroller: Scroller = new Scroller();
 
   private hasLoaded: boolean = false;
@@ -71,7 +72,8 @@ export struct RecommendTab {
   private updateHeaderAlpha(): void {
     const offset = this.scroller.currentOffset();
     const y = offset.yOffset;
-    const next = Math.min(1, Math.max(0, y / 180));
+    const scrollRatio = Math.min(1, Math.max(0, y / 160));
+    const next = RecommendTab.MIN_HEADER_ALPHA + (1 - RecommendTab.MIN_HEADER_ALPHA) * scrollRatio;
     if (Math.abs(next - this.headerAlpha) >= 0.02) {
       this.headerAlpha = next;
     }
@@ -357,7 +359,7 @@ export struct RecommendTab {
 
       Row() {
         Text(this.siteName)
-          .fontSize(22)
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
           .maxLines(1)
@@ -368,22 +370,22 @@ export struct RecommendTab {
         Row() {
           AppIcon({
             src: $r('sys.symbol.magnifyingglass'),
-            iconSize: 16,
+            iconSize: 15,
             color: AppTheme.TEXT_SECONDARY
           })
           Text('搜索')
-            .fontSize(13)
+            .fontSize(12)
             .fontColor(AppTheme.TEXT_SECONDARY)
-            .margin({ left: AppTheme.SPACE_SM })
+            .margin({ left: AppTheme.SPACE_XS })
         }
-        .height(36)
-        .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_LG })
+        .height(32)
+        .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD })
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.headerAlpha > 0.55 ? AppTheme.BG_CHIP : 'rgba(0,0,0,0.42)')
+        .backgroundColor('rgba(255, 255, 255, 0.10)')
         .borderRadius(AppTheme.RADIUS_PILL)
         .border({
           width: 1,
-          color: this.headerAlpha > 0.55 ? AppTheme.BORDER : 'rgba(255,255,255,0.14)'
+          color: 'rgba(255, 255, 255, 0.14)'
         })
         .onClick(() => {
           if (this.onOpenSearch) {
@@ -394,7 +396,7 @@ export struct RecommendTab {
         })
       }
       .width('100%')
-      .height(52)
+      .height(44)
       .padding({
         left: AppTheme.SPACE_LG,
         right: AppTheme.SPACE_LG

@@ -93,7 +93,16 @@ struct ServerConfigPage {
     if (this.reconnect) {
       promptAction.showToast({ message: '已重新接入' });
       SourceGuard.markClosed();
-      router.back();
+      try {
+        const len = parseInt(router.getLength());
+        if (len > 1) {
+          router.back();
+        } else {
+          router.replaceUrl({ url: 'pages/Index' });
+        }
+      } catch (_e) {
+        router.replaceUrl({ url: 'pages/Index' });
+      }
       SourceGuard.notifyReconnected();
       return;
     }

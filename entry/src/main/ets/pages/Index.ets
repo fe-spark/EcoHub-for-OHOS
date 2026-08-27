@@ -81,7 +81,7 @@ struct Index {
       router.replaceUrl({ url: 'pages/ServerConfigPage' });
       return;
     }
-    await this.loadSite(true);
+    await this.loadSite(false);
     SiteHeartbeat.getInstance().start();
     this.reconnectCb = () => {
       this.loadSite(false);

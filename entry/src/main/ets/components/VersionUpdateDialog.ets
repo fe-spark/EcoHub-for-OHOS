@@ -1,3 +1,4 @@
+import curves from '@ohos.curves';
 import { AppTheme } from '../common/constants/AppTheme';
 import { AppIcon } from './AppIcon';
 import { AppUpdateInfo } from '../common/utils/AppVersionUtil';
@@ -17,12 +18,38 @@ export struct VersionUpdateDialog {
   };
   onClose: () => void = () => {};
 
+  @State private maskOpacity: number = 0;
+  @State private cardScale: number = 0.72;
+  @State private cardOpacity: number = 0;
+  private isClosing: boolean = false;
+
+  aboutToAppear(): void {
+    setTimeout(() => {
+      this.maskOpacity = 1;
+      this.cardScale = 1;
+      this.cardOpacity = 1;
+    }, 16);
+  }
+
+  private handleClose(): void {
+    if (this.isClosing) {
+      return;
+    }
+    this.isClosing = true;
+    this.maskOpacity = 0;
+    this.cardScale = 0.85;
+    this.cardOpacity = 0;
+    setTimeout(() => {
+      this.onClose();
+    }, 200);
+  }
+
   private handleUpdate(): void {
     const url = this.updateInfo.downloadUrl || this.updateInfo.releaseUrl;
     if (url) {
       NavUtil.openBrowser(getContext(this) as common.UIAbilityContext, url);
     }
-    this.onClose();
+    this.handleClose();
   }
 
   build() {
@@ -32,8 +59,10 @@ export struct VersionUpdateDialog {
         .width('100%')
         .height('100%')
         .backgroundColor('rgba(0, 0, 0, 0.72)')
+        .opacity(this.maskOpacity)
+        .animation({ duration: 200, curve: Curve.EaseOut })
         .onClick(() => {
-          this.onClose();
+          this.handleClose();
         })
 
       // 居中卡片
@@ -74,7 +103,7 @@ export struct VersionUpdateDialog {
           .justifyContent(FlexAlign.Center)
           .borderRadius(14)
           .onClick(() => {
-            this.onClose();
+            this.handleClose();
           })
         }
         .width('100%')
@@ -153,7 +182,7 @@ export struct VersionUpdateDialog {
             .fontColor(AppTheme.TEXT_MUTED)
             .backgroundColor(Color.Transparent)
             .onClick(() => {
-              this.onClose();
+              this.handleClose();
             })
         }
         .width('100%')
@@ -165,6 +194,11 @@ export struct VersionUpdateDialog {
       .borderRadius(AppTheme.RADIUS_LG)
       .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
       .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.5)', offsetY: 8 })
+      .scale({ x: this.cardScale, y: this.cardScale })
+      .opacity(this.cardOpacity)
+      .animation({
+        curve: curves.springMotion(0.38, 0.65, 0)
+      })
       .onClick(() => {}) // 阻止点击卡片内部冒泡关闭
     }
     .width('100%')
