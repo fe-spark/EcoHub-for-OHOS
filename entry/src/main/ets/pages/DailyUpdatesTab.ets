@@ -5,6 +5,8 @@ import { AppIcon } from '../components/AppIcon';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { SourceGuard } from '../common/utils/SourceGuard';
+import { NavUtil } from '../common/utils/NavUtil';
+import { RefreshHint } from '../common/utils/RefreshHint';
 import { DailyUpdatePane } from './DailyUpdatePane';
 
 const PAGE_SIZE = 21;
@@ -20,6 +22,7 @@ export struct DailyUpdatesTab {
   @State private seedList: MovieBasicInfo[] = [];
   @State private seedPage: PageInfo = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
   @State private reloadToken: number = 0;
+  @State private refreshing: boolean = false;
   private swiperController: SwiperController = new SwiperController();
   private chipsScroller: Scroller = new Scroller();
   private hasLoaded: boolean = false;
@@ -34,7 +37,6 @@ export struct DailyUpdatesTab {
     if (this.hasLoaded) {
       return;
     }
-    this.hasLoaded = true;
     this.loadMeta();
   }
 
@@ -54,9 +56,15 @@ export struct DailyUpdatesTab {
     if (this.fetchLock) {
       return;
     }
+    const fromPull = this.refreshing;
     this.fetchLock = true;
-    this.loading = this.categories.length === 0;
+    this.loading = true;
     this.errorText = '';
+    this.ready = false;
+    this.categories = [];
+    this.seedList = [];
+    this.seedPid = 0;
+    this.currentIndex = 0;
     try {
       const result = await FilmApi.getDailyUpdates(0, 1, PAGE_SIZE);
       let cats = result.categories;
@@ -67,17 +75,21 @@ export struct DailyUpdatesTab {
       this.seedPid = 0;
       this.seedList = result.list;
       this.seedPage = result.page;
-      if (this.currentIndex >= this.categories.length) {
-        this.currentIndex = 0;
-      }
       this.reloadToken = this.reloadToken + 1;
       this.ready = true;
+      this.hasLoaded = true;
     } catch (err) {
       this.errorText = err instanceof Error ? err.message : '每日更新加载失败';
-      this.ready = this.categories.length > 0;
+      this.ready = false;
+      this.hasLoaded = false;
+      this.reloadToken = this.reloadToken + 1;
     } finally {
       this.fetchLock = false;
       this.loading = false;
+      this.refreshing = false;
+      if (fromPull && this.ready) {
+        RefreshHint.succeed();
+      }
     }
   }
 
@@ -104,12 +116,16 @@ export struct DailyUpdatesTab {
   filterChip(index: number, item: DailyUpdateCategory) {
     Text(item.name)
       .fontSize(13)
-      .fontWeight(this.currentIndex === index ? FontWeight.Medium : FontWeight.Regular)
-      .fontColor(this.currentIndex === index ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
+      .fontWeight(this.currentIndex === index ? FontWeight.Bold : FontWeight.Regular)
+      .fontColor(this.currentIndex === index ? '#FFFFFF' : AppTheme.TEXT_SECONDARY)
       .height(32)
-      .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD })
-      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : AppTheme.BG_CARD)
+      .padding({ left: 14, right: 14 })
+      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.06)')
       .borderRadius(AppTheme.RADIUS_PILL)
+      .border({
+        width: 1,
+        color: this.currentIndex === index ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
+      })
       .onClick(() => {
         this.selectIndex(index);
       })
@@ -119,25 +135,58 @@ export struct DailyUpdatesTab {
     Column() {
       Column() {
         Row() {
-          AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 26, color: AppTheme.ACCENT })
-          Text('每日更新')
-            .fontSize(26)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .margin({ left: AppTheme.SPACE_SM })
-            .layoutWeight(1)
-          Text(`近 24 小时  ${this.currentCategory().count} 部`)
-            .fontSize(12)
-            .fontColor(AppTheme.TEXT_MUTED)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Row() {
+            AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 18, color: AppTheme.ACCENT })
+            Text('每日更新')
+              .fontSize(19)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .margin({ left: AppTheme.SPACE_SM })
+          }
+          .layoutWeight(1)
+
+          Row({ space: AppTheme.SPACE_SM }) {
+            Row() {
+              Text('近 24 小时 ')
+                .fontSize(11)
+                .fontColor(AppTheme.TEXT_MUTED)
+              Text(`${this.currentCategory().count}`)
+                .fontSize(12)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ACCENT)
+              Text(' 部')
+                .fontSize(11)
+                .fontColor(AppTheme.TEXT_MUTED)
+            }
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor('rgba(255, 255, 255, 0.06)')
+            .borderRadius(AppTheme.RADIUS_PILL)
+            .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
+
+            Row() {
+              AppIcon({
+                src: $r('sys.symbol.magnifyingglass'),
+                iconSize: 16,
+                color: AppTheme.TEXT_SECONDARY
+              })
+            }
+            .width(32)
+            .height(32)
+            .justifyContent(FlexAlign.Center)
+            .backgroundColor('rgba(255, 255, 255, 0.06)')
+            .borderRadius(AppTheme.RADIUS_PILL)
+            .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
+            .onClick(() => {
+              NavUtil.openSearch();
+            })
+          }
         }
         .width('100%')
+        .height(38)
         .alignItems(VerticalAlign.Center)
         .padding({
           left: AppTheme.SPACE_LG,
-          right: AppTheme.SPACE_LG,
-          top: AppTheme.SPACE_SM
+          right: AppTheme.SPACE_LG
         })
 
         if (this.categories.length > 1) {
@@ -158,27 +207,49 @@ export struct DailyUpdatesTab {
           })
           .scrollBar(BarState.Off)
           .alignListItem(ListItemAlign.Center)
-          .margin({ top: AppTheme.SPACE_SM })
+          .margin({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_XS })
           .padding({ left: AppTheme.SPACE_LG })
         }
       }
       .width('100%')
-      .padding({ bottom: AppTheme.SPACE_MD })
+      .padding({ bottom: this.categories.length > 1 ? AppTheme.SPACE_MD : AppTheme.SPACE_XS })
 
       if (this.loading && !this.ready) {
         LoadingView({ label: '正在加载今日更新' })
           .layoutWeight(1)
       } else if (!this.ready && this.errorText) {
-        Column() {
-          EmptyState({
-            title: '加载失败',
-            subtitle: this.errorText,
-            icon: $r('sys.symbol.info_circle')
-          })
+        Refresh({ refreshing: $$this.refreshing }) {
+          Scroll() {
+            Column() {
+              EmptyState({
+                title: '加载失败',
+                subtitle: this.errorText,
+                icon: $r('sys.symbol.info_circle')
+              })
+              Button('重试')
+                .margin({ top: 16 })
+                .backgroundColor(AppTheme.BG_CARD)
+                .fontColor(AppTheme.TEXT_PRIMARY)
+                .onClick(() => {
+                  this.loadMeta();
+                })
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
+          }
+          .scrollBar(BarState.Off)
+          .width('100%')
+          .height('100%')
         }
+        .onRefreshing(() => {
+          if (this.fetchLock) {
+            return;
+          }
+          this.loadMeta();
+        })
+        .pullToRefresh(!this.fetchLock)
         .width('100%')
         .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
       } else {
         Swiper(this.swiperController) {
           ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {

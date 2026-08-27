@@ -65,7 +65,7 @@ export class FilmApi {
     return [];
   }
 
-  static async getSiteConfig(force: boolean = false): Promise<BasicConfig> {
+  static async getSiteConfig(force: boolean = false, timeout: number = 15000): Promise<BasicConfig> {
     if (!force && FilmApi.siteConfig) {
       return FilmApi.siteConfig;
     }
@@ -74,7 +74,7 @@ export class FilmApi {
     }
     FilmApi.configPromise = (async () => {
       try {
-        const res = await HttpClient.getInstance().get('/config/basic');
+        const res = await HttpClient.getInstance().get('/config/basic', undefined, timeout);
         if (res.code !== 0 || !res.data) {
           throw new Error(res.msg || '站点配置获取失败');
         }

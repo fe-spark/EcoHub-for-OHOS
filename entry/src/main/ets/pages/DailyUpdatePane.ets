@@ -1,13 +1,12 @@
 import { FilmApi } from '../api/FilmApi';
 import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { FilmCard } from '../components/FilmCard';
+import { FilmGrid } from '../components/FilmGrid';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { RefreshHint } from '../common/utils/RefreshHint';
 
 const PAGE_SIZE = 21;
-const GRID_COLS = 3;
 
 @Component
 export struct DailyUpdatePane {
@@ -24,6 +23,7 @@ export struct DailyUpdatePane {
   @State private refreshing: boolean = false;
   @State private loadingMore: boolean = false;
   @State private errorText: string = '';
+  @State private loadMoreError: boolean = false;
   @State private fetchLock: boolean = false;
   private hasLoaded: boolean = false;
 
@@ -49,6 +49,7 @@ export struct DailyUpdatePane {
     this.films = [];
     this.page = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
     this.errorText = '';
+    this.loadMoreError = false;
     if (this.active) {
       this.load(true, false);
     } else {
@@ -70,6 +71,7 @@ export struct DailyUpdatePane {
     this.hasLoaded = true;
     this.loading = false;
     this.errorText = '';
+    this.loadMoreError = false;
     return true;
   }
 
@@ -90,6 +92,7 @@ export struct DailyUpdatePane {
       this.loadingMore = true;
     }
     this.errorText = '';
+    this.loadMoreError = false;
     let ok = false;
     try {
       const result = await FilmApi.getDailyUpdates(this.pid, nextPage, PAGE_SIZE);
@@ -98,16 +101,23 @@ export struct DailyUpdatePane {
       this.hasLoaded = true;
       ok = true;
     } catch (err) {
+      const msg = err instanceof Error ? err.message : '每日更新加载失败';
       if (reset) {
-        this.errorText = err instanceof Error ? err.message : '每日更新加载失败';
+        this.errorText = msg;
+      } else {
+        this.loadMoreError = true;
       }
     } finally {
       this.fetchLock = false;
       this.loading = false;
       this.loadingMore = false;
       this.refreshing = false;
-      if (fromPull && ok) {
-        RefreshHint.succeed();
+      if (fromPull) {
+        if (ok) {
+          RefreshHint.succeed();
+        } else {
+          RefreshHint.fail(this.errorText || '刷新失败');
+        }
       }
     }
   }
@@ -120,44 +130,13 @@ export struct DailyUpdatePane {
     if (this.loadingMore) {
       return '加载中...';
     }
+    if (this.loadMoreError) {
+      return '加载失败，上拉重试';
+    }
     if (!this.hasMore()) {
       return '没有更多了';
     }
     return '上拉加载更多';
-  }
-
-  private rowIds(): number[] {
-    const n = Math.ceil(this.films.length / GRID_COLS);
-    const ids: number[] = [];
-    for (let i = 0; i < n; i++) {
-      ids.push(i);
-    }
-    return ids;
-  }
-
-  @Builder
-  filmCell(index: number) {
-    if (index < this.films.length) {
-      FilmCard({ film: this.films[index] })
-        .layoutWeight(1)
-        .constraintSize({ minWidth: 0 })
-    } else {
-      Column()
-        .layoutWeight(1)
-        .constraintSize({ minWidth: 0 })
-    }
-  }
-
-  @Builder
-  filmRow(row: number) {
-    Row({ space: AppTheme.SPACE_SM }) {
-      this.filmCell(row * GRID_COLS)
-      this.filmCell(row * GRID_COLS + 1)
-      this.filmCell(row * GRID_COLS + 2)
-    }
-    .width('100%')
-    .alignItems(VerticalAlign.Top)
-    .padding({ bottom: AppTheme.SPACE_MD })
   }
 
   @Builder
@@ -171,11 +150,16 @@ export struct DailyUpdatePane {
       }
       Text(this.footerText())
         .fontSize(12)
-        .fontColor(AppTheme.TEXT_MUTED)
+        .fontColor(this.loadMoreError ? AppTheme.ACCENT : AppTheme.TEXT_MUTED)
     }
     .width('100%')
     .height(48)
     .justifyContent(FlexAlign.Center)
+    .onClick(() => {
+      if (this.loadMoreError || this.hasMore()) {
+        this.load(false, false);
+      }
+    })
   }
 
   build() {
@@ -215,29 +199,22 @@ export struct DailyUpdatePane {
         .layoutWeight(1)
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
-          List() {
-            ForEach(this.rowIds(), (row: number) => {
-              ListItem() {
-                this.filmRow(row)
+          Column() {
+            FilmGrid({
+              films: this.films,
+              nestedRefresh: true,
+              onReachEnd: () => {
+                if (!this.loadMoreError) {
+                  this.load(false, false);
+                }
               }
-            }, (row: number) => `film_row_${row}_${this.films[row * GRID_COLS].id}`)
-
-            ListItem() {
-              this.loadFooter()
-            }
+            })
+              .layoutWeight(1)
+              .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+            this.loadFooter()
           }
           .width('100%')
           .height('100%')
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
-          })
-          .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-          .onReachEnd(() => {
-            this.load(false, false);
-          })
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
