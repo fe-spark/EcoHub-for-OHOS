@@ -1,10 +1,16 @@
 import { common } from '@kit.AbilityKit';
 import { AVVolumePanel } from '@kit.AudioKit';
-import { PlayerVolumeInfo, PlayerWindow } from '../common/utils/PlayerWindow';
-import { PlayerSpeed } from '../common/utils/PlayerSpeed';
-import { PlayerPan, PlayerPanResult, PlayerTipKind } from '../common/utils/PlayerPan';
-import { PlayerSkin } from './PlayerSkin';
-import { PlayerSpeedDialog } from './PlayerTip';
+import { PlayerWindow } from '../common/utils/PlayerWindow';
+import { PlayerTipKind } from '../common/utils/PlayerPan';
+import { PlayerStallWatcher } from './PlayerStallWatcher';
+import { PlayerVideoLayer } from './PlayerVideoLayer';
+import { PlayerAudioBridge } from './PlayerAudioBridge';
+import { PlayerGestureCoordinator } from './PlayerGestureCoordinator';
+import { PlayerSpeedController } from './PlayerSpeedController';
+import { PlayerPlaybackState } from './PlayerPlaybackState';
+import { PlayerSkinEvents, PlayerSkinView } from './PlayerSkinView';
+import { PlayerObserverHost, PlayerVideoObserver } from './PlayerVideoObserver';
+import { PlayerSpeedSheet } from './PlayerSpeedSheet';
 
 @Component
 export struct VideoPlayer {
@@ -28,6 +34,7 @@ export struct VideoPlayer {
   onPrev?: () => void;
   onNext?: () => void;
   onFullscreenChange?: (full: boolean) => void;
+
   @State private duration: number = 0;
   @State private currentTime: number = 0;
   @State private isPlaying: boolean = false;
@@ -46,141 +53,128 @@ export struct VideoPlayer {
   @State private longPressing: boolean = false;
   @State private feedback: string = '';
   @State private feedbackKind: number = PlayerTipKind.NONE;
-  @State private showSpeed: boolean = false;
   @State private speedIndex: number = 1;
   @State private speedLabel: string = '1.0x';
   @State private playSrc: string = '';
   @State private playerOn: boolean = false;
+  @State private speedOpenSeq: number = 0;
+
   private controller: VideoController = new VideoController();
-  private lastPersist: number = 0;
-  private hideTimer: number = -1;
-  private stallTimer: number = -1;
-  private tipTimer: number = -1;
-  private openTimer: number = -1;
-  private bootGen: number = 0;
-  private mountGen: number = 0;
+  private watcher: PlayerStallWatcher = new PlayerStallWatcher();
+  private audioBridge: PlayerAudioBridge = new PlayerAudioBridge();
+  private gestures: PlayerGestureCoordinator = new PlayerGestureCoordinator();
+  private speedCtrl: PlayerSpeedController = new PlayerSpeedController();
+  private state: PlayerPlaybackState = new PlayerPlaybackState();
+  private observer: PlayerVideoObserver | null = null;
   private pageWasHidden: boolean = false;
-  private lastUpdateAt: number = 0;
-  private lastProgressTime: number = -1;
   private playerW: number = 1;
   private playerH: number = 1;
-  private savedSpeedIndex: number = 1;
-  private volumeMax: number = 15;
-  private lastVolumeIndex: number = 8;
-  private dragging: boolean = false;
-  private seekTarget: number = -1;
-  private seekAt: number = 0;
-  private lastToggleAt: number = 0;
-  private pan: PlayerPan = new PlayerPan();
-  private speedDialog: CustomDialogController | null = null;
 
   aboutToAppear() {
+    this.observer = new PlayerVideoObserver(this.observerHost());
     this.nonce = 1;
-    this.bootGen = 1;
-    this.mountGen = 1;
-    this.opening = !!this.videoUrl;
+    this.state.bootGen = 1;
+    this.state.mountGen = 1;
+    this.state.reset(this.videoUrl);
+    this.syncFromState();
     this.playSrc = this.videoUrl;
     this.playerOn = !!this.videoUrl;
+    this.state.playerOn = !!this.videoUrl;
     this.armOpenWatch();
     this.armHide();
-    this.syncVolume();
+    this.audioBridge.sync((vol, _max, isMuted) => {
+      this.volumeIndex = vol;
+      this.muted = isMuted;
+    });
   }
 
   aboutToDisappear() {
-    this.clearHide();
-    this.clearStallWatch();
-    this.clearTip();
-    this.clearOpenWatch();
+    this.watcher.clearAll();
     this.closeSpeedDialog();
-    this.bootGen++;
-    if (this.currentTime > 0) {
-      this.emitProgress(this.currentTime, this.duration, true);
-    }
+    this.state.bootGen++;
+    if (this.currentTime > 0) this.state.emitProgress(this.onProgress, true);
     const ctx = this.ctx();
     PlayerWindow.resetBrightness(ctx);
     PlayerWindow.setKeepScreenOn(ctx, false);
     if (this.fullNow()) {
-      if (this.onFullscreenChange) {
-        this.onFullscreenChange(false);
-      } else {
-        PlayerWindow.setFullscreen(ctx, false);
-      }
+      if (this.onFullscreenChange) this.onFullscreenChange(false);
+      else PlayerWindow.setFullscreen(ctx, false);
     }
   }
 
   onUrlChange(): void {
-    this.duration = 0;
-    this.currentTime = 0;
-    this.isPlaying = false;
-    this.playRequested = true;
-    this.completed = false;
-    this.showHud = true;
-    this.lastPersist = 0;
-    this.opening = !!this.videoUrl;
-    this.errorText = '';
-    this.seeking = false;
-    this.resetStallWatch();
-    this.ready = false;
-    if (this.longPressing) {
-      this.speedIndex = this.savedSpeedIndex;
-      this.speedLabel = PlayerSpeed.label(this.savedSpeedIndex);
-    }
-    this.longPressing = false;
-    this.feedback = '';
-    this.feedbackKind = PlayerTipKind.NONE;
-    this.clearTip();
-    this.closeSpeedDialog();
-    this.dragging = false;
-    this.seekTarget = -1;
-    this.seekAt = 0;
-    this.lastToggleAt = 0;
-    this.pan.reset();
-    this.armHide();
+    this.resetPlayState();
     this.remountPlayer();
   }
 
   onReloadTokenChange(): void {
-    this.duration = 0;
-    this.currentTime = 0;
-    this.isPlaying = false;
-    this.playRequested = true;
-    this.completed = false;
-    this.showHud = true;
-    this.lastPersist = 0;
-    this.opening = !!this.videoUrl;
-    this.errorText = '';
-    this.seeking = false;
-    this.resetStallWatch();
-    this.ready = false;
-    this.clearTip();
-    this.closeSpeedDialog();
-    this.dragging = false;
-    this.seekTarget = -1;
-    this.seekAt = 0;
-    this.lastToggleAt = 0;
-    this.pan.reset();
-    this.armHide();
+    this.resetPlayState();
     this.remountPlayer();
+  }
+
+  private observerHost(): PlayerObserverHost {
+    return {
+      controller: this.controller,
+      state: this.state,
+      watcher: this.watcher,
+      initialTime: this.initialTime,
+      videoUrl: this.videoUrl,
+      onProgress: this.onProgress,
+      onEnded: this.onEnded,
+      syncKeepScreen: () => this.syncKeepScreen(),
+      armHide: () => this.armHide(),
+      revealHud: () => { this.showHud = true; this.watcher.clearHide(); },
+      onUIUpdate: () => this.syncFromState()
+    };
+  }
+
+  private syncFromState(): void {
+    this.duration = this.state.duration;
+    this.currentTime = this.state.currentTime;
+    this.isPlaying = this.state.isPlaying;
+    this.playRequested = this.state.playRequested;
+    this.completed = this.state.completed;
+    this.opening = this.state.opening;
+    this.errorText = this.state.errorText;
+    this.seeking = this.state.seeking;
+    this.stalled = this.state.stalled;
+    this.ready = this.state.ready;
+  }
+
+  private resetPlayState(): void {
+    this.state.reset(this.videoUrl);
+    this.syncFromState();
+    this.showHud = true;
+    this.watcher.resetStallWatch();
+    this.closeSpeedDialog();
+    this.speedCtrl.reset();
+    this.speedIndex = this.speedCtrl.index;
+    this.speedLabel = this.speedCtrl.label;
+    this.longPressing = false;
+    this.feedback = '';
+    this.feedbackKind = PlayerTipKind.NONE;
+    this.watcher.clearTip();
+    this.gestures.pan.reset();
+    this.armHide();
   }
 
   onPageActiveChange(): void {
     if (this.pageActive) {
-      this.enterForeground();
+      if (!this.pageWasHidden || !this.videoUrl || this.state.completed || this.state.errorText) return;
+      this.pageWasHidden = false;
+      this.state.stalled = false;
+      this.watcher.resetStallWatch();
+      this.syncFromState();
+      if (this.state.playRequested) this.controller.start();
     } else {
-      this.leaveBackground();
-    }
-  }
-
-  private leaveBackground(): void {
-    this.pageWasHidden = true;
-    this.clearStallWatch();
-    this.clearHide();
-    this.closeSpeedDialog();
-    if (this.currentTime > 0) {
-      this.emitProgress(this.currentTime, this.duration, true);
-    }
-    if (this.controller && this.isPlaying) {
-      this.controller.pause();
+      this.pageWasHidden = true;
+      this.state.stalled = false;
+      this.watcher.clearStallWatch();
+      this.watcher.clearHide();
+      this.closeSpeedDialog();
+      this.syncFromState();
+      if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
+      if (this.controller && this.state.isPlaying) this.controller.pause();
     }
   }
 
@@ -188,175 +182,57 @@ export struct VideoPlayer {
     return getContext(this) as common.UIAbilityContext;
   }
 
-  private fullNow(): boolean { return this.isFull || this.innerFull; }
-
-  private resumeTime(): number {
-    if (this.currentTime >= 2) {
-      return this.currentTime;
-    }
-    return this.initialTime;
-  }
-
-  private enterForeground(): void {
-    if (!this.pageWasHidden || !this.videoUrl || this.completed || this.errorText) {
-      return;
-    }
-    this.pageWasHidden = false;
-    this.resetStallWatch();
-    if (!this.playRequested) {
-      return;
-    }
-    this.controller.start();
-  }
-
-  private canPlay(): boolean { return this.ready && !this.opening && !this.errorText; }
-
-  private emitProgress(current: number, duration: number, force: boolean = false): void {
-    if (!this.onProgress) {
-      return;
-    }
-    const now = Date.now();
-    if (!force && now - this.lastPersist < 3000 && current < duration - 1) {
-      return;
-    }
-    this.lastPersist = now;
-    this.onProgress(current, duration);
+  private fullNow(): boolean {
+    return this.isFull || this.innerFull;
   }
 
   private armHide(): void {
-    this.clearHide();
-    if (!this.playRequested || this.completed || this.errorText || this.opening ||
-      this.dragging || this.seeking || this.stalled) {
-      return;
-    }
-    this.hideTimer = setTimeout(() => {
-      if (this.playRequested && !this.completed && !this.errorText) {
-        this.showHud = false;
-      }
-    }, 3000);
+    const canHide = this.state.playRequested && !this.state.completed && !this.state.errorText &&
+      !this.state.opening && !this.state.dragging && !this.state.seeking && !this.state.stalled;
+    this.watcher.armHide(() => {
+      if (this.state.playRequested && !this.state.completed && !this.state.errorText) this.showHud = false;
+    }, canHide);
   }
 
-  private clearHide(): void {
-    if (this.hideTimer >= 0) {
-      clearTimeout(this.hideTimer);
-      this.hideTimer = -1;
-    }
-  }
-
-  private clearTip(): void {
-    if (this.tipTimer >= 0) {
-      clearTimeout(this.tipTimer);
-      this.tipTimer = -1;
-    }
-  }
-
-  private showTip(message: string, kind: number): void {
-    this.clearTip();
-    this.feedback = message;
-    this.feedbackKind = kind;
-    this.tipTimer = setTimeout(() => {
-      this.tipTimer = -1;
-      this.feedback = '';
-      this.feedbackKind = PlayerTipKind.NONE;
-    }, 1000);
-  }
-
-  private clearStallWatch(): void {
-    if (this.stallTimer >= 0) {
-      clearTimeout(this.stallTimer);
-      this.stallTimer = -1;
-    }
-  }
-
-  private resetStallWatch(): void {
-    this.clearStallWatch();
-    this.stalled = false;
-    this.lastProgressTime = -1;
-  }
-
-  private noteProgress(time: number = -1): void {
-    if (time >= 0) {
-      const moved = this.lastProgressTime < 0 || Math.abs(time - this.lastProgressTime) > 0.001;
-      this.lastProgressTime = time;
-      if (!moved) {
-        return;
-      }
-    }
-    this.lastUpdateAt = Date.now();
-    if (this.stalled) {
-      this.stalled = false;
-    }
-    this.clearStallWatch();
-    if (!this.playRequested || !this.isPlaying || this.completed || this.errorText) {
-      return;
-    }
-    // Video.onUpdate 正常播放也可能约 1s 一次；短暂停顿不弹「加载中」
-    this.stallTimer = setTimeout(() => {
-      this.stallTimer = -1;
-      if (this.playRequested && this.isPlaying && !this.completed && !this.errorText &&
-        !this.dragging && this.seekTarget < 0) {
-        this.stalled = true;
-      }
-    }, 2500);
-  }
-
-  private toggleHud(): void {
-    if (this.showSpeed || this.pan.mode > 1 || this.longPressing) {
-      return;
-    }
-    if (this.showHud) {
-      if (!this.playRequested || this.completed) {
-        return;
-      }
-      this.showHud = false;
-      this.clearHide();
-    } else {
-      this.showHud = true;
-      this.armHide();
-    }
+  private pulseHud(): void {
+    this.showHud = true;
+    this.armHide();
   }
 
   private togglePlay(): void {
     const now = Date.now();
-    if (now - this.lastToggleAt < 280) {
+    if (now - this.state.lastToggleAt < 280) return;
+    this.state.lastToggleAt = now;
+    if (!this.state.canPlay() && !this.state.completed) return;
+    if (this.state.completed) {
+      this.state.playRequested = true;
+      this.state.completed = false;
+      this.state.currentTime = 0;
+      this.syncFromState();
+      this.state.seek(0, this.controller);
+      this.syncFromState();
+      this.pulseHud();
       return;
     }
-    this.lastToggleAt = now;
-    if (!this.canPlay() && !this.completed) {
-      return;
-    }
-    if (this.completed) {
-      this.playRequested = true;
-      this.completed = false;
-      this.currentTime = 0;
-      this.seeking = true;
-      this.seekTarget = 0;
-      this.seekAt = Date.now();
-      this.controller.setCurrentTime(0, SeekMode.Accurate);
-      this.controller.start();
-      this.showHud = true;
-      this.armHide();
-      return;
-    }
-    if (this.playRequested) {
-      this.playRequested = false;
-      this.isPlaying = false;
+    if (this.state.playRequested) {
+      this.state.playRequested = false;
+      this.state.isPlaying = false;
       this.controller.pause();
+      this.syncFromState();
       this.syncKeepScreen();
       this.showHud = true;
-      this.clearHide();
+      this.watcher.clearHide();
     } else {
-      this.playRequested = true;
+      this.state.playRequested = true;
       this.controller.start();
-      this.showHud = true;
-      this.armHide();
+      this.syncFromState();
+      this.pulseHud();
     }
   }
 
   private toggleFull(): void {
     const next = !this.fullNow();
-    this.showHud = true;
-    this.armHide();
+    this.pulseHud();
     if (this.onFullscreenChange) {
       this.onFullscreenChange(next);
     } else {
@@ -367,539 +243,249 @@ export struct VideoPlayer {
   }
 
   private syncKeepScreen(): void {
-    const on = this.pageActive && this.playRequested && this.isPlaying && !this.completed && !this.errorText;
+    const on = this.pageActive && this.state.playRequested && this.state.isPlaying &&
+      !this.state.completed && !this.state.errorText;
     PlayerWindow.setKeepScreenOn(this.ctx(), on);
   }
 
-  private formatPlayError(wasReady: boolean): string {
-    const stage = wasReady ? '播放过程中失败' : '打开视频失败';
-    const url = this.videoUrl.trim();
-    if (!url) {
-      return `${stage}\n未提供播放地址`;
-    }
-    return `${stage}\n${url}`;
-  }
-
-  private syncVolume(): void {
-    PlayerWindow.getVolume().then((info: PlayerVolumeInfo) => {
-      this.volumeMax = info.max;
-      this.volumeIndex = info.current;
-      this.muted = info.current <= 0;
-      if (info.current > 0) {
-        this.lastVolumeIndex = info.current;
-      }
-      this.pan.primeVolume(info.max > 0 ? info.current / info.max : 0);
-    });
-  }
-
-  private applyVolume(ratio: number): void {
-    const max = Math.max(1, this.volumeMax);
-    const next = Math.round(Math.min(1, Math.max(0, ratio)) * max);
-    this.volumeIndex = next;
-    this.muted = next <= 0;
-    if (next > 0) {
-      this.lastVolumeIndex = next;
-    }
-  }
-
   private toggleMute(): void {
-    if (this.volumeIndex <= 0 || this.muted) {
-      const restore = this.lastVolumeIndex > 0 ? this.lastVolumeIndex : Math.ceil(this.volumeMax / 2);
-      this.volumeIndex = restore;
-      this.muted = false;
-      this.pan.primeVolume(this.volumeMax > 0 ? restore / this.volumeMax : 0.5);
-      this.showTip(`${Math.round(restore / Math.max(1, this.volumeMax) * 100)}%`, PlayerTipKind.VOLUME);
-    } else {
-      this.lastVolumeIndex = this.volumeIndex;
-      this.volumeIndex = 0;
-      this.muted = true;
-      this.pan.primeVolume(0);
-      this.showTip('静音', PlayerTipKind.VOLUME);
-    }
-    this.showHud = true;
-    this.armHide();
-  }
-
-  private handleBack(): void {
-    if (this.fullNow()) {
-      this.toggleFull();
-      return;
-    }
-    if (this.onBack) {
-      this.onBack();
-    }
+    const res = this.audioBridge.toggleMute();
+    this.volumeIndex = res.volume;
+    this.muted = res.muted;
+    this.gestures.pan.primeVolume(this.audioBridge.max > 0 ? res.volume / this.audioBridge.max : 0);
+    this.watcher.showTip(res.label, PlayerTipKind.VOLUME, (msg, k) => {
+      this.feedback = msg;
+      this.feedbackKind = k;
+    }, () => {
+      this.feedback = '';
+      this.feedbackKind = PlayerTipKind.NONE;
+    });
+    this.pulseHud();
   }
 
   private retry(): void {
-    this.errorText = '';
-    this.opening = true;
-    this.ready = false;
-    this.completed = false;
-    this.playRequested = true;
-    this.isPlaying = false;
-    this.resetStallWatch();
-    this.seeking = false;
-    this.seekTarget = -1;
+    this.state.prepareRetry();
+    this.watcher.resetStallWatch();
+    this.syncFromState();
     this.showHud = true;
     this.remountPlayer();
   }
 
-  private live(): boolean {
-    return this.playerOn && this.bootGen === this.mountGen;
-  }
-
   private remountPlayer(): void {
-    const gen = ++this.bootGen;
+    const gen = ++this.state.bootGen;
     this.playerOn = false;
+    this.state.playerOn = false;
     this.playSrc = '';
     this.controller = new VideoController();
     this.nonce += 1;
+    if (this.observer) this.observer.updateHost(this.observerHost());
     this.armOpenWatch();
     if (!this.videoUrl) {
-      this.clearOpenWatch();
-      this.opening = false;
+      this.watcher.clearOpenWatch();
+      this.state.opening = false;
+      this.syncFromState();
       return;
     }
     setTimeout(() => {
-      if (gen !== this.bootGen) {
-        return;
-      }
-      this.mountGen = gen;
+      if (gen !== this.state.bootGen) return;
+      this.state.mountGen = gen;
       this.playSrc = this.videoUrl;
       this.playerOn = true;
+      this.state.playerOn = true;
     }, 80);
   }
 
   private armOpenWatch(): void {
-    this.clearOpenWatch();
-    if (!this.opening) {
-      return;
-    }
-    this.openTimer = setTimeout(() => {
-      this.openTimer = -1;
-      if (this.live() && this.opening && !this.ready && !this.errorText) {
-        this.opening = false;
-        this.playRequested = false;
-        this.errorText = this.formatPlayError(false);
+    this.watcher.armOpenWatch(() => {
+      if (this.state.live() && this.state.opening && !this.state.ready && !this.state.errorText) {
+        this.state.failOpen(this.videoUrl);
+        this.syncFromState();
         this.syncKeepScreen();
       }
-    }, 12000);
-  }
-
-  private clearOpenWatch(): void {
-    if (this.openTimer >= 0) {
-      clearTimeout(this.openTimer);
-      this.openTimer = -1;
-    }
-  }
-
-  private showErrorDetail(): void {
-    AlertDialog.show({
-      title: '报错详情',
-      message: this.errorText,
-      confirm: { value: '知道了', action: () => {} }
-    });
-  }
-
-  private pickSpeed(index: number): void {
-    this.speedIndex = index;
-    this.speedLabel = PlayerSpeed.label(index);
-    this.showSpeed = false;
-    this.closeSpeedDialog();
-    this.showHud = true;
-    this.armHide();
-  }
-
-  private openSpeedDialog(): void {
-    this.closeSpeedDialog();
-    this.showSpeed = true;
-    this.speedDialog = new CustomDialogController({
-      builder: PlayerSpeedDialog({
-        speedLabel: this.speedLabel,
-        onPickSpeed: (index: number) => this.pickSpeed(index)
-      }),
-      autoCancel: true,
-      alignment: DialogAlignment.Bottom,
-      customStyle: true,
-      backgroundColor: Color.Transparent,
-      maskColor: 'rgba(0,0,0,0.52)',
-      cancel: () => {
-        this.showSpeed = false;
-        this.speedDialog = null;
-      }
-    });
-    this.speedDialog.open();
-  }
-
-  private closeSpeedDialog(): void {
-    this.showSpeed = false;
-    if (this.speedDialog) {
-      this.speedDialog.close();
-      this.speedDialog = null;
-    }
+    }, this.state.opening);
   }
 
   private seekTo(time: number): void {
-    if (!this.canPlay() || this.duration <= 0) {
-      return;
-    }
-    const next = Math.min(this.duration, Math.max(0, time));
-    this.seeking = true;
-    this.currentTime = next;
-    this.seekTarget = next;
-    this.seekAt = Date.now();
-    this.controller.setCurrentTime(next, SeekMode.Accurate);
-    if (this.playRequested) {
-      this.controller.start();
-    }
+    this.state.seek(time, this.controller);
+    this.syncFromState();
   }
 
-  private applyPlaybackTime(time: number): void {
-    if (this.dragging || this.pan.mode === 2) {
-      return;
-    }
-    if (this.seekTarget >= 0) {
-      const delta = Math.abs(time - this.seekTarget);
-      const elapsed = Date.now() - this.seekAt;
-      const settled = delta <= 1.2 || elapsed > 1800;
-      if (!settled) {
-        return;
-      }
-      this.seekTarget = -1;
-      this.seeking = false;
-      this.armHide();
-    }
-    this.currentTime = time;
+  private openSpeedDialog(): void {
+    this.speedCtrl.setShowing(true);
+    this.speedOpenSeq += 1;
   }
 
-  private seekBy(delta: number): void {
-    this.seekTo(this.currentTime + delta);
-    this.showHud = true;
-    this.armHide();
-  }
-
-  private beginSpeed(): void {
-    if (!this.canPlay() || !this.isPlaying) {
-      return;
-    }
-    this.savedSpeedIndex = this.speedIndex;
-    this.longPressing = true;
-    this.speedIndex = PlayerSpeed.FAST_INDEX;
-    this.speedLabel = PlayerSpeed.label(PlayerSpeed.FAST_INDEX);
-    this.feedback = '';
-    this.feedbackKind = PlayerTipKind.NONE;
-    this.showHud = false;
-  }
-
-  private endSpeed(): void {
-    if (!this.longPressing) {
-      return;
-    }
-    this.longPressing = false;
-    this.speedIndex = this.savedSpeedIndex;
-    this.speedLabel = PlayerSpeed.label(this.savedSpeedIndex);
-    this.showHud = true;
-    this.armHide();
-  }
-
-  private panStart(event: GestureEvent): void {
-    if (!this.canPlay() || this.longPressing) {
-      this.pan.reset();
-      return;
-    }
-    if (!event.fingerList || event.fingerList.length === 0) {
-      return;
-    }
-    const finger = event.fingerList[0];
-    this.pan.begin(finger.localX, finger.localY, this.currentTime, this.playerW);
-    PlayerWindow.getBrightness(this.ctx()).then((value: number) => {
-      this.pan.primeBright(value);
-    });
-    PlayerWindow.getVolume().then((info: PlayerVolumeInfo) => {
-      this.volumeMax = info.max;
-      this.pan.primeVolume(info.max > 0 ? info.current / info.max : 0);
-    });
+  private closeSpeedDialog(): void {
+    this.speedCtrl.setShowing(false);
+    this.speedOpenSeq = 0;
   }
 
   private panMove(event: GestureEvent): void {
-    if (this.pan.mode === 0 || this.longPressing) {
-      return;
-    }
-    if (!event.fingerList || event.fingerList.length === 0) {
-      return;
-    }
-    const finger = event.fingerList[0];
-    const result: PlayerPanResult | null =
-      this.pan.move(finger.localX, finger.localY, this.fullNow(), this.duration, this.playerW, this.playerH);
-    if (!result) {
-      return;
-    }
-    if (result.mode === 2) {
-      this.dragging = true;
-      this.currentTime = result.time;
-      this.feedback = result.feedback;
-      this.feedbackKind = result.kind;
-      this.clearHide();
-    } else if (result.mode === 3 && result.bright >= 0) {
-      PlayerWindow.setBrightness(this.ctx(), result.bright);
-      this.feedback = result.feedback;
-      this.feedbackKind = result.kind;
-    } else if (result.mode === 4 && result.volume >= 0) {
-      this.applyVolume(result.volume);
-      this.feedback = result.feedback;
-      this.feedbackKind = result.kind;
+    const res = this.gestures.move(event, this.longPressing, this.fullNow(), this.duration, this.playerW, this.playerH);
+    if (!res) return;
+    if (res.mode === 2 && res.time !== undefined) {
+      this.state.dragging = true;
+      this.currentTime = res.time;
+      this.state.currentTime = res.time;
+      this.feedback = res.feedback;
+      this.feedbackKind = res.feedbackKind;
+      this.watcher.clearHide();
+    } else if (res.mode === 3 && res.bright !== undefined && res.bright >= 0) {
+      PlayerWindow.setBrightness(this.ctx(), res.bright);
+      this.feedback = res.feedback;
+      this.feedbackKind = res.feedbackKind;
+    } else if (res.mode === 4 && res.volumeRatio !== undefined && res.volumeRatio >= 0) {
+      const vol = this.audioBridge.applyRatio(res.volumeRatio);
+      this.volumeIndex = vol;
+      this.muted = vol <= 0;
+      this.feedback = res.feedback;
+      this.feedbackKind = res.feedbackKind;
     }
   }
 
   private finishPanSeek(): void {
-    const shouldSeek = this.pan.mode === 2;
-    const target = this.currentTime;
-    this.pan.reset();
-    this.clearTip();
+    const res = this.gestures.finish(this.currentTime);
+    this.watcher.clearTip();
     this.feedback = '';
     this.feedbackKind = PlayerTipKind.NONE;
-    if (shouldSeek) {
-      this.seekTo(target);
-    }
-    this.dragging = false;
-    this.showHud = true;
-    this.armHide();
+    if (res.shouldSeek) this.seekTo(res.targetTime);
+    this.state.dragging = false;
+    this.pulseHud();
   }
 
-  private panEnd(): void {
-    this.finishPanSeek();
-  }
-
-  private panCancel(): void {
-    this.finishPanSeek();
-  }
-
-  @Builder
-  skin() {
-    PlayerSkin({
-      isFull: this.fullNow(),
-      showHud: this.showHud,
-      showBack: this.showBack,
-      title: this.title,
-      playRequested: this.playRequested,
-      isPlaying: this.isPlaying,
-      completed: this.completed,
-      opening: this.opening,
-      seeking: this.seeking,
-      stalled: this.stalled,
-      errorText: this.errorText,
-      currentTime: this.currentTime,
-      duration: this.duration,
-      muted: this.muted,
-      speedLabel: this.speedLabel,
-      hasPrev: this.hasPrev,
-      hasNext: this.hasNext,
-      longPressing: this.longPressing,
-      feedback: this.feedback,
-      feedbackKind: this.feedbackKind,
-      topInset: this.topInset,
-      leftInset: this.leftInset,
-      rightInset: this.rightInset,
-      bottomInset: this.bottomInset,
-      ready: this.ready,
-      onBack: () => this.handleBack(),
+  private skinEvents(): PlayerSkinEvents {
+    return {
+      onBack: () => {
+        if (this.fullNow()) this.toggleFull();
+        else if (this.onBack) this.onBack();
+      },
       onPlay: () => this.togglePlay(),
       onFull: () => this.toggleFull(),
       onMute: () => this.toggleMute(),
-      onPrev: () => {
-        if (this.onPrev) {
-          this.onPrev();
-        }
-      },
-      onNext: () => {
-        if (this.onNext) {
-          this.onNext();
-        }
-      },
+      onPrev: () => { if (this.onPrev) this.onPrev(); },
+      onNext: () => { if (this.onNext) this.onNext(); },
       onSpeed: () => this.openSpeedDialog(),
       onRetry: () => this.retry(),
-      onErrorDetail: () => this.showErrorDetail(),
-      onSeekBack: () => this.seekBy(-10),
-      onSeekForward: () => this.seekBy(10),
-      onSeekStart: (value: number) => {
-        this.dragging = true;
-        this.currentTime = value;
-        this.clearHide();
-        this.showHud = true;
+      onErrorDetail: () => {
+        AlertDialog.show({ title: '报错详情', message: this.errorText, confirm: { value: '知道了', action: () => {} } });
       },
-      onSeekUpdate: (value: number) => {
-        this.currentTime = value;
+      onSeekBack: () => { this.seekTo(this.currentTime - 10); this.pulseHud(); },
+      onSeekForward: () => { this.seekTo(this.currentTime + 10); this.pulseHud(); },
+      onSeekStart: (val) => {
+        this.state.dragging = true; this.currentTime = val; this.state.currentTime = val;
+        this.watcher.clearHide(); this.showHud = true;
       },
-      onSeekEnd: (value: number) => {
-        this.seekTo(value);
-        this.dragging = false;
-        this.showHud = true;
-        this.armHide();
+      onSeekUpdate: (val) => { this.currentTime = val; this.state.currentTime = val; },
+      onSeekEnd: (val) => { this.seekTo(val); this.state.dragging = false; this.pulseHud(); },
+      onToggleHud: () => {
+        if (this.speedCtrl.showing || this.gestures.pan.mode > 1 || this.longPressing) return;
+        if (this.showHud) {
+          if (!this.playRequested || this.completed) return;
+          this.showHud = false;
+          this.watcher.clearHide();
+        } else {
+          this.showHud = true;
+          this.armHide();
+        }
       },
-      onToggleHud: () => this.toggleHud(),
-      onLongPress: () => this.beginSpeed(),
-      onLongPressEnd: () => this.endSpeed(),
-      onPanStart: (event: GestureEvent) => this.panStart(event),
-      onPanMove: (event: GestureEvent) => this.panMove(event),
-      onPanEnd: () => this.panEnd(),
-      onPanCancel: () => this.panCancel()
-    })
-      .width('100%')
-      .height('100%')
+      onLongPress: () => {
+        if (this.speedCtrl.beginFastForward(this.state.canPlay(), this.isPlaying)) {
+          this.longPressing = true; this.speedIndex = this.speedCtrl.index;
+          this.speedLabel = this.speedCtrl.label; this.feedback = '';
+          this.feedbackKind = PlayerTipKind.NONE; this.showHud = false;
+        }
+      },
+      onLongPressEnd: () => {
+        if (this.speedCtrl.endFastForward()) {
+          this.longPressing = false; this.speedIndex = this.speedCtrl.index;
+          this.speedLabel = this.speedCtrl.label; this.pulseHud();
+        }
+      },
+      onPanStart: (e) => this.gestures.start(e, this.state.canPlay(), this.longPressing, this.currentTime, this.playerW, this.ctx()),
+      onPanMove: (e) => this.panMove(e),
+      onPanEnd: () => this.finishPanSeek(),
+      onPanCancel: () => this.finishPanSeek()
+    };
   }
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       AVVolumePanel({ volumeLevel: this.volumeIndex })
-        .width(1)
-        .height(1)
-        .hitTestBehavior(HitTestMode.None)
-        .opacity(0)
+        .width(1).height(1).hitTestBehavior(HitTestMode.None).opacity(0)
 
-      if (this.playerOn && this.playSrc) {
-        Video({
-          src: this.playSrc,
-          previewUri: this.poster,
+      if (this.playerOn) {
+        PlayerVideoLayer({
+          playSrc: this.playSrc,
+          poster: this.poster,
+          speedIndex: this.speedIndex,
+          autoPlay: this.playRequested,
+          muted: this.muted || this.volumeIndex <= 0,
+          nonce: this.nonce,
           controller: this.controller,
-          currentProgressRate: PlayerSpeed.of(this.speedIndex)
+          onPreparedCallback: (info) => { if (this.observer) this.observer.handlePrepared(info); },
+          onStartCallback: () => { if (this.observer) this.observer.handleStart(); },
+          onPauseCallback: () => { if (this.observer) this.observer.handlePause(); },
+          onUpdateCallback: (info) => { if (this.observer) this.observer.handleUpdate(info); },
+          onSeekingCallback: () => {
+            if (this.state.live() && (this.state.seekTarget >= 0 || this.state.dragging)) {
+              this.state.seeking = true; this.seeking = true;
+            }
+          },
+          onSeekedCallback: () => {
+            if (this.state.live() && this.state.seekTarget < 0) {
+              this.state.seeking = false; this.seeking = false;
+            }
+          },
+          onFinishCallback: () => { if (this.observer) this.observer.handleFinish(); },
+          onErrorCallback: () => { if (this.observer) this.observer.handleError(); }
         })
-          .id(`eco_player_${this.nonce}`)
-          .width('100%')
-          .height('100%')
-          .autoPlay(this.playRequested)
-          .controls(false)
-          .muted(this.muted || this.volumeIndex <= 0)
-          .objectFit(ImageFit.Contain)
-          .backgroundColor('#000000')
-          .hitTestBehavior(HitTestMode.None)
-          .onPrepared((info: PreparedInfo) => {
-            if (!this.live()) {
-              return;
-            }
-            this.duration = info.duration;
-            this.ready = true;
-            this.opening = false;
-            this.clearOpenWatch();
-            this.errorText = '';
-            const resumeAt = this.resumeTime();
-            if (resumeAt >= 2) {
-              this.currentTime = resumeAt;
-              this.seeking = true;
-              this.seekTarget = resumeAt;
-              this.seekAt = Date.now();
-              this.controller.setCurrentTime(resumeAt, SeekMode.Accurate);
-            }
-            if (this.playRequested) {
-              this.controller.start();
-            }
-          })
-          .onStart(() => {
-            if (!this.live()) {
-              return;
-            }
-            if (!this.playRequested) {
-              this.controller.pause();
-              this.isPlaying = false;
-              return;
-            }
-            this.isPlaying = true;
-            this.opening = false;
-            this.clearOpenWatch();
-            this.completed = false;
-            if (this.seekTarget < 0) {
-              this.seeking = false;
-            }
-            this.noteProgress();
-            this.syncKeepScreen();
-            this.armHide();
-          })
-          .onPause(() => {
-            if (!this.live()) {
-              return;
-            }
-            this.isPlaying = false;
-            this.stalled = false;
-            this.clearStallWatch();
-            this.syncKeepScreen();
-            if (!this.playRequested) {
-              this.showHud = true;
-              this.clearHide();
-            }
-            this.emitProgress(this.currentTime, this.duration, true);
-          })
-          .onUpdate((info: PlaybackInfo) => {
-            if (!this.live()) {
-              return;
-            }
-            this.opening = false;
-            if (info.time > 0) {
-              this.isPlaying = this.playRequested;
-            }
-            this.noteProgress(info.time);
-            this.applyPlaybackTime(info.time);
-            this.emitProgress(this.currentTime, this.duration);
-          })
-          .onSeeking(() => {
-            if (!this.live()) {
-              return;
-            }
-            if (this.seekTarget >= 0 || this.dragging) {
-              this.seeking = true;
-            }
-          })
-          .onSeeked(() => {
-            if (!this.live()) {
-              return;
-            }
-            if (this.seekTarget < 0) {
-              this.seeking = false;
-            }
-          })
-          .onFinish(() => {
-            if (!this.live()) {
-              return;
-            }
-            this.isPlaying = false;
-            this.playRequested = false;
-            this.completed = true;
-            this.stalled = false;
-            this.clearStallWatch();
-            this.showHud = true;
-            this.syncKeepScreen();
-            this.lastPersist = 0;
-            this.emitProgress(this.duration > 0 ? this.duration : this.currentTime, this.duration);
-            if (this.onEnded) {
-              this.onEnded();
-            }
-          })
-          .onError(() => {
-            if (!this.live()) {
-              return;
-            }
-            const wasReady = this.ready;
-            this.isPlaying = false;
-            this.playRequested = false;
-            this.opening = false;
-            this.clearOpenWatch();
-            this.ready = false;
-            this.showHud = true;
-            this.errorText = this.formatPlayError(wasReady);
-            this.syncKeepScreen();
-          })
       } else if (this.poster) {
-        Image(this.poster)
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Cover)
-          .opacity(0.35)
+        Image(this.poster).width('100%').height('100%').objectFit(ImageFit.Cover).opacity(0.35)
       } else {
-        Column()
-          .width('100%')
-          .height('100%')
-          .backgroundColor('#000000')
+        Column().width('100%').height('100%').backgroundColor('#000000')
       }
 
-      this.skin()
+      PlayerSpeedSheet({
+        openSeq: this.speedOpenSeq,
+        speedLabel: this.speedLabel,
+        onPick: (index: number) => {
+          this.speedCtrl.pick(index);
+          this.speedIndex = index;
+          this.speedLabel = this.speedCtrl.label;
+          this.closeSpeedDialog();
+          this.pulseHud();
+        },
+        onClosed: () => this.speedCtrl.setShowing(false)
+      })
+
+      PlayerSkinView({
+        isFull: this.fullNow(),
+        showHud: this.showHud,
+        showBack: this.showBack,
+        title: this.title,
+        playRequested: this.playRequested,
+        isPlaying: this.isPlaying,
+        completed: this.completed,
+        opening: this.opening,
+        seeking: this.seeking,
+        stalled: this.stalled,
+        errorText: this.errorText,
+        currentTime: this.currentTime,
+        duration: this.duration,
+        muted: this.muted,
+        speedLabel: this.speedLabel,
+        hasPrev: this.hasPrev,
+        hasNext: this.hasNext,
+        longPressing: this.longPressing,
+        feedback: this.feedback,
+        feedbackKind: this.feedbackKind,
+        topInset: this.topInset,
+        leftInset: this.leftInset,
+        rightInset: this.rightInset,
+        bottomInset: this.bottomInset,
+        ready: this.ready,
+        events: this.skinEvents()
+      })
     }
     .width('100%')
     .height('100%')

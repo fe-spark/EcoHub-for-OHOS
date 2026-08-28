@@ -1,5 +1,9 @@
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI';
 import { ServerConfigManager } from './ServerConfigManager';
+
+export interface ServerConfigRouteParams {
+  mode: string;
+}
 
 export class SourceGuard {
   private static intercepting: boolean = false;
@@ -48,9 +52,10 @@ export class SourceGuard {
     }
     SourceGuard.intercepting = true;
     try {
+      const params: ServerConfigRouteParams = { mode: 'reconnect' };
       router.pushUrl({
         url: 'pages/ServerConfigPage',
-        params: { mode: 'reconnect' }
+        params: params
       }, (err: Error) => {
         if (err) {
           SourceGuard.intercepting = false;

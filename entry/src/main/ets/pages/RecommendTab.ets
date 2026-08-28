@@ -1,4 +1,4 @@
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
 import { BannerItem, HomeSection } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -198,6 +198,7 @@ export struct RecommendTab {
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
+            this.refreshing = false;
             return;
           }
           this.loadHome(true, true);
@@ -261,6 +262,7 @@ export struct RecommendTab {
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
+            this.refreshing = false;
             return;
           }
           this.loadHome(true, true);
@@ -348,6 +350,7 @@ export struct RecommendTab {
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
+            this.refreshing = false;
             return;
           }
           this.loadHome(true, true);

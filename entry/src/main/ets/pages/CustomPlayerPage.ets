@@ -1,4 +1,4 @@
-import promptAction from '@ohos.promptAction';
+import { promptAction } from '@kit.ArkUI';
 import { AppTheme } from '../common/constants/AppTheme';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { PageHeader } from '../components/PageHeader';
@@ -22,7 +22,7 @@ struct CustomPlayerPage {
   @State private playerActive: boolean = true;
   private inputController: TextInputController = new TextInputController();
 
-  aboutToAppear() {
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
@@ -34,7 +34,12 @@ struct CustomPlayerPage {
     });
   }
 
+  aboutToAppear() {
+    this.applyWindowBar();
+  }
+
   onPageShow(): void {
+    this.applyWindowBar();
     this.playerActive = true;
   }
 

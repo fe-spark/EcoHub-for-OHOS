@@ -5,7 +5,6 @@ import { AppIcon } from '../components/AppIcon';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { SourceGuard } from '../common/utils/SourceGuard';
-import { NavUtil } from '../common/utils/NavUtil';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { DailyUpdatePane } from './DailyUpdatePane';
 
@@ -145,41 +144,22 @@ export struct DailyUpdatesTab {
           }
           .layoutWeight(1)
 
-          Row({ space: AppTheme.SPACE_SM }) {
-            Row() {
-              Text('近 24 小时 ')
-                .fontSize(11)
-                .fontColor(AppTheme.TEXT_MUTED)
-              Text(`${this.currentCategory().count}`)
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.ACCENT)
-              Text(' 部')
-                .fontSize(11)
-                .fontColor(AppTheme.TEXT_MUTED)
-            }
-            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .backgroundColor('rgba(255, 255, 255, 0.06)')
-            .borderRadius(AppTheme.RADIUS_PILL)
-            .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
-
-            Row() {
-              AppIcon({
-                src: $r('sys.symbol.magnifyingglass'),
-                iconSize: 16,
-                color: AppTheme.TEXT_SECONDARY
-              })
-            }
-            .width(32)
-            .height(32)
-            .justifyContent(FlexAlign.Center)
-            .backgroundColor('rgba(255, 255, 255, 0.06)')
-            .borderRadius(AppTheme.RADIUS_PILL)
-            .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
-            .onClick(() => {
-              NavUtil.openSearch();
-            })
+          Row() {
+            Text('近 24 小时 ')
+              .fontSize(11)
+              .fontColor(AppTheme.TEXT_MUTED)
+            Text(`${this.currentCategory().count}`)
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.ACCENT)
+            Text(' 部')
+              .fontSize(11)
+              .fontColor(AppTheme.TEXT_MUTED)
           }
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .backgroundColor('rgba(255, 255, 255, 0.06)')
+          .borderRadius(AppTheme.RADIUS_PILL)
+          .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
         }
         .width('100%')
         .height(38)
@@ -243,6 +223,7 @@ export struct DailyUpdatesTab {
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
+            this.refreshing = false;
             return;
           }
           this.loadMeta();

@@ -1,10 +1,8 @@
-import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
+import { router, promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
 import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { FormatUtil } from '../common/utils/FormatUtil';
 import { NavUtil } from '../common/utils/NavUtil';
 import { WindowBar } from '../common/utils/WindowBar';
 import { EmptyState } from '../components/EmptyState';
@@ -14,6 +12,7 @@ import { BackIcon } from '../components/BackIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { SearchHistoryManager } from '../common/utils/SearchHistoryManager';
+import { SearchResultItem } from '../components/SearchResultItem';
 
 @Entry
 @Component
@@ -25,12 +24,16 @@ struct SearchPage {
   @State loading: boolean = false;
   @State loadingMore: boolean = false;
   @State searchHistory: string[] = [];
+  @State hotKeywords: string[] = [];
   @State private refreshing: boolean = false;
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
   private reconnectCb: () => void = () => {};
   private inputController: TextInputController = new TextInputController();
+  private static readonly DEFAULT_HOT_KEYWORDS: string[] = [
+    '凡人修仙传', '庆余年', '仙逆', '吞噬星空', '遮天', '斗破苍穹', '白夜破晓', '大奉打更人'
+  ];
 
   private hideKeyboard(): void {
     try {
@@ -45,19 +48,42 @@ struct SearchPage {
     }, 50);
   }
 
-  aboutToAppear() {
+  private getSearchPlaceholder(): string {
+    if (this.hotKeywords.length > 0 && this.hotKeywords[0]) {
+      return `大家都在搜：${this.hotKeywords[0]}`;
+    }
+    return '搜索电影、剧集、动漫';
+  }
+
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
+  }
+
+  aboutToAppear() {
+    this.applyWindowBar();
     this.loadHistory();
+    this.loadHotKeywords();
+    const params = router.getParams();
+    const initialKw = NavUtil.param(params, 'keyword');
+    if (initialKw) {
+      this.keyword = initialKw;
+      this.doSearch(true, false);
+    }
     this.reconnectCb = () => {
       this.loadHistory();
+      this.loadHotKeywords();
       if (this.submitted) {
         this.doSearch(true, false);
       }
     };
     SourceGuard.onReconnect(this.reconnectCb);
+  }
+
+  onPageShow(): void {
+    this.applyWindowBar();
   }
 
   onBackPress(): boolean {
@@ -71,6 +97,20 @@ struct SearchPage {
 
   private async loadHistory(): Promise<void> {
     this.searchHistory = await SearchHistoryManager.list();
+  }
+
+  private async loadHotKeywords(): Promise<void> {
+    try {
+      const list = await FilmApi.getHotKeywords();
+      if (list && list.length > 0) {
+        this.hotKeywords = list;
+        return;
+      }
+    } catch (_e) {
+    }
+    if (this.hotKeywords.length === 0) {
+      this.hotKeywords = SearchPage.DEFAULT_HOT_KEYWORDS.slice();
+    }
   }
 
   private confirmClearHistory(): void {
@@ -95,6 +135,9 @@ struct SearchPage {
     const kw = this.keyword.trim();
     if (!kw) {
       this.refreshing = false;
+      if (reset && !fromPull) {
+        promptAction.showToast({ message: '请输入搜索关键词' });
+      }
       return;
     }
     const nextPage = reset ? 1 : this.page.current + 1;
@@ -153,7 +196,11 @@ struct SearchPage {
             iconSize: 18,
             color: AppTheme.TEXT_MUTED
           })
-          TextInput({ text: this.keyword, placeholder: '搜索电影、剧集、动漫', controller: this.inputController })
+          TextInput({
+            text: this.keyword,
+            placeholder: this.getSearchPlaceholder(),
+            controller: this.inputController
+          })
             .layoutWeight(1)
             .height(40)
             .fontSize(14)
@@ -225,85 +272,153 @@ struct SearchPage {
       if (this.loading) {
         LoadingView({ label: '正在搜索' })
       } else if (!this.submitted) {
-        if (this.searchHistory.length > 0) {
+        Scroll() {
           Column() {
-            Row() {
-              Text('搜索历史')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(AppTheme.TEXT_PRIMARY)
-
-              Row() {
-                AppIcon({
-                  src: $r('sys.symbol.trash'),
-                  iconSize: 14,
-                  color: AppTheme.TEXT_MUTED
-                })
-                Text('清空')
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                  .margin({ left: 4 })
-              }
-              .onClick(() => this.confirmClearHistory())
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.SpaceBetween)
-            .padding({ left: 16, right: 16, top: 8, bottom: 12 })
-
-            Flex({ wrap: FlexWrap.Wrap }) {
-              ForEach(this.searchHistory, (item: string) => {
+            if (this.searchHistory.length > 0) {
+              Column() {
                 Row() {
-                  Row() {
-                    Text(item)
-                      .fontSize(13)
-                      .fontColor(AppTheme.TEXT_SECONDARY)
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .constraintSize({ maxWidth: 200 })
-                  }
-                  .padding({ left: 12, right: 4, top: 6, bottom: 6 })
-                  .onClick(() => {
-                    this.hideKeyboard();
-                    this.keyword = item;
-                    this.doSearch(true);
-                  })
+                  Text('搜索历史')
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppTheme.TEXT_PRIMARY)
 
                   Row() {
                     AppIcon({
-                      src: $r('sys.symbol.xmark'),
-                      iconSize: 10,
+                      src: $r('sys.symbol.trash'),
+                      iconSize: 14,
                       color: AppTheme.TEXT_MUTED
                     })
+                    Text('清空')
+                      .fontSize(12)
+                      .fontColor(AppTheme.TEXT_MUTED)
+                      .margin({ left: 4 })
                   }
-                  .width(22)
-                  .height(28)
-                  .justifyContent(FlexAlign.Center)
-                  .padding({ right: 6 })
-                  .onClick(() => {
-                    SearchHistoryManager.remove(item).then(() => {
-                      this.loadHistory();
-                    });
-                  })
+                  .onClick(() => this.confirmClearHistory())
                 }
-                .margin({ right: 8, bottom: 8 })
-                .backgroundColor(AppTheme.BG_CARD)
-                .borderRadius(AppTheme.RADIUS_PILL)
-              }, (item: string) => item)
+                .width('100%')
+                .justifyContent(FlexAlign.SpaceBetween)
+                .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+
+                Flex({ wrap: FlexWrap.Wrap }) {
+                  ForEach(this.searchHistory, (item: string) => {
+                    Row() {
+                      Row() {
+                        Text(item)
+                          .fontSize(13)
+                          .fontColor(AppTheme.TEXT_SECONDARY)
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                          .constraintSize({ maxWidth: 200 })
+                      }
+                      .padding({ left: 12, right: 4, top: 6, bottom: 6 })
+                      .onClick(() => {
+                        this.hideKeyboard();
+                        this.keyword = item;
+                        this.doSearch(true);
+                      })
+
+                      Row() {
+                        AppIcon({
+                          src: $r('sys.symbol.xmark'),
+                          iconSize: 10,
+                          color: AppTheme.TEXT_MUTED
+                        })
+                      }
+                      .width(22)
+                      .height(28)
+                      .justifyContent(FlexAlign.Center)
+                      .padding({ right: 6 })
+                      .onClick(() => {
+                        SearchHistoryManager.remove(item).then(() => {
+                          this.loadHistory();
+                        });
+                      })
+                    }
+                    .margin({ right: 8, bottom: 8 })
+                    .backgroundColor(AppTheme.BG_CARD)
+                    .borderRadius(AppTheme.RADIUS_PILL)
+                  }, (item: string) => item)
+                }
+                .padding({ left: 16, right: 16 })
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Start)
+              .margin({ bottom: 16 })
             }
-            .padding({ left: 16, right: 16 })
+
+            if (this.hotKeywords.length > 0) {
+              Column() {
+                Row() {
+                  AppIcon({
+                    src: $r('sys.symbol.flame_fill'),
+                    iconSize: 15,
+                    color: AppTheme.ACCENT
+                  })
+                  Text('热门搜索')
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppTheme.TEXT_PRIMARY)
+                    .margin({ left: 6 })
+                }
+                .width('100%')
+                .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+
+                Flex({ wrap: FlexWrap.Wrap }) {
+                  ForEach(this.hotKeywords, (item: string, index: number) => {
+                    Row() {
+                      Text(`${index + 1}`)
+                        .fontSize(11)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(index < 3 ? AppTheme.ACCENT : AppTheme.TEXT_MUTED)
+                        .margin({ right: 6 })
+                      Text(item)
+                        .fontSize(13)
+                        .fontColor(AppTheme.TEXT_PRIMARY)
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .constraintSize({ maxWidth: 200 })
+                    }
+                    .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+                    .margin({ right: 8, bottom: 8 })
+                    .backgroundColor(index < 3 ? AppTheme.BG_CHIP : AppTheme.BG_CARD)
+                    .border({
+                      width: 1,
+                      color: index < 3 ? AppTheme.ACCENT_SOFT : AppTheme.BORDER
+                    })
+                    .borderRadius(AppTheme.RADIUS_PILL)
+                    .onClick(() => {
+                      this.hideKeyboard();
+                      this.keyword = item;
+                      this.doSearch(true);
+                    })
+                  }, (item: string) => item)
+                }
+                .padding({ left: 16, right: 16 })
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Start)
+            }
+
+            if (this.searchHistory.length === 0 && this.hotKeywords.length === 0) {
+              EmptyState({
+                title: '搜索影片',
+                subtitle: '输入片名、演员或关键词',
+                icon: $r('sys.symbol.magnifyingglass')
+              })
+            }
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start)
-          .onClick(() => {
-            this.hideKeyboard();
-          })
-        } else {
-          EmptyState({
-            title: '搜索影片',
-            subtitle: '输入片名、演员或关键词',
-            icon: $r('sys.symbol.magnifyingglass')
-          })
+          .justifyContent(FlexAlign.Start)
+          .padding({ bottom: this.bottomInset + 20 })
         }
+        .scrollBar(BarState.Off)
+        .width('100%')
+        .layoutWeight(1)
+        .align(Alignment.Top)
+        .onClick(() => {
+          this.hideKeyboard();
+        })
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
           if (this.list.length === 0) {
@@ -328,65 +443,12 @@ struct SearchPage {
               }
               ForEach(this.list, (film: MovieBasicInfo) => {
                 ListItem() {
-                  Row() {
-                    Stack({ alignContent: Alignment.Center }) {
-                      Image(FormatUtil.poster(film))
-                        .width(86)
-                        .height(128)
-                        .objectFit(ImageFit.Cover)
-                        .borderRadius(AppTheme.RADIUS_MD)
-                        .backgroundColor(AppTheme.BG_CARD)
-                      Row() {
-                        AppIcon({
-                          src: $r('sys.symbol.play_fill'),
-                          iconSize: 12,
-                          color: AppTheme.TEXT_PRIMARY
-                        })
-                      }
-                      .width(28)
-                      .height(28)
-                      .justifyContent(FlexAlign.Center)
-                      .backgroundColor('rgba(0,0,0,0.55)')
-                      .borderRadius(14)
+                  SearchResultItem({
+                    film: film,
+                    onSelect: (selected: MovieBasicInfo) => {
+                      this.hideKeyboard();
+                      NavUtil.openPlay(selected.id);
                     }
-                    Column() {
-                      Text(film.name)
-                        .fontSize(16)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor(AppTheme.TEXT_PRIMARY)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      Text(FormatUtil.joinMeta([film.cName, film.year, film.area, film.remarks]))
-                        .fontSize(12)
-                        .fontColor(AppTheme.TEXT_SECONDARY)
-                        .margin({ top: 8 })
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      Text(`导演 ${film.director || '未知'}`)
-                        .fontSize(12)
-                        .fontColor(AppTheme.TEXT_MUTED)
-                        .margin({ top: 6 })
-                        .maxLines(1)
-                      Text(`主演 ${film.actor || '未知'}`)
-                        .fontSize(12)
-                        .fontColor(AppTheme.TEXT_MUTED)
-                        .margin({ top: 4 })
-                        .maxLines(1)
-                      Text(film.blurb || '暂无简介')
-                        .fontSize(12)
-                        .fontColor(AppTheme.TEXT_SECONDARY)
-                        .margin({ top: 8 })
-                        .maxLines(2)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    }
-                    .layoutWeight(1)
-                    .alignItems(HorizontalAlign.Start)
-                    .margin({ left: 12 })
-                  }
-                  .width('100%')
-                  .onClick(() => {
-                    this.hideKeyboard();
-                    NavUtil.openPlay(film.id);
                   })
                 }
               }, (film: MovieBasicInfo) => `${film.id}`)
@@ -425,6 +487,7 @@ struct SearchPage {
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
+            this.refreshing = false;
             return;
           }
           this.doSearch(true, true);

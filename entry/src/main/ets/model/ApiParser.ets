@@ -395,4 +395,21 @@ export class ApiParser {
     };
     return config;
   }
+
+  static parseStringList(raw: Object | Object[] | null | undefined): string[] {
+    if (!raw || !Array.isArray(raw)) {
+      return [];
+    }
+    const arr: Object[] = raw as Object[];
+    const list: string[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      const item: Object = arr[i];
+      const str: string = `${item ?? ''}`.trim();
+      if (str !== '') {
+        list.push(str);
+      }
+    }
+    return list;
+  }
 }
+

@@ -1,4 +1,4 @@
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI';
 import { AppTheme } from '../common/constants/AppTheme';
 import { BackIcon } from './BackIcon';
 

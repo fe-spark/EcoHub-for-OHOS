@@ -1,4 +1,4 @@
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
@@ -61,11 +61,15 @@ struct Index {
     }
   }
 
-  async aboutToAppear() {
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
+  }
+
+  async aboutToAppear() {
+    this.applyWindowBar();
     this.configCb = (config: BasicConfig) => {
       this.siteName = config.siteName || 'EcoHub';
       this.siteOpen = config.state !== false;
@@ -90,6 +94,7 @@ struct Index {
   }
 
   onPageShow(): void {
+    this.applyWindowBar();
     if (this.ready) {
       this.loadSite(false);
     }

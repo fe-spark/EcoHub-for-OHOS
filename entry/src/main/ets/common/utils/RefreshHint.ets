@@ -1,4 +1,4 @@
-import promptAction from '@ohos.promptAction';
+import { promptAction } from '@kit.ArkUI';
 
 export class RefreshHint {
   static succeed(): void {

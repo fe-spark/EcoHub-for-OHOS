@@ -1,5 +1,4 @@
-import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
+import { router, promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { FilmApi } from '../api/FilmApi';

@@ -26,6 +26,7 @@ export struct DailyUpdatePane {
   @State private errorText: string = '';
   @State private fetchLock: boolean = false;
   private hasLoaded: boolean = false;
+  private listScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.boot();
@@ -123,6 +124,13 @@ export struct DailyUpdatePane {
     return this.page.current < this.page.pageCount;
   }
 
+  private onPullRefreshing(): void {
+    if (this.fetchLock) {
+      return;
+    }
+    this.load(true, true);
+  }
+
   private rowIds(): number[] {
     const n = Math.ceil(this.films.length / GRID_COLS);
     const ids: number[] = [];
@@ -184,17 +192,14 @@ export struct DailyUpdatePane {
           .height('100%')
         }
         .onRefreshing(() => {
-          if (this.fetchLock) {
-            return;
-          }
-          this.load(true, true);
+          this.onPullRefreshing();
         })
         .pullToRefresh(!this.fetchLock)
         .width('100%')
         .layoutWeight(1)
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
-          List() {
+          List({ scroller: this.listScroller }) {
             ForEach(this.rowIds(), (row: number) => {
               ListItem() {
                 this.filmRow(row)
@@ -206,7 +211,7 @@ export struct DailyUpdatePane {
                 .fontSize(12)
                 .fontColor(AppTheme.TEXT_MUTED)
                 .width('100%')
-                .height(40)
+                .height(72)
                 .textAlign(TextAlign.Center)
             }
           }
@@ -224,10 +229,7 @@ export struct DailyUpdatePane {
           })
         }
         .onRefreshing(() => {
-          if (this.fetchLock) {
-            return;
-          }
-          this.load(true, true);
+          this.onPullRefreshing();
         })
         .pullToRefresh(!this.fetchLock)
         .width('100%')

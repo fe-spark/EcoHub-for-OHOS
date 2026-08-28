@@ -1,23 +1,27 @@
-import { MovieUrlInfo, PlaySource } from '../model/FilmModels';
+import { MovieDescriptor, MovieUrlInfo, PlaySource } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { AppIcon } from './AppIcon';
+import { FilmDetailHeader } from './FilmDetailHeader';
 
 const GROUP_SIZE = 100;
 const EPISODE_MIN_H = 44;
-const EP_COLS = 4;
+const EP_COLS_COMPACT = 3;
+const EP_COLS_WIDE = 2;
+const EP_NAME_WIDE_LEN = 6;
 
 @Component
 export struct PlayDetailPanel {
   @Prop name: string = '';
   @Prop subTitle: string = '';
+  @Prop actor: string = '';
   @Prop plot: string = '';
+  @Prop descriptor: MovieDescriptor | null = null;
   @Prop sources: PlaySource[] = [];
   @Prop @Watch('onPlayIndexChange') playingSourceId: string = '';
   @Prop @Watch('onViewSourceChange') viewingSourceId: string = '';
   @Prop @Watch('onPlayIndexChange') episodeIndex: number = 0;
   onViewSource?: (id: string) => void;
   onSelectEpisode?: (sourceId: string, index: number) => void;
-  @State private plotOpen: boolean = false;
   @State private groupSourceIds: string[] = [];
   @State private groupIndexes: number[] = [];
 
@@ -122,8 +126,26 @@ export struct PlayDetailPanel {
     return result;
   }
 
-  private epRowIds(): number[] {
-    const n = Math.ceil(this.visibleEpisodes().length / EP_COLS);
+  private usesWideTiles(): boolean {
+    const list = this.visibleEpisodes();
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].episode.length > EP_NAME_WIDE_LEN) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private epCols(): number {
+    return this.usesWideTiles() ? EP_COLS_WIDE : EP_COLS_COMPACT;
+  }
+
+  private epMaxLines(): number {
+    return this.usesWideTiles() ? 2 : 1;
+  }
+
+  private colIds(): number[] {
+    const n = this.epCols();
     const ids: number[] = [];
     for (let i = 0; i < n; i++) {
       ids.push(i);
@@ -131,24 +153,26 @@ export struct PlayDetailPanel {
     return ids;
   }
 
-  private subtitleText(): string {
-    const text = this.subTitle ? this.subTitle.trim() : '';
-    return text ? text : '暂无数据';
+  private epRowIds(): number[] {
+    const n = Math.ceil(this.visibleEpisodes().length / this.epCols());
+    const ids: number[] = [];
+    for (let i = 0; i < n; i++) {
+      ids.push(i);
+    }
+    return ids;
   }
 
-  private plotText(): string {
-    const raw = this.plot ? this.plot : '';
-    const text = raw
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    return text ? text : '暂无介绍';
+  private showEpisodeTitle(name: string): void {
+    const text = name.trim();
+    if (!text) {
+      return;
+    }
+    AlertDialog.show({
+      title: '剧集名称',
+      message: text,
+      autoCancel: true,
+      confirm: { value: '知道了', action: () => {} }
+    });
   }
 
   private isEpisodeOn(index: number): boolean {
@@ -204,11 +228,16 @@ export struct PlayDetailPanel {
     })
     .width('100%')
     .height(36)
+    .margin({ top: 8 })
   }
 
   @Builder
   groupBar() {
     Column() {
+      Divider()
+        .color(AppTheme.BORDER)
+        .width('100%')
+
       if (this.sources.length > 0) {
         this.sourceRow()
       }
@@ -241,7 +270,7 @@ export struct PlayDetailPanel {
       }
     }
     .width('100%')
-    .padding({ top: 8, bottom: 8 })
+    .padding({ bottom: 8 })
     .backgroundColor(AppTheme.BG)
   }
 
@@ -262,11 +291,10 @@ export struct PlayDetailPanel {
 
   @Builder
   epRow(row: number) {
-    Row({ space: 10 }) {
-      this.epCell(row * EP_COLS)
-      this.epCell(row * EP_COLS + 1)
-      this.epCell(row * EP_COLS + 2)
-      this.epCell(row * EP_COLS + 3)
+    Row({ space: AppTheme.SPACE_SM }) {
+      ForEach(this.colIds(), (col: number) => {
+        this.epCell(row * this.epCols() + col)
+      }, (col: number) => `ep_col_${this.viewingSourceId}_${row}_${col}`)
     }
     .width('100%')
     .padding({ left: 12, right: 12, bottom: 10 })
@@ -291,14 +319,14 @@ export struct PlayDetailPanel {
   @Builder
   episodeTile(ep: MovieUrlInfo, index: number) {
     Text(ep.episode)
-      .fontSize(14)
+      .fontSize(13)
       .fontWeight(this.isEpisodeOn(index) ? FontWeight.Bold : FontWeight.Medium)
       .fontColor(this.isEpisodeOn(index) ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
       .width('100%')
       .constraintSize({ minHeight: EPISODE_MIN_H })
-      .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+      .padding({ left: AppTheme.SPACE_SM, right: AppTheme.SPACE_SM, top: 10, bottom: 10 })
       .textAlign(TextAlign.Center)
-      .maxLines(1)
+      .maxLines(this.epMaxLines())
       .textOverflow({ overflow: TextOverflow.Ellipsis })
       .backgroundColor(this.isEpisodeOn(index) ? AppTheme.ACCENT_SOFT : AppTheme.BG_CARD)
       .borderRadius(AppTheme.RADIUS_MD)
@@ -306,8 +334,15 @@ export struct PlayDetailPanel {
         width: this.isEpisodeOn(index) ? 2 : 0,
         color: AppTheme.ACCENT
       })
+      .gesture(
+        LongPressGesture({ repeat: false })
+          .onAction(() => {
+            this.showEpisodeTitle(ep.episode);
+          })
+      )
       .onClick(() => {
         if (this.isEpisodeOn(index) || !this.onSelectEpisode) {
+          this.showEpisodeTitle(ep.episode);
           return;
         }
         this.onSelectEpisode(this.viewingSourceId, index);
@@ -317,61 +352,12 @@ export struct PlayDetailPanel {
   build() {
     List() {
       ListItem() {
-        Column() {
-          Row() {
-            Column() {
-              Text(this.name)
-                .fontSize(16)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.TEXT_PRIMARY)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .width('100%')
-              Text(this.subtitleText())
-                .fontSize(13)
-                .fontColor(AppTheme.TEXT_MUTED)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .margin({ top: 4 })
-                .width('100%')
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
-
-            AppIcon({
-              src: this.plotOpen ? $r('sys.symbol.chevron_up') : $r('sys.symbol.chevron_down'),
-              iconSize: 18,
-              color: AppTheme.TEXT_MUTED
-            })
-          }
-          .width('100%')
-          .padding({ left: 12, right: 4, top: 12 })
-          .alignItems(VerticalAlign.Center)
-          .onClick(() => {
-            this.plotOpen = !this.plotOpen;
-          })
-
-          if (this.plotOpen) {
-            Column() {
-              Text(this.plotText())
-                .fontSize(13)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .lineHeight(22)
-                .width('100%')
-                .padding(12)
-                .backgroundColor(AppTheme.BG_CARD)
-                .borderRadius(AppTheme.RADIUS_MD)
-            }
-            .width('100%')
-            .padding({ left: 12, right: 12, top: 12 })
-          }
-
-          Divider()
-            .color(AppTheme.BORDER)
-            .margin({ top: 12, bottom: 4 })
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
+        FilmDetailHeader({
+          name: this.name,
+          actor: this.actor,
+          plot: this.plot,
+          descriptor: this.descriptor
+        })
       }
 
       if (this.needsGrouping() || this.sources.length > 0) {

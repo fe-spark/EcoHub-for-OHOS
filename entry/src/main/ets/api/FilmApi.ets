@@ -96,6 +96,15 @@ export class FilmApi {
     FilmApi.configPromise = null;
   }
 
+  static async getHotKeywords(limit: number = 8): Promise<string[]> {
+    const params = new QueryParams().set('limit', limit);
+    const res = await HttpClient.getInstance().get('/hotKeywords', params);
+    if (res.code !== 0 || !res.data) {
+      return [];
+    }
+    return ApiParser.parseStringList(res.data);
+  }
+
   static async searchFilm(keyword: string, current: number = 1): Promise<SearchResult> {
     const params = new QueryParams().set('keyword', keyword).set('current', current);
     const res = await HttpClient.getInstance().get('/searchFilm', params);

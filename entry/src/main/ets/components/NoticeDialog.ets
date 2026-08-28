@@ -1,4 +1,4 @@
-import curves from '@ohos.curves';
+import { curves } from '@kit.ArkUI';
 import { AppTheme } from '../common/constants/AppTheme';
 import { AppIcon } from './AppIcon';
 

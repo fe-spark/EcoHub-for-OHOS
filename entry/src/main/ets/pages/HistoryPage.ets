@@ -1,4 +1,4 @@
-import promptAction from '@ohos.promptAction';
+import { promptAction } from '@kit.ArkUI';
 import { HistoryItem } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
@@ -23,11 +23,15 @@ struct HistoryPage {
   @State private bottomInset: number = 16;
   private sourceCb: () => void = () => {};
 
-  aboutToAppear() {
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
+  }
+
+  aboutToAppear() {
+    this.applyWindowBar();
     this.sourceCb = () => {
       this.reload(false);
     };
@@ -36,6 +40,7 @@ struct HistoryPage {
   }
 
   onPageShow(): void {
+    this.applyWindowBar();
     this.reload(false);
   }
 
@@ -216,6 +221,7 @@ struct HistoryPage {
       }
       .onRefreshing(() => {
         if (this.fetchLock) {
+          this.refreshing = false;
           return;
         }
         this.reload(true);

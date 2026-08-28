@@ -1,7 +1,6 @@
-import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
+import { router, promptAction } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
-import { HistoryItem, MovieBasicInfo, MovieUrlInfo, PlaySource } from '../model/FilmModels';
+import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { HistoryManager } from '../common/utils/HistoryManager';
@@ -26,7 +25,9 @@ struct PlayPage {
   @State private name: string = '';
   @State private picture: string = '';
   @State private subTitle: string = '';
+  @State private actor: string = '';
   @State private plot: string = '';
+  @State private descriptor: MovieDescriptor | null = null;
   @State private sources: PlaySource[] = [];
   @State private playingSourceId: string = '';
   @State private viewingSourceId: string = '';
@@ -55,7 +56,7 @@ struct PlayPage {
   private lastCurrentTime: number = 0;
   private lastDuration: number = 0;
 
-  aboutToAppear() {
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
@@ -65,6 +66,10 @@ struct PlayPage {
       this.viewW = width;
       this.viewH = height;
     });
+  }
+
+  aboutToAppear() {
+    this.applyWindowBar();
     const params = router.getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
     const sourceId = NavUtil.param(params, 'sourceId');
@@ -107,6 +112,7 @@ struct PlayPage {
   }
 
   onPageShow(): void {
+    this.applyWindowBar();
     this.playerActive = true;
   }
 
@@ -163,7 +169,9 @@ struct PlayPage {
       const detail = info.detail;
       this.name = detail.name;
       this.picture = detail.picture;
+      this.descriptor = detail.descriptor;
       this.subTitle = detail.descriptor.subTitle;
+      this.actor = detail.descriptor.actor;
       this.plot = detail.descriptor.content || detail.descriptor.blurb;
       this.sources = detail.list;
       this.playingSourceId = info.currentPlayFrom || (detail.list.length > 0 ? detail.list[0].id : '');
@@ -426,7 +434,9 @@ struct PlayPage {
             PlayDetailPanel({
               name: this.name,
               subTitle: this.subTitle,
+              actor: this.actor,
               plot: this.plot,
+              descriptor: this.descriptor,
               sources: this.sources,
               playingSourceId: this.playingSourceId,
               viewingSourceId: this.viewingSourceId,

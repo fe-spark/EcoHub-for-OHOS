@@ -81,16 +81,24 @@ struct TipPage {
   @State private bottomInset: number = 16;
   private reconnectCb: () => void = () => {};
 
-  async aboutToAppear() {
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
+  }
+
+  async aboutToAppear() {
+    this.applyWindowBar();
     this.reconnectCb = () => {
       this.loadConfig();
     };
     SourceGuard.onReconnect(this.reconnectCb);
     await this.loadConfig();
+  }
+
+  onPageShow(): void {
+    this.applyWindowBar();
   }
 
   aboutToDisappear(): void {

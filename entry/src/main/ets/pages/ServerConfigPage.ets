@@ -1,5 +1,4 @@
-import router from '@ohos.router';
-import promptAction from '@ohos.promptAction';
+import { router, promptAction } from '@kit.ArkUI';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { FilmApi } from '../api/FilmApi';
@@ -24,15 +23,23 @@ struct ServerConfigPage {
   @State private showHistoryDialog: boolean = false;
   private inputController: TextInputController = new TextInputController();
 
-  async aboutToAppear() {
+  private applyWindowBar(): void {
     WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
+  }
+
+  async aboutToAppear() {
+    this.applyWindowBar();
     const params = router.getParams() as Object;
     this.reconnect = NavUtil.param(params, 'mode') === 'reconnect';
     this.serverUrl = await ServerConfigManager.getInstance().getServerUrl();
     await this.loadHistory();
+  }
+
+  onPageShow(): void {
+    this.applyWindowBar();
   }
 
   aboutToDisappear(): void {
