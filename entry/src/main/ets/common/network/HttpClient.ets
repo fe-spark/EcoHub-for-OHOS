@@ -2,6 +2,7 @@ import { http } from '@kit.NetworkKit';
 import { ServerConfigManager } from '../utils/ServerConfigManager';
 import { QueryParams } from '../utils/QueryParams';
 import { SourceGuard } from '../utils/SourceGuard';
+import { AppVersionUtil } from '../utils/AppVersionUtil';
 
 export interface ApiResponse {
   code: number;
@@ -9,10 +10,29 @@ export interface ApiResponse {
   data: Object | Object[] | string | number | boolean | null;
 }
 
+interface TrackViewPayload {
+  action: string;
+  resource: string;
+}
+
 export class HttpClient {
   private static instance: HttpClient;
+  private userAgent: string = '';
 
   private constructor() {
+  }
+
+  private async resolveUserAgent(): Promise<string> {
+    if (this.userAgent) {
+      return this.userAgent;
+    }
+    try {
+      const version = await AppVersionUtil.getVersionName();
+      this.userAgent = version ? `EcoHub-OHOS/${version}` : 'EcoHub-OHOS';
+    } catch (_err) {
+      this.userAgent = 'EcoHub-OHOS';
+    }
+    return this.userAgent;
   }
 
   public static getInstance(): HttpClient {
@@ -40,6 +60,43 @@ export class HttpClient {
     return this.send(url, timeout);
   }
 
+  public trackView(action: string, resource: string = ''): void {
+    this.sendTrack(action, resource).catch(() => {});
+  }
+
+  private async sendTrack(action: string, resource: string): Promise<void> {
+    const manager = ServerConfigManager.getInstance();
+    let url = '';
+    try {
+      url = manager.buildApiUrl('/stat/view');
+    } catch (_err) {
+      return;
+    }
+    const httpRequest = http.createHttp();
+    const userAgent = await this.resolveUserAgent();
+    const payload: TrackViewPayload = {
+      action: action,
+      resource: resource
+    };
+    try {
+      await httpRequest.request(url, {
+        method: http.RequestMethod.POST,
+        header: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': userAgent
+        },
+        extraData: payload,
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 5000,
+        readTimeout: 5000
+      });
+    } catch (_err) {
+    } finally {
+      httpRequest.destroy();
+    }
+  }
+
   public async testConnection(baseUrl: string): Promise<boolean> {
     const manager = ServerConfigManager.getInstance();
     const origin = ServerConfigManager.stripApiSuffix(manager.normalizeRaw(baseUrl));
@@ -59,12 +116,14 @@ export class HttpClient {
 
   private async send(url: string, timeout: number): Promise<ApiResponse> {
     const httpRequest = http.createHttp();
+    const userAgent = await this.resolveUserAgent();
     try {
       const response = await httpRequest.request(url, {
         method: http.RequestMethod.GET,
         header: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'User-Agent': userAgent
         },
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: timeout,

@@ -12,6 +12,7 @@ import { BackIcon } from '../components/BackIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { SearchHistoryManager } from '../common/utils/SearchHistoryManager';
+import { HttpClient } from '../common/network/HttpClient';
 import { SearchResultItem } from '../components/SearchResultItem';
 
 @Entry
@@ -146,6 +147,9 @@ struct SearchPage {
     }
     if (this.fetchLock) {
       return;
+    }
+    if (reset) {
+      HttpClient.getInstance().trackView('search', kw);
     }
     this.fetchLock = true;
     if (reset) {

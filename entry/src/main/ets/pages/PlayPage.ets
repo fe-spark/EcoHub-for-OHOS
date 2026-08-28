@@ -15,6 +15,7 @@ import { FilmGrid } from '../components/FilmGrid';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { SourceGuard } from '../common/utils/SourceGuard';
+import { HttpClient } from '../common/network/HttpClient';
 
 @Entry
 @Component
@@ -72,6 +73,9 @@ struct PlayPage {
     this.applyWindowBar();
     const params = router.getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
+    if (this.filmId) {
+      HttpClient.getInstance().trackView('play', this.filmId);
+    }
     const sourceId = NavUtil.param(params, 'sourceId');
     const hasEpisodeParam = NavUtil.param(params, 'episodeIndex') !== '';
     const hasCurrentTimeParam = NavUtil.param(params, 'currentTime') !== '';

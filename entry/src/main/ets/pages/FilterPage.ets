@@ -13,6 +13,7 @@ import { FilterTagRow } from '../components/FilterTagRow';
 import { ScrollFab } from '../components/ScrollFab';
 import { FilmCard } from '../components/FilmCard';
 import { SourceGuard } from '../common/utils/SourceGuard';
+import { HttpClient } from '../common/network/HttpClient';
 import { RefreshHint } from '../common/utils/RefreshHint';
 
 const GRID_COLS = 3;
@@ -58,6 +59,7 @@ struct FilterPage {
     this.applyWindowBar();
     const params = router.getParams() as Object;
     this.pid = NavUtil.param(params, 'Pid');
+    HttpClient.getInstance().trackView('classify', this.pid);
     const category = NavUtil.param(params, 'Category');
     const sort = NavUtil.param(params, 'Sort');
     if (category) {

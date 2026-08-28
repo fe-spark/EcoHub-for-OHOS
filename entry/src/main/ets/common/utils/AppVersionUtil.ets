@@ -12,7 +12,7 @@ export interface AppUpdateInfo {
 }
 
 export class AppVersionUtil {
-  public static readonly APP_VERSION: string = '1.1.0';
+  public static readonly APP_VERSION: string = '1.1.2-beta.1';
   private static cachedVersionName: string = '';
 
   /**
@@ -159,6 +159,10 @@ export class AppVersionUtil {
       for (let i = 0; i < releases.length; i++) {
         const item = releases[i];
         if (item['draft']) {
+          continue;
+        }
+        // 正式版用户不提示测试版，已装 beta 的才跟 pre-release
+        if (item['prerelease'] && currentVersion.indexOf('-') < 0) {
           continue;
         }
         const tagName = (item['tag_name'] as string) || '';

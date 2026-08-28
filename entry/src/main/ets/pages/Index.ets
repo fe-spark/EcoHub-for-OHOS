@@ -13,6 +13,7 @@ import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 import { AppVersionUtil } from '../common/utils/AppVersionUtil';
+import { HttpClient } from '../common/network/HttpClient';
 import { NoticeDialog } from '../components/NoticeDialog';
 
 @Entry
@@ -86,6 +87,7 @@ struct Index {
       return;
     }
     await this.loadSite(false);
+    HttpClient.getInstance().trackView('browse');
     SiteHeartbeat.getInstance().start();
     this.reconnectCb = () => {
       this.loadSite(false);
