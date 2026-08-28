@@ -2,6 +2,7 @@ import { FilmApi } from '../api/FilmApi';
 import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FilmCard } from '../components/FilmCard';
+import { ScrollFab } from '../components/ScrollFab';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { RefreshHint } from '../common/utils/RefreshHint';
@@ -25,6 +26,8 @@ export struct DailyUpdatePane {
   @State private loadingMore: boolean = false;
   @State private errorText: string = '';
   @State private fetchLock: boolean = false;
+  @State private listHeight: number = 0;
+  @State private showTopFab: boolean = false;
   private hasLoaded: boolean = false;
   private listScroller: Scroller = new Scroller();
 
@@ -131,6 +134,18 @@ export struct DailyUpdatePane {
     this.load(true, true);
   }
 
+  private scrollToTop(): void {
+    this.showTopFab = false;
+    this.listScroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true });
+  }
+
+  private syncTopFab(y: number): void {
+    const show = this.listHeight > 0 && y > this.listHeight;
+    if (show !== this.showTopFab) {
+      this.showTopFab = show;
+    }
+  }
+
   private rowIds(): number[] {
     const n = Math.ceil(this.films.length / GRID_COLS);
     const ids: number[] = [];
@@ -166,74 +181,98 @@ export struct DailyUpdatePane {
   }
 
   build() {
-    Column() {
-      if (this.loading && this.films.length === 0) {
-        LoadingView({ label: '正在加载今日更新' })
-          .layoutWeight(1)
-      } else if (this.films.length === 0) {
-        Refresh({ refreshing: $$this.refreshing }) {
-          Scroll() {
-            if (this.errorText) {
-              EmptyState({
-                title: '加载失败',
-                subtitle: this.errorText,
-                icon: $r('sys.symbol.info_circle')
-              })
-            } else {
-              EmptyState({
-                title: '暂无更新',
-                subtitle: '近 24 小时还没有新片入库',
-                icon: $r('sys.symbol.flame')
-              })
-            }
-          }
-          .scrollBar(BarState.Off)
-          .width('100%')
-          .height('100%')
-        }
-        .onRefreshing(() => {
-          this.onPullRefreshing();
-        })
-        .pullToRefresh(!this.fetchLock)
-        .width('100%')
-        .layoutWeight(1)
-      } else {
-        Refresh({ refreshing: $$this.refreshing }) {
-          List({ scroller: this.listScroller }) {
-            ForEach(this.rowIds(), (row: number) => {
-              ListItem() {
-                this.filmRow(row)
+    Stack({ alignContent: Alignment.BottomEnd }) {
+      Column() {
+        if (this.loading && this.films.length === 0) {
+          LoadingView({ label: '正在加载今日更新' })
+            .layoutWeight(1)
+        } else if (this.films.length === 0) {
+          Refresh({ refreshing: $$this.refreshing }) {
+            Scroll() {
+              if (this.errorText) {
+                EmptyState({
+                  title: '加载失败',
+                  subtitle: this.errorText,
+                  icon: $r('sys.symbol.info_circle')
+                })
+              } else {
+                EmptyState({
+                  title: '暂无更新',
+                  subtitle: '近 24 小时还没有新片入库',
+                  icon: $r('sys.symbol.flame')
+                })
               }
-            }, (row: number) => `film_row_${row}_${this.films[row * GRID_COLS].id}`)
-
-            ListItem() {
-              Text(this.loadingMore ? '加载中...' : (this.hasMore() ? '' : '没有更多了'))
-                .fontSize(12)
-                .fontColor(AppTheme.TEXT_MUTED)
-                .width('100%')
-                .height(72)
-                .textAlign(TextAlign.Center)
             }
+            .scrollBar(BarState.Off)
+            .width('100%')
+            .height('100%')
           }
+          .onRefreshing(() => {
+            this.onPullRefreshing();
+          })
+          .pullToRefresh(!this.fetchLock)
           .width('100%')
-          .height('100%')
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
+          .layoutWeight(1)
+        } else {
+          Refresh({ refreshing: $$this.refreshing }) {
+            List({ scroller: this.listScroller }) {
+              ForEach(this.rowIds(), (row: number) => {
+                ListItem() {
+                  this.filmRow(row)
+                }
+              }, (row: number) => `film_row_${row}_${this.films[row * GRID_COLS].id}`)
+
+              ListItem() {
+                Text(this.loadingMore ? '加载中...' : (this.hasMore() ? '' : '没有更多了'))
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                  .width('100%')
+                  .height(72)
+                  .textAlign(TextAlign.Center)
+              }
+            }
+            .width('100%')
+            .height('100%')
+            .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.Spring)
+            .onAreaChange((_oldValue: Area, newValue: Area) => {
+              const h = Number(newValue.height);
+              if (h > 0) {
+                this.listHeight = h;
+              }
+            })
+            .onDidScroll((_offset: number, _state: ScrollState) => {
+              this.syncTopFab(this.listScroller.currentOffset().yOffset);
+            })
+            .nestedScroll({
+              scrollForward: NestedScrollMode.SELF_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST
+            })
+            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+            .onReachEnd(() => {
+              this.load(false, false);
+            })
+          }
+          .onRefreshing(() => {
+            this.onPullRefreshing();
           })
-          .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-          .onReachEnd(() => {
-            this.load(false, false);
-          })
+          .pullToRefresh(!this.fetchLock)
+          .width('100%')
+          .layoutWeight(1)
         }
-        .onRefreshing(() => {
-          this.onPullRefreshing();
+      }
+      .width('100%')
+      .height('100%')
+
+      if (!this.loading && this.films.length > 0) {
+        ScrollFab({
+          visible: this.showTopFab,
+          src: $r('sys.symbol.arrow_up'),
+          bottom: AppTheme.SPACE_LG,
+          onClickFab: () => {
+            this.scrollToTop();
+          }
         })
-        .pullToRefresh(!this.fetchLock)
-        .width('100%')
-        .layoutWeight(1)
       }
     }
     .width('100%')
