@@ -85,6 +85,16 @@ struct SearchPage {
 
   onPageShow(): void {
     this.applyWindowBar();
+    const params = router.getParams();
+    const initialKw = NavUtil.param(params, 'keyword');
+    if (!initialKw && !this.submitted) {
+      setTimeout(() => {
+        try {
+          focusControl.requestFocus('SearchPage_Input');
+        } catch (_e) {
+        }
+      }, 100);
+    }
   }
 
   onBackPress(): boolean {
@@ -205,6 +215,8 @@ struct SearchPage {
             placeholder: this.getSearchPlaceholder(),
             controller: this.inputController
           })
+            .id('SearchPage_Input')
+            .defaultFocus(true)
             .layoutWeight(1)
             .height(40)
             .fontSize(14)

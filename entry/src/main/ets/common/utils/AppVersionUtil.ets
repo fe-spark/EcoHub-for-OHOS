@@ -12,7 +12,7 @@ export interface AppUpdateInfo {
 }
 
 export class AppVersionUtil {
-  public static readonly APP_VERSION: string = '1.1.2-beta.1';
+  public static readonly APP_VERSION: string = '1.1.2';
   private static cachedVersionName: string = '';
 
   /**
