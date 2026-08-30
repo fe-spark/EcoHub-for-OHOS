@@ -6,3 +6,4 @@ oh_modules/
 *.element
 node_modules/
 local.properties
+.ai/
