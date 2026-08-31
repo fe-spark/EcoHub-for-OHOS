@@ -1,4 +1,4 @@
-import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { HistoryManager } from '../common/utils/HistoryManager';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
@@ -6,6 +6,10 @@ import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 
 export default class EntryAbility extends UIAbility {
   onCreate(_want: Want, _launchParam: AbilityConstant.LaunchParam): void {
+    try {
+      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
+    } catch (_e) {
+    }
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
@@ -18,6 +22,7 @@ export default class EntryAbility extends UIAbility {
           return;
         }
         windowStage.getMainWindow().then((win: window.Window) => {
+          AppStorage.setOrCreate('UI_CONTEXT', win.getUIContext());
           win.setWindowSystemBarEnable(['status', 'navigation']);
           win.setWindowLayoutFullScreen(true);
           win.setWindowSystemBarProperties({

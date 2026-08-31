@@ -1,4 +1,3 @@
-import { promptAction } from '@kit.ArkUI';
 import { HistoryItem } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
@@ -24,7 +23,7 @@ struct HistoryPage {
   private sourceCb: () => void = () => {};
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
@@ -62,7 +61,7 @@ struct HistoryPage {
   }
 
   private confirmClear(): void {
-    AlertDialog.show({
+    this.getUIContext().showAlertDialog({
       title: '清空观看历史',
       message: '确定删除当前软件源的全部观看记录吗？',
       primaryButton: {
@@ -71,7 +70,10 @@ struct HistoryPage {
         action: () => {
           HistoryManager.clear().then(() => {
             this.reload(false);
-            promptAction.showToast({ message: '已清空' });
+            try {
+              this.getUIContext().getPromptAction().showToast({ message: '已清空' });
+            } catch (_e) {
+            }
           });
         }
       },
@@ -79,21 +81,38 @@ struct HistoryPage {
     });
   }
 
-  private confirmDelete(item: HistoryItem): void {
-    AlertDialog.show({
-      title: '删除记录',
-      message: `确定删除「${item.name}」吗？`,
-      primaryButton: {
-        value: '删除',
-        fontColor: AppTheme.DANGER,
-        action: () => {
-          HistoryManager.remove(item.id).then(() => {
-            this.reload(false);
-          });
-        }
-      },
-      secondaryButton: { value: '取消', action: () => {} }
+  private deleteItem(item: HistoryItem): void {
+    HistoryManager.remove(item.id).then(() => {
+      this.reload(false);
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '已删除' });
+      } catch (_e) {
+      }
     });
+  }
+
+  @Builder
+  itemEnd(item: HistoryItem) {
+    Row() {
+      Button({ type: ButtonType.Normal }) {
+        Column({ space: 4 }) {
+          AppIcon({ src: $r('sys.symbol.trash'), iconSize: 20, color: AppTheme.TEXT_PRIMARY })
+          Text('删除')
+            .fontSize(12)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+        }
+      }
+      .backgroundColor(AppTheme.DANGER)
+      .borderRadius(AppTheme.RADIUS_LG)
+      .width(72)
+      .height('100%')
+      .onClick(() => {
+        this.deleteItem(item);
+      })
+    }
+    .padding({ left: 8 })
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
   }
 
   build() {
@@ -115,6 +134,11 @@ struct HistoryPage {
         })
         }
         .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
+        })
         .width('100%')
         .height('100%')
       } else {
@@ -129,11 +153,8 @@ struct HistoryPage {
                   .objectFit(ImageFit.Cover)
                   .borderRadius(AppTheme.RADIUS_MD)
                   .backgroundColor(AppTheme.BG_ELEVATED)
-                  .onClick(() => {
-                    NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
-                  })
 
-                // Info & Actions Column
+                // Info Column
                 Column() {
                   // Top section: Name + Source/Episode + Timestamp
                   Column() {
@@ -162,40 +183,15 @@ struct HistoryPage {
                   }
                   .width('100%')
                   .alignItems(HorizontalAlign.Start)
-                  .onClick(() => {
-                    NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
-                  })
 
-                  // Bottom section: Progress (Left) & Delete Button (Right)
+                  // Bottom section: Progress
                   Row() {
-                    Row() {
-                      Text(FormatUtil.progress(item.currentTime, item.duration))
-                        .fontSize(12)
-                        .fontWeight(FontWeight.Medium)
-                        .fontColor(AppTheme.ACCENT)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    }
-                    .layoutWeight(1)
-                    .alignItems(VerticalAlign.Center)
-                    .onClick(() => {
-                      NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
-                    })
-
-                    Row() {
-                      AppIcon({ src: $r('sys.symbol.trash'), iconSize: 12, color: AppTheme.DANGER })
-                      Text('删除')
-                        .fontSize(11)
-                        .fontColor(AppTheme.DANGER)
-                        .margin({ left: 3 })
-                    }
-                    .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                    .backgroundColor(AppTheme.DANGER_SOFT)
-                    .borderRadius(AppTheme.RADIUS_SM)
-                    .margin({ left: 8 })
-                    .onClick(() => {
-                      this.confirmDelete(item);
-                    })
+                    Text(FormatUtil.progress(item.currentTime, item.duration))
+                      .fontSize(12)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(AppTheme.ACCENT)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .width('100%')
                   .alignItems(VerticalAlign.Center)
@@ -210,13 +206,29 @@ struct HistoryPage {
               .padding(12)
               .backgroundColor(AppTheme.BG_CARD)
               .borderRadius(AppTheme.RADIUS_LG)
+              .onClick(() => {
+                NavUtil.openPlay(item.id, item.sourceId, item.episodeIndex, item.currentTime);
+              })
             }
+            .swipeAction({
+              end: {
+                builder: () => {
+                  this.itemEnd(item);
+                }
+              },
+              edgeEffect: SwipeEdgeEffect.Spring
+            })
           }, (item: HistoryItem) => `${item.id}_${item.timeStamp}_${Math.floor(item.currentTime)}_${item.sourceId}_${item.episodeIndex}`)
         }
         .width('100%')
         .height('100%')
         .padding({ left: 16, right: 16, bottom: 16 })
         .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
+        })
       }
       }
       .onRefreshing(() => {

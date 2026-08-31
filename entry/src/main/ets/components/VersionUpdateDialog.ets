@@ -47,7 +47,7 @@ export struct VersionUpdateDialog {
   private handleUpdate(): void {
     const url = this.updateInfo.downloadUrl || this.updateInfo.releaseUrl;
     if (url) {
-      NavUtil.openBrowser(getContext(this) as common.UIAbilityContext, url);
+      NavUtil.openBrowser(this.getUIContext().getHostContext() as common.UIAbilityContext, url);
     }
     this.handleClose();
   }

@@ -167,7 +167,7 @@ export struct PlayDetailPanel {
     if (!text) {
       return;
     }
-    AlertDialog.show({
+    this.getUIContext().showAlertDialog({
       title: '剧集名称',
       message: text,
       autoCancel: true,

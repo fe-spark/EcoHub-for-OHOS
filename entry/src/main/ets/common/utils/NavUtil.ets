@@ -1,4 +1,4 @@
-import { router } from '@kit.ArkUI';
+import { UIContext } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 
 export interface PlayRouteParams {
@@ -19,8 +19,13 @@ export interface SearchRouteParams {
 }
 
 export class NavUtil {
+  private static getRouter(uiContext?: UIContext) {
+    const ctx = uiContext || AppStorage.get<UIContext>('UI_CONTEXT');
+    return ctx ? ctx.getRouter() : undefined;
+  }
+
   static openPlay(id: string | number, sourceId: string = '', episodeIndex: number = 0,
-    currentTime: number = 0): void {
+    currentTime: number = 0, uiContext?: UIContext): void {
     if (!id && id !== 0) {
       return;
     }
@@ -30,36 +35,75 @@ export class NavUtil {
       episodeIndex: `${episodeIndex}`,
       currentTime: `${currentTime}`
     };
-    router.pushUrl({
-      url: 'pages/PlayPage',
-      params: params
-    });
+    try {
+      const r = NavUtil.getRouter(uiContext);
+      if (r) {
+        r.pushUrl({
+          url: 'pages/PlayPage',
+          params: params
+        });
+      }
+    } catch (_e) {
+    }
   }
 
-  static openFilter(pid: string | number, category: string = '', sort: string = ''): void {
+  static openFilter(pid: string | number, category: string = '', sort: string = '', uiContext?: UIContext): void {
     const params: FilterRouteParams = {
       Pid: `${pid}`,
       Category: category,
       Sort: sort
     };
-    router.pushUrl({
-      url: 'pages/FilterPage',
-      params: params
-    });
+    try {
+      const r = NavUtil.getRouter(uiContext);
+      if (r) {
+        r.pushUrl({
+          url: 'pages/FilterPage',
+          params: params
+        });
+      }
+    } catch (_e) {
+    }
   }
 
-  static openSearch(keyword: string = ''): void {
-    if (keyword) {
-      const params: SearchRouteParams = { keyword: keyword };
-      router.pushUrl({
-        url: 'pages/SearchPage',
-        params: params
+  static openSearch(keyword: string = '', uiContext?: UIContext): void {
+    try {
+      const r = NavUtil.getRouter(uiContext);
+      if (!r) {
+        return;
+      }
+      if (keyword) {
+        const params: SearchRouteParams = { keyword: keyword };
+        r.pushUrl({
+          url: 'pages/SearchPage',
+          params: params
+        });
+        return;
+      }
+      r.pushUrl({
+        url: 'pages/SearchPage'
       });
-      return;
+    } catch (_e) {
     }
-    router.pushUrl({
-      url: 'pages/SearchPage'
-    });
+  }
+
+  static openCustomPlayer(url: string = '', uiContext?: UIContext): void {
+    try {
+      const r = NavUtil.getRouter(uiContext);
+      if (!r) {
+        return;
+      }
+      if (url) {
+        r.pushUrl({
+          url: 'pages/CustomPlayerPage',
+          params: { url: url }
+        });
+        return;
+      }
+      r.pushUrl({
+        url: 'pages/CustomPlayerPage'
+      });
+    } catch (_e) {
+    }
   }
 
   static openBrowser(context: common.UIAbilityContext, url: string): void {

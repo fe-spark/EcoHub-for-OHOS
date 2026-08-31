@@ -70,7 +70,10 @@ export class SearchHistoryManager {
     if (!store || !key) {
       return;
     }
-    await store.put(key, JSON.stringify(list));
-    await store.flush();
+    try {
+      await store.put(key, JSON.stringify(list));
+      await store.flush();
+    } catch (_err) {
+    }
   }
 }

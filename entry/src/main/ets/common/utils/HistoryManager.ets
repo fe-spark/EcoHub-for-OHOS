@@ -123,7 +123,10 @@ export class HistoryManager {
     if (!store || !key) {
       return;
     }
-    await store.put(key, JSON.stringify(map));
-    await store.flush();
+    try {
+      await store.put(key, JSON.stringify(map));
+      await store.flush();
+    } catch (_err) {
+    }
   }
 }

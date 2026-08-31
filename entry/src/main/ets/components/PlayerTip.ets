@@ -45,7 +45,7 @@ export struct PlayerTip {
         this.speedIcons()
       } else if (this.kind !== PlayerTipKind.NONE) {
         AppIcon({ src: this.iconSrc(), iconSize: 18, color: 'rgba(255,255,255,0.9)' })
-          .key(`${this.kind}_${this.message}`)
+          .id(`${this.kind}_${this.message}`)
       }
       Text(this.message)
         .fontSize(this.kind === PlayerTipKind.SPEED ? 13 : 16)

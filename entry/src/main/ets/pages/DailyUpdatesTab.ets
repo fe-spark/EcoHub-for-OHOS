@@ -117,14 +117,10 @@ export struct DailyUpdatesTab {
       .fontSize(13)
       .fontWeight(this.currentIndex === index ? FontWeight.Bold : FontWeight.Regular)
       .fontColor(this.currentIndex === index ? '#FFFFFF' : AppTheme.TEXT_SECONDARY)
-      .height(32)
-      .padding({ left: 14, right: 14 })
-      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.06)')
+      .height(28)
+      .padding({ left: 12, right: 12 })
+      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : Color.Transparent)
       .borderRadius(AppTheme.RADIUS_PILL)
-      .border({
-        width: 1,
-        color: this.currentIndex === index ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
-      })
       .onClick(() => {
         this.selectIndex(index);
       })
@@ -135,31 +131,58 @@ export struct DailyUpdatesTab {
       Column() {
         Row() {
           Row() {
-            AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 18, color: AppTheme.ACCENT })
+            AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 20, color: AppTheme.ACCENT })
             Text('每日更新')
-              .fontSize(19)
+              .fontSize(20)
               .fontWeight(FontWeight.Bold)
               .fontColor(AppTheme.TEXT_PRIMARY)
-              .margin({ left: AppTheme.SPACE_SM })
+              .margin({ left: 6 })
+
+            if (this.categories.length > 0) {
+              Text('·')
+                .fontSize(12)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.TEXT_MUTED)
+                .margin({ left: 8, right: 8 })
+
+              Row() {
+                Text('近 24 小时 ')
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                Text(`${this.currentCategory().count}`)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.ACCENT)
+                Text(' 部')
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+              }
+            }
           }
           .layoutWeight(1)
 
-          Row() {
-            Text('近 24 小时 ')
-              .fontSize(11)
-              .fontColor(AppTheme.TEXT_MUTED)
-            Text(`${this.currentCategory().count}`)
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.ACCENT)
-            Text(' 部')
-              .fontSize(11)
-              .fontColor(AppTheme.TEXT_MUTED)
+          Button({ type: ButtonType.Circle, stateEffect: true }) {
+            if (this.loading) {
+              LoadingProgress()
+                .width(16)
+                .height(16)
+                .color(AppTheme.ACCENT)
+            } else {
+              AppIcon({
+                src: $r('sys.symbol.arrow_counterclockwise'),
+                iconSize: 17,
+                color: AppTheme.TEXT_SECONDARY
+              })
+            }
           }
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .backgroundColor('rgba(255, 255, 255, 0.06)')
-          .borderRadius(AppTheme.RADIUS_PILL)
-          .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
+          .width(32)
+          .height(32)
+          .backgroundColor(Color.Transparent)
+          .onClick(() => {
+            if (!this.fetchLock) {
+              this.loadMeta();
+            }
+          })
         }
         .width('100%')
         .height(38)
@@ -180,6 +203,7 @@ export struct DailyUpdatesTab {
           .listDirection(Axis.Horizontal)
           .width('100%')
           .height(32)
+          .contentStartOffset(AppTheme.SPACE_LG)
           .contentEndOffset(AppTheme.SPACE_LG)
           .nestedScroll({
             scrollForward: NestedScrollMode.SELF_FIRST,
@@ -188,7 +212,6 @@ export struct DailyUpdatesTab {
           .scrollBar(BarState.Off)
           .alignListItem(ListItemAlign.Center)
           .margin({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_XS })
-          .padding({ left: AppTheme.SPACE_LG })
         }
       }
       .width('100%')
@@ -218,6 +241,11 @@ export struct DailyUpdatesTab {
             .alignItems(HorizontalAlign.Center)
           }
           .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
           .width('100%')
           .height('100%')
         }

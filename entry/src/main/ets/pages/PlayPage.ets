@@ -1,4 +1,3 @@
-import { router, promptAction } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
 import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -58,7 +57,7 @@ struct PlayPage {
   private lastDuration: number = 0;
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     }, (left: number, right: number, width: number, height: number) => {
@@ -71,7 +70,7 @@ struct PlayPage {
 
   aboutToAppear() {
     this.applyWindowBar();
-    const params = router.getParams() as Object;
+    const params = this.getUIContext().getRouter().getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
     if (this.filmId) {
       HttpClient.getInstance().trackView('play', this.filmId);
@@ -150,7 +149,7 @@ struct PlayPage {
       return;
     }
     this.playerFull = full;
-    PlayerWindow.setFullscreen(getContext(this) as common.UIAbilityContext, full);
+    PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full);
   }
 
   private async loadPlay(sourceId: string): Promise<void> {
@@ -193,7 +192,10 @@ struct PlayPage {
       }
       const message = err instanceof Error ? err.message : '播放数据获取失败';
       if (this.name) {
-        promptAction.showToast({ message: message });
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: message });
+        } catch (_e) {
+        }
       } else {
         this.errorText = message;
       }
@@ -270,7 +272,10 @@ struct PlayPage {
 
   private playPrev(): void {
     if (!this.hasPrev()) {
-      promptAction.showToast({ message: '已经是第一集了' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' });
+      } catch (_e) {
+      }
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex - 1);
@@ -278,7 +283,10 @@ struct PlayPage {
 
   private playNext(): void {
     if (!this.hasNext()) {
-      promptAction.showToast({ message: '已经是最后一集了' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' });
+      } catch (_e) {
+      }
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex + 1);
@@ -394,7 +402,10 @@ struct PlayPage {
           rightInset: this.playerFull ? this.rightInset : 0,
           bottomInset: this.playerFull ? this.bottomInset : 0,
           onBack: () => {
-            router.back();
+            try {
+              this.getUIContext().getRouter().back();
+            } catch (_e) {
+            }
           },
           onEnded: () => {
             if (this.hasNext()) {

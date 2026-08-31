@@ -31,18 +31,18 @@ export struct FilmCard {
   @Builder
   posterTag(text: string) {
     Text(text)
-      .fontSize(10)
+      .fontSize(9)
+      .fontWeight(FontWeight.Medium)
       .fontColor('#FFFFFF')
       .maxLines(1)
       .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-      .backgroundColor('rgba(20, 18, 36, 0.72)')
+      .backgroundColor('rgba(10, 11, 16, 0.78)')
       .borderRadius(4)
-      .margin({ right: 4, bottom: 4 })
   }
 
   build() {
     Column() {
-      Stack({ alignContent: Alignment.TopStart }) {
+      Stack({ alignContent: Alignment.TopEnd }) {
         if (!this.broken && this.posterUrl()) {
           Image(this.posterUrl())
             .width('100%')
@@ -73,26 +73,20 @@ export struct FilmCard {
           .borderRadius(AppTheme.RADIUS_MD)
           .linearGradient({
             angle: 180,
-            colors: [['rgba(0,0,0,0)', 0.55], ['rgba(0,0,0,0.72)', 1]]
+            colors: [['rgba(0,0,0,0)', 0.65], ['rgba(10,11,16,0.60)', 1]]
           })
 
-        Flex({ wrap: FlexWrap.Wrap }) {
-          if (this.film.year) {
-            this.posterTag(this.film.year)
+        if (this.film.remarks || this.film.cName) {
+          Row() {
+            this.posterTag(this.film.remarks || this.film.cName)
           }
-          if (this.film.cName) {
-            this.posterTag(this.film.cName)
-          }
-          if (this.film.remarks) {
-            this.posterTag(this.film.remarks)
-          }
+          .padding(6)
         }
-        .width('100%')
-        .padding(8)
       }
       .width('100%')
       .clip(true)
       .borderRadius(AppTheme.RADIUS_MD)
+      .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.08)' })
 
       if (this.showMeta) {
         Text(this.film.name)
@@ -103,16 +97,16 @@ export struct FilmCard {
           .fontColor(AppTheme.TEXT_PRIMARY)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: AppTheme.SPACE_SM })
-        Text(this.film.subTitle ? this.film.subTitle : ' ')
+          .margin({ top: 6 })
+
+        Text(this.film.subTitle || FormatUtil.joinMeta([this.film.year, this.film.cName]))
           .width('100%')
           .height(15)
           .fontSize(11)
           .fontColor(AppTheme.TEXT_MUTED)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: AppTheme.SPACE_XS })
-          .visibility(this.film.subTitle ? Visibility.Visible : Visibility.Hidden)
+          .margin({ top: 2 })
       }
     }
     .width(this.cardSize())

@@ -1,4 +1,3 @@
-import { router } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
 import { BannerItem, HomeSection } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -20,9 +19,11 @@ export struct RecommendTab {
   @State private loading: boolean = true;
   @State private refreshing: boolean = false;
   @State private errorText: string = '';
-  private static readonly MIN_HEADER_ALPHA: number = 0.72;
-  @State private headerAlpha: number = RecommendTab.MIN_HEADER_ALPHA;
   private scroller: Scroller = new Scroller();
+  private swiperController: SwiperController = new SwiperController();
+  @State private currentBannerIndex: number = 0;
+  @State private reloadToken: number = 0;
+  @State private headerAlpha: number = 0;
 
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
@@ -56,7 +57,15 @@ export struct RecommendTab {
       const home = await FilmApi.getHome();
       this.banners = home.banners;
       this.sections = home.content;
+      this.reloadToken = Date.now();
       ok = true;
+      if (fromPull && this.banners.length > 0) {
+        this.currentBannerIndex = 0;
+        try {
+          this.swiperController.changeIndex(0, false);
+        } catch (_err) {
+        }
+      }
     } catch (err) {
       this.errorText = err instanceof Error ? err.message : '首页加载失败';
     } finally {
@@ -69,18 +78,12 @@ export struct RecommendTab {
     }
   }
 
-  private updateHeaderAlpha(): void {
-    const offset = this.scroller.currentOffset();
-    const y = offset.yOffset;
-    const scrollRatio = Math.min(1, Math.max(0, y / 160));
-    const next = RecommendTab.MIN_HEADER_ALPHA + (1 - RecommendTab.MIN_HEADER_ALPHA) * scrollRatio;
-    if (Math.abs(next - this.headerAlpha) >= 0.02) {
-      this.headerAlpha = next;
+  private displayBanners(): BannerItem[] {
+    if (this.banners.length === 2) {
+      // 扩充为 4 张循环副本，解决仅有 2 张时 Swiper 左右两翼无法同时渲染出上一张/下一张露出卡片的问题
+      return [this.banners[0], this.banners[1], this.banners[0], this.banners[1]];
     }
-  }
-
-  private headerBg(): string {
-    return `rgba(10, 11, 16, ${this.headerAlpha.toFixed(2)})`;
+    return this.banners;
   }
 
   private visibleSections(): HomeSection[] {
@@ -95,82 +98,210 @@ export struct RecommendTab {
 
   @Builder
   categoryEntry(section: HomeSection) {
-    Text(section.nav.name)
-      .fontSize(13)
-      .fontWeight(FontWeight.Medium)
-      .fontColor('#FFFFFF')
-      .maxLines(1)
-      .height(36)
-      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-      .backgroundColor(FormatUtil.tagBg(section.nav.id, section.nav.name))
-      .borderRadius(AppTheme.RADIUS_PILL)
-      .border({ width: 1, color: FormatUtil.tagBorder(section.nav.id, section.nav.name) })
-      .onClick(() => {
-        NavUtil.openFilter(section.nav.id);
-      })
+    Row() {
+      Text(section.nav.name)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppTheme.TEXT_PRIMARY)
+        .maxLines(1)
+    }
+    .height(34)
+    .padding({ left: 16, right: 16 })
+    .backgroundColor(AppTheme.BG_CARD)
+    .borderRadius(AppTheme.RADIUS_PILL)
+    .border({ width: 1, color: AppTheme.BORDER })
+    .onClick(() => {
+      NavUtil.openFilter(section.nav.id);
+    })
   }
 
   @Builder
-  heroItem(item: BannerItem) {
-    Stack({ alignContent: Alignment.BottomStart }) {
+  heroBannerItem(item: BannerItem) {
+    Stack({ alignContent: Alignment.Bottom }) {
+      // 1. 海报大图（多张时为圆角卡片，单张时满铺全屏直角无留白）
       Image(FormatUtil.bannerBackdrop(item))
         .width('100%')
         .height('100%')
         .objectFit(ImageFit.Cover)
+        .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
+
+      // 2. 顶部微暗角遮罩（保障 Header 纯净可读）
+      Column()
+        .width('100%')
+        .height(110)
+        .position({ x: 0, y: 0 })
+        .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
+        .linearGradient({
+          angle: 180,
+          colors: [
+            ['rgba(10, 11, 16, 0.70)', 0],
+            ['rgba(10, 11, 16, 0.20)', 0.55],
+            ['rgba(10, 11, 16, 0.0)', 1.0]
+          ]
+        })
+
+      // 3. 底部 5 阶指数羽化遮罩（海报与页面黑位融合）
       Column()
         .width('100%')
         .height('100%')
+        .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
         .linearGradient({
           angle: 180,
-          colors: [['rgba(10,11,16,0.08)', 0], ['rgba(10,11,16,0.12)', 0.4], ['rgba(10,11,16,0.92)', 1]]
+          colors: [
+            ['rgba(10, 11, 16, 0.0)', 0.0],
+            ['rgba(10, 11, 16, 0.20)', 0.40],
+            ['rgba(10, 11, 16, 0.70)', 0.70],
+            ['rgba(10, 11, 16, 0.95)', 0.90],
+            ['#0A0B10', 1.0]
+          ]
         })
+
+      // 4. Apple TV+ 居中对称排版层
       Column() {
-        if (item.remark) {
-          Text(item.remark)
-            .fontSize(11)
-            .fontColor('#FFFFFF')
-            .padding({ left: AppTheme.SPACE_SM, right: AppTheme.SPACE_SM, top: AppTheme.SPACE_XS, bottom: AppTheme.SPACE_XS })
-            .backgroundColor(AppTheme.ACCENT)
-            .borderRadius(AppTheme.RADIUS_SM)
-            .margin({ bottom: AppTheme.SPACE_SM })
-        }
+        // 极简大片标 (24vp 特粗纯白 + 居中对齐 + 电影级文字阴影)
         Text(item.name)
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.TEXT_PRIMARY)
+          .fontSize(23)
+          .fontWeight(FontWeight.Bolder)
+          .fontColor('#FFFFFF')
+          .textAlign(TextAlign.Center)
           .maxLines(2)
-        Text(FormatUtil.joinMeta([item.year, item.cName, item.area]))
-          .fontSize(12)
-          .fontColor(AppTheme.TEXT_SECONDARY)
-          .margin({ top: AppTheme.SPACE_SM })
-        Row() {
-          AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
-          Text('立即播放')
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .margin({ left: AppTheme.SPACE_SM })
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textShadow({
+            radius: 10,
+            color: 'rgba(0, 0, 0, 0.90)',
+            offsetY: 2
+          })
+
+        // 极细元数据副标 (居中对齐)
+        Row({ space: 6 }) {
+          if (item.remark) {
+            Text(item.remark)
+              .fontSize(11)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FA8C16')
+          }
+          Text(FormatUtil.joinMeta([item.year, item.cName, item.area]))
+            .fontSize(12)
+            .fontColor('rgba(255, 255, 255, 0.75)')
         }
-        .height(40)
-        .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-        .backgroundColor(AppTheme.ACCENT)
+        .justifyContent(FlexAlign.Center)
+        .margin({ top: 6, bottom: 14 })
+
+        // 主操作：主题琥珀金流光播放胶囊（居中）
+        Row({ space: 6 }) {
+          AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 13, color: '#FFFFFF' })
+          Text('立即播放')
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+        }
+        .height(36)
+        .padding({ left: 22, right: 24 })
+        .linearGradient({
+          angle: 90,
+          colors: [['#FA8C16', 0], ['#FFA940', 1]]
+        })
         .borderRadius(AppTheme.RADIUS_PILL)
-        .margin({ top: AppTheme.SPACE_LG })
+        .shadow({
+          radius: 12,
+          color: 'rgba(250, 140, 22, 0.38)',
+          offsetY: 4
+        })
         .onClick(() => {
           NavUtil.openPlay(item.mid > 0 ? item.mid : item.id);
         })
       }
-      .alignItems(HorizontalAlign.Start)
-      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_XL })
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
+      .padding({
+        left: AppTheme.SPACE_MD,
+        right: AppTheme.SPACE_MD,
+        bottom: AppTheme.SPACE_LG
+      })
     }
     .width('100%')
     .height('100%')
+    .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
+    .clip(true)
+    .shadow(this.banners.length > 1 ? {
+      radius: 12,
+      color: 'rgba(0, 0, 0, 0.50)',
+      offsetY: 4
+    } : undefined)
+  }
+
+  @Builder
+  headerRow() {
+    Row() {
+      // 站点 Logo + 名称
+      Row({ space: 6 }) {
+        AppIcon({
+          src: $r('sys.symbol.play_square_stack_fill'),
+          iconSize: 20,
+          color: AppTheme.ACCENT
+        })
+        Text(this.siteName)
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.TEXT_PRIMARY)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textShadow({
+            radius: 8,
+            color: 'rgba(0, 0, 0, 0.85)',
+            offsetY: 1
+          })
+      }
+      .layoutWeight(1)
+
+      // 搜索胶囊（背景与边框随滚动深度平滑变色）
+      Row({ space: 6 }) {
+        AppIcon({
+          src: $r('sys.symbol.magnifyingglass'),
+          iconSize: 14,
+          color: 'rgba(255, 255, 255, 0.75)'
+        })
+        Text('搜索')
+          .fontSize(12)
+          .fontColor('rgba(255, 255, 255, 0.55)')
+      }
+      .height(34)
+      .padding({ left: 12, right: 14 })
+      .backgroundColor(`rgba(${Math.round(22 * this.headerAlpha)}, ${Math.round(23 * this.headerAlpha)}, ${Math.round(31 * this.headerAlpha)}, ${0.36 + 0.64 * this.headerAlpha})`)
+      .borderRadius(AppTheme.RADIUS_PILL)
+      .border({
+        width: 1,
+        color: `rgba(255, 255, 255, ${0.16 * (1 - this.headerAlpha) + 0.08 * this.headerAlpha})`
+      })
+      .onClick(() => {
+        if (this.onOpenSearch) {
+          this.onOpenSearch();
+        } else {
+          NavUtil.openSearch();
+        }
+      })
+    }
+    .width('100%')
+    .height(48)
+    .padding({
+      left: AppTheme.SPACE_LG,
+      right: AppTheme.SPACE_LG
+    })
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor(`rgba(10, 11, 16, ${this.headerAlpha})`)
+    .border({
+      width: { bottom: this.headerAlpha > 0.5 ? 0.5 : 0 },
+      color: `rgba(255, 255, 255, ${Math.max(0, (this.headerAlpha - 0.5) * 0.16)})`
+    })
   }
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
+      // 1. 主页面滚动区
       if (this.loading) {
         LoadingView({ label: '正在加载推荐' })
+          .width('100%')
+          .height('100%')
       } else if (this.errorText) {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll() {
@@ -193,6 +324,11 @@ export struct RecommendTab {
             .alignItems(HorizontalAlign.Center)
           }
           .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
           .width('100%')
           .height('100%')
         }
@@ -210,7 +346,7 @@ export struct RecommendTab {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll() {
             Column() {
-              Blank().height(100)
+              Blank().height(80)
               EmptyState({
                 title: '暂无影片数据',
                 subtitle: '当前软件源内暂无影片或尚未采集，可下拉刷新或更换软件源',
@@ -248,7 +384,10 @@ export struct RecommendTab {
                 .backgroundColor(AppTheme.ACCENT)
                 .borderRadius(AppTheme.RADIUS_PILL)
                 .onClick(() => {
-                  router.pushUrl({ url: 'pages/ServerConfigPage' });
+                  try {
+                    this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
+                  } catch (_e) {
+                  }
                 })
               }
               .margin({ top: 16 })
@@ -257,6 +396,11 @@ export struct RecommendTab {
             .alignItems(HorizontalAlign.Center)
           }
           .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
           .width('100%')
           .height('100%')
         }
@@ -275,35 +419,50 @@ export struct RecommendTab {
           Scroll(this.scroller) {
             Column() {
               if (this.banners.length > 0) {
-                Swiper() {
-                  ForEach(this.banners, (item: BannerItem) => {
-                    this.heroItem(item)
-                  }, (item: BannerItem) => item.id)
+                Column() {
+                  Swiper(this.swiperController) {
+                    ForEach(this.displayBanners(), (item: BannerItem, index: number) => {
+                      this.heroBannerItem(item)
+                    }, (item: BannerItem, index: number) => `banner_${item.id}_${index}_${this.reloadToken}`)
+                  }
+                  .autoPlay(this.banners.length > 1)
+                  .interval(4800)
+                  .loop(this.banners.length > 1)
+                  .indicator(false)
+                  .prevMargin(this.banners.length > 1 ? 20 : 0)
+                  .nextMargin(this.banners.length > 1 ? 20 : 0)
+                  .itemSpace(this.banners.length > 1 ? 10 : 0)
+                  .onChange((index: number) => {
+                    this.currentBannerIndex = index % this.banners.length;
+                  })
+                  .width('100%')
+                  .height(this.banners.length > 1 ? 360 : 380)
+
+                  // 居中指示条（置于首尾露出轮播图下方，按真实数据数量显示点数）
+                  if (this.banners.length > 1) {
+                    Row({ space: 4 }) {
+                      ForEach(this.banners, (_b: BannerItem, bIdx: number) => {
+                        Row()
+                          .width(bIdx === (this.currentBannerIndex % this.banners.length) ? 18 : 5)
+                          .height(3.5)
+                          .borderRadius(2)
+                          .backgroundColor(bIdx === (this.currentBannerIndex % this.banners.length) ? '#FA8C16' : 'rgba(255, 255, 255, 0.25)')
+                          .animation({ duration: 250, curve: Curve.EaseInOut })
+                      }, (_b: BannerItem, bIdx: number) => `ind_${bIdx}`)
+                    }
+                    .margin({ top: 12 })
+                    .justifyContent(FlexAlign.Center)
+                  }
                 }
-                .autoPlay(this.banners.length > 1)
-                .interval(4800)
-                .loop(this.banners.length > 1)
-                .indicator(this.banners.length > 1)
-                .indicatorStyle({
-                  selectedColor: AppTheme.ACCENT,
-                  color: '#66FFFFFF'
-                })
                 .width('100%')
-                .height(360)
-                .margin({ bottom: AppTheme.SPACE_LG })
+                .margin({ bottom: this.banners.length > 1 ? AppTheme.SPACE_XL : AppTheme.SPACE_LG })
               } else {
-                Column().height(56)
+                Blank().height(48)
               }
 
+              // 片库分类快捷导航胶囊
               if (this.visibleSections().length > 0) {
                 Column() {
-                  Text('片库分类')
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-                    .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-                    .margin({ bottom: AppTheme.SPACE_MD })
-
                   Scroll() {
                     Row({ space: AppTheme.SPACE_SM }) {
                       ForEach(this.visibleSections(), (section: HomeSection) => {
@@ -328,6 +487,7 @@ export struct RecommendTab {
                 .margin({ bottom: AppTheme.SPACE_LG })
               }
 
+              // 各分类影视横向推荐流（通栏无卡片沉浸背景带）
               ForEach(this.visibleSections(), (section: HomeSection) => {
                 FilmRow({
                   title: section.nav.name,
@@ -337,15 +497,29 @@ export struct RecommendTab {
                     NavUtil.openFilter(section.nav.id);
                   }
                 })
-              }, (section: HomeSection) => `${section.nav.id}`)
+              }, (section: HomeSection) => `sec_${section.nav.id}_${this.reloadToken}`)
             }
             .width('100%')
-            .padding({ bottom: AppTheme.SPACE_LG })
+            .padding({ bottom: 0 })
           }
           .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
           .onDidScroll((_x: number, _y: number, _state: ScrollState) => {
-            this.updateHeaderAlpha();
+            const y = this.scroller.currentOffset().yOffset;
+            if (y <= 0) {
+              if (this.headerAlpha !== 0) {
+                this.headerAlpha = 0;
+              }
+            } else {
+              const alpha = Math.min(1.0, y / 160.0);
+              if (Math.abs(this.headerAlpha - alpha) > 0.01 || alpha === 1.0 || alpha === 0.0) {
+                this.headerAlpha = alpha;
+              }
+            }
           })
         }
         .onRefreshing(() => {
@@ -360,55 +534,13 @@ export struct RecommendTab {
         .height('100%')
       }
 
-      Row() {
-        Text(this.siteName)
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.TEXT_PRIMARY)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
-          .margin({ right: AppTheme.SPACE_MD })
-
-        Row() {
-          AppIcon({
-            src: $r('sys.symbol.magnifyingglass'),
-            iconSize: 15,
-            color: AppTheme.TEXT_SECONDARY
-          })
-          Text('搜索')
-            .fontSize(12)
-            .fontColor(AppTheme.TEXT_SECONDARY)
-            .margin({ left: AppTheme.SPACE_XS })
-        }
-        .height(32)
-        .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD })
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor('rgba(255, 255, 255, 0.10)')
-        .borderRadius(AppTheme.RADIUS_PILL)
-        .border({
-          width: 1,
-          color: 'rgba(255, 255, 255, 0.14)'
-        })
-        .onClick(() => {
-          if (this.onOpenSearch) {
-            this.onOpenSearch();
-          } else {
-            NavUtil.openSearch();
-          }
-        })
-      }
-      .width('100%')
-      .height(44)
-      .padding({
-        left: AppTheme.SPACE_LG,
-        right: AppTheme.SPACE_LG
-      })
-      .alignItems(VerticalAlign.Center)
-      .backgroundColor(this.headerBg())
+      // 2. 连续 60fps 渐变 Header（位于顶层，背景随滚动深度无缝过渡 0.0 -> 1.0）
+      this.headerRow()
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
   }
 }
+
+

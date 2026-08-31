@@ -1,4 +1,3 @@
-import { router } from '@kit.ArkUI';
 import { AppTheme } from '../common/constants/AppTheme';
 import { BackIcon } from './BackIcon';
 
@@ -15,7 +14,10 @@ export struct PageHeader {
       if (this.showBack) {
         BackIcon({ color: AppTheme.TEXT_PRIMARY })
           .onClick(() => {
-            router.back();
+            try {
+              this.getUIContext().getRouter().back();
+            } catch (_e) {
+            }
           })
       }
 

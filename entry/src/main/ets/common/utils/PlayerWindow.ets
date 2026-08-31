@@ -72,10 +72,9 @@ export class PlayerWindow {
   static async getVolume(): Promise<PlayerVolumeInfo> {
     const info = new PlayerVolumeInfo();
     try {
-      const group = await audio.getAudioManager().getVolumeManager()
-        .getVolumeGroupManager(audio.DEFAULT_VOLUME_GROUP_ID);
-      info.max = Math.max(1, await group.getMaxVolume(audio.AudioVolumeType.MEDIA));
-      info.current = Math.min(info.max, Math.max(0, await group.getVolume(audio.AudioVolumeType.MEDIA)));
+      const volumeManager = audio.getAudioManager().getVolumeManager();
+      info.max = Math.max(1, volumeManager.getMaxVolumeByStream(audio.StreamUsage.STREAM_USAGE_MOVIE));
+      info.current = Math.min(info.max, Math.max(0, volumeManager.getVolumeByStream(audio.StreamUsage.STREAM_USAGE_MOVIE)));
     } catch (err) {
       console.error('get volume failed:', JSON.stringify(err));
     }

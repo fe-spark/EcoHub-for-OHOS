@@ -179,7 +179,7 @@ export struct VideoPlayer {
   }
 
   private ctx(): common.UIAbilityContext | undefined {
-    return getContext(this) as common.UIAbilityContext;
+    return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
   private fullNow(): boolean {
@@ -367,7 +367,7 @@ export struct VideoPlayer {
       onSpeed: () => this.openSpeedDialog(),
       onRetry: () => this.retry(),
       onErrorDetail: () => {
-        AlertDialog.show({ title: '报错详情', message: this.errorText, confirm: { value: '知道了', action: () => {} } });
+        this.getUIContext().showAlertDialog({ title: '报错详情', message: this.errorText, confirm: { value: '知道了', action: () => {} } });
       },
       onSeekBack: () => { this.seekTo(this.currentTime - 10); this.pulseHud(); },
       onSeekForward: () => { this.seekTo(this.currentTime + 10); this.pulseHud(); },

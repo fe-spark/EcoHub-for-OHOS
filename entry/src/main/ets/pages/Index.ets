@@ -1,4 +1,3 @@
-import { router } from '@kit.ArkUI';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
@@ -63,7 +62,7 @@ struct Index {
   }
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
@@ -83,7 +82,10 @@ struct Index {
     }).catch(() => {});
     const url = await ServerConfigManager.getInstance().getServerUrl();
     if (!url) {
-      router.replaceUrl({ url: 'pages/ServerConfigPage' });
+      try {
+        this.getUIContext().getRouter().replaceUrl({ url: 'pages/ServerConfigPage' });
+      } catch (_e) {
+      }
       return;
     }
     await this.loadSite(false);
@@ -250,7 +252,10 @@ struct Index {
               .backgroundColor(AppTheme.ACCENT)
               .borderRadius(AppTheme.RADIUS_PILL)
               .onClick(() => {
-                router.pushUrl({ url: 'pages/ServerConfigPage' });
+                try {
+                  this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
+                } catch (_e) {
+                }
               })
             }
             .width('100%')

@@ -1,4 +1,3 @@
-import { router } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
 import { FilterResult, MovieBasicInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -49,7 +48,7 @@ struct FilterPage {
   private scroller: Scroller = new Scroller();
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
@@ -57,7 +56,7 @@ struct FilterPage {
 
   aboutToAppear() {
     this.applyWindowBar();
-    const params = router.getParams() as Object;
+    const params = this.getUIContext().getRouter().getParams() as Object;
     this.pid = NavUtil.param(params, 'Pid');
     HttpClient.getInstance().trackView('classify', this.pid);
     const category = NavUtil.param(params, 'Category');
@@ -323,7 +322,10 @@ struct FilterPage {
       .height(32)
       .justifyContent(FlexAlign.Center)
       .onClick(() => {
-        router.back();
+        try {
+          this.getUIContext().getRouter().back();
+        } catch (_e) {
+        }
       })
 
       List({ space: AppTheme.SPACE_SM }) {
@@ -379,7 +381,10 @@ struct FilterPage {
             .height(32)
             .justifyContent(FlexAlign.Center)
             .onClick(() => {
-              router.back();
+              try {
+                this.getUIContext().getRouter().back();
+              } catch (_e) {
+              }
             })
           }
           .width('100%')
@@ -450,7 +455,11 @@ struct FilterPage {
             .width('100%')
             .height('100%')
             .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.Spring)
+            .edgeEffect(EdgeEffect.None)
+            .nestedScroll({
+              scrollForward: NestedScrollMode.SELF_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST
+            })
             .onAreaChange((_oldValue: Area, newValue: Area) => {
               const h = Number(newValue.height);
               if (h > 0) {

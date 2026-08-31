@@ -82,7 +82,7 @@ struct TipPage {
   private reconnectCb: () => void = () => {};
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });

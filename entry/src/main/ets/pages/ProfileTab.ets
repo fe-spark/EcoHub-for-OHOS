@@ -1,4 +1,3 @@
-import { router, promptAction } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
 import { BasicConfig } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -28,7 +27,7 @@ export struct ProfileTab {
     noticeVersion: '1'
   };
   @State private sourceUrl: string = '';
-  @State private appVersion: string = '1.0.6';
+  @State private appVersion: string = '1.0.0';
   @State private isCheckingVersion: boolean = false;
   @State private showUpdateDialog: boolean = false;
   @State private updateInfo: AppUpdateInfo = {
@@ -40,40 +39,36 @@ export struct ProfileTab {
     releaseUrl: '',
     downloadUrl: ''
   };
-  private hasLoaded: boolean = false;
+  private configCb: (config: BasicConfig) => void = () => {};
   private reconnectCb: () => void = () => {};
 
-  async aboutToAppear() {
+  aboutToAppear() {
+    AppVersionUtil.getVersionName().then((v: string) => {
+      this.appVersion = v;
+    }).catch(() => {});
+    this.configCb = (config: BasicConfig) => {
+      this.config = config;
+    };
+    FilmApi.onConfigChange(this.configCb);
+    this.loadSiteConfig();
     this.reconnectCb = () => {
-      this.reload();
+      this.loadSiteConfig();
     };
     SourceGuard.onReconnect(this.reconnectCb);
-    this.appVersion = await AppVersionUtil.getVersionName();
-    this.checkUpdateSilent();
-    if (this.hasLoaded) {
-      return;
-    }
-    this.hasLoaded = true;
-    await this.reload();
+
+    // 进入「我的」页面时静默检查是否有更新，用于红点提示
+    AppVersionUtil.checkUpdate(false).then((info) => {
+      this.updateInfo = info;
+    }).catch(() => {});
   }
 
-  aboutToDisappear(): void {
+  aboutToDisappear() {
+    FilmApi.offConfigChange(this.configCb);
     SourceGuard.offReconnect(this.reconnectCb);
   }
 
-  private async checkUpdateSilent(): Promise<void> {
-    try {
-      const info = await AppVersionUtil.checkUpdate(false);
-      if (info) {
-        this.updateInfo = info;
-      }
-    } catch (_err) {
-      // 静默检查失败不打扰用户
-    }
-  }
-
-  private async reload(): Promise<void> {
-    this.sourceUrl = await ServerConfigManager.getInstance().getServerUrl();
+  private async loadSiteConfig(): Promise<void> {
+    this.sourceUrl = ServerConfigManager.getInstance().getCachedServerUrl();
     try {
       this.config = await FilmApi.getSiteConfig(false);
     } catch (err) {
@@ -91,17 +86,26 @@ export struct ProfileTab {
       return;
     }
     this.isCheckingVersion = true;
-    promptAction.showToast({ message: '正在检查版本更新...' });
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '正在检查版本更新...' });
+    } catch (_e) {
+    }
     try {
       const info = await AppVersionUtil.checkUpdate(true);
       this.updateInfo = info;
       if (info.hasUpdate) {
         this.showUpdateDialog = true;
       } else {
-        promptAction.showToast({ message: `当前已是最新版本 (v${this.appVersion})` });
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: `当前已是最新版本 (v${this.appVersion})` });
+        } catch (_e) {
+        }
       }
     } catch (err) {
-      promptAction.showToast({ message: '检查版本失败，请稍后重试' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '检查版本失败，请稍后重试' });
+      } catch (_e) {
+      }
     } finally {
       this.isCheckingVersion = false;
     }
@@ -205,9 +209,9 @@ export struct ProfileTab {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         Row() {
-          AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 22, color: AppTheme.ACCENT })
+          AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 20, color: AppTheme.ACCENT })
           Text('我的')
-            .fontSize(22)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.TEXT_PRIMARY)
             .margin({ left: AppTheme.SPACE_SM })
@@ -281,7 +285,10 @@ export struct ProfileTab {
         .borderRadius(AppTheme.RADIUS_LG)
         .margin({ bottom: AppTheme.SPACE_LG })
         .onClick(() => {
-          router.pushUrl({ url: 'pages/ServerConfigPage' });
+          try {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
+          } catch (_e) {
+          }
         })
 
         Column() {
@@ -289,14 +296,20 @@ export struct ProfileTab {
             this.menuRow($r('sys.symbol.clock_fill'), '观看历史')
           }
           .onClick(() => {
-            router.pushUrl({ url: 'pages/HistoryPage' });
+            try {
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/HistoryPage' });
+            } catch (_e) {
+            }
           })
           this.menuLine()
           Column() {
             this.menuRow($r('sys.symbol.play_circle_fill'), '自定义播放')
           }
           .onClick(() => {
-            router.pushUrl({ url: 'pages/CustomPlayerPage' });
+            try {
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/CustomPlayerPage' });
+            } catch (_e) {
+            }
           })
           if (this.config.tipEnabled) {
             this.menuLine()
@@ -304,7 +317,10 @@ export struct ProfileTab {
               this.menuRow($r('sys.symbol.gift'), this.config.tipTitle || '赞赏支持')
             }
             .onClick(() => {
-              router.pushUrl({ url: 'pages/TipPage' });
+              try {
+                this.getUIContext().getRouter().pushUrl({ url: 'pages/TipPage' });
+              } catch (_e) {
+              }
             })
           }
           this.menuLine()

@@ -175,9 +175,12 @@ export class ServerConfigManager {
     if (!this.pref) {
       return;
     }
-    await this.pref.put(KEY_SERVER_URL, cleanUrl);
-    await this.pref.flush();
-    await this.addServerHistory(cleanUrl);
+    try {
+      await this.pref.put(KEY_SERVER_URL, cleanUrl);
+      await this.pref.flush();
+      await this.addServerHistory(cleanUrl);
+    } catch (_err) {
+    }
   }
 
   public async clearServerUrl(): Promise<void> {
@@ -185,8 +188,11 @@ export class ServerConfigManager {
     if (!this.pref) {
       return;
     }
-    await this.pref.delete(KEY_SERVER_URL);
-    await this.pref.flush();
+    try {
+      await this.pref.delete(KEY_SERVER_URL);
+      await this.pref.flush();
+    } catch (_err) {
+    }
   }
 
   public normalizeRaw(url: string): string {

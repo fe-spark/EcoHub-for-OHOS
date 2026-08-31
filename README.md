@@ -1,16 +1,24 @@
 # EcoHub for OHOS
 
+[![Release](https://img.shields.io/github/v/release/fe-spark/EcoHub-for-OHOS)](https://github.com/fe-spark/EcoHub-for-OHOS/releases)
+[![Download HAP](https://img.shields.io/badge/Download-.hap-orange?logo=huawei&logoColor=white)](https://github.com/fe-spark/EcoHub-for-OHOS/releases/latest)
+
 [EcoHub](https://github.com/fe-spark/EcoHub) 的 OpenHarmony / HarmonyOS 原生客户端。装到手机或平板后，连接你自己部署的 EcoHub 服务。
 
 本仓库 **不是 EcoHub 本体**。EcoHub 是自托管影视聚合的服务端和 Web；这里只做 OHOS App，产物是 HAP 安装包。
 
 同级还有 [EcoHub for Android](https://github.com/fe-spark/EcoHub-for-Android)。
 
+## 📥 下载安装
+
+- 🚀 **[点击下载最新版本 HAP (Releases Latest)](https://github.com/fe-spark/EcoHub-for-OHOS/releases/latest)**
+- 📜 **[查看所有历史版本与更新日志 (All Releases)](https://github.com/fe-spark/EcoHub-for-OHOS/releases)**
+
 | | EcoHub | EcoHub for OHOS |
 | --- | --- | --- |
 | 是什么 | 服务端 + Web | OHOS App |
 | 仓库 | [fe-spark/EcoHub](https://github.com/fe-spark/EcoHub) | [fe-spark/EcoHub-for-OHOS](https://github.com/fe-spark/EcoHub-for-OHOS) |
-| 产物 | Docker 镜像 / 网站 | `.hap` 安装包 |
+| 产物 | Docker 镜像 / 网站 | [最新 `.hap` 下载](https://github.com/fe-spark/EcoHub-for-OHOS/releases/latest) |
 | 设备显示名 | — | EcoHub |
 | 包名 | — | `com.ecohub.spark` |
 

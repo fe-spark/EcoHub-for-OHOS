@@ -1,4 +1,3 @@
-import { router, promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { FilmApi } from '../api/FilmApi';
@@ -17,7 +16,8 @@ struct SplashPage {
   @State private bottomInset: number = 16;
 
   async aboutToAppear() {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    AppStorage.setOrCreate('UI_CONTEXT', this.getUIContext());
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
@@ -30,8 +30,11 @@ struct SplashPage {
 
     if (!url || !url.trim()) {
       await this.ensureMinTime(startTime, MIN_SPLASH_TIME);
-      promptAction.showToast({ message: '请先配置软件源' });
-      router.replaceUrl({ url: 'pages/ServerConfigPage' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '请先配置软件源' });
+        this.getUIContext().getRouter().replaceUrl({ url: 'pages/ServerConfigPage' });
+      } catch (_e) {
+      }
       return;
     }
 
@@ -52,13 +55,19 @@ struct SplashPage {
     await this.ensureMinTime(startTime, MIN_SPLASH_TIME);
 
     if (ok) {
-      router.replaceUrl({ url: 'pages/Index' });
+      try {
+        this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
+      } catch (_e) {
+      }
     } else {
-      promptAction.showToast({ message: '软件源连接失败，请检查网络或重新配置' });
-      router.replaceUrl({
-        url: 'pages/ServerConfigPage',
-        params: { mode: 'reconnect' }
-      });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '软件源连接失败，请检查网络或重新配置' });
+        this.getUIContext().getRouter().replaceUrl({
+          url: 'pages/ServerConfigPage',
+          params: { mode: 'reconnect' }
+        });
+      } catch (_e) {
+      }
     }
   }
 

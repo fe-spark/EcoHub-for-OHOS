@@ -1,4 +1,3 @@
-import { router, promptAction } from '@kit.ArkUI';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { FilmApi } from '../api/FilmApi';
@@ -24,7 +23,7 @@ struct ServerConfigPage {
   private inputController: TextInputController = new TextInputController();
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
@@ -32,7 +31,7 @@ struct ServerConfigPage {
 
   async aboutToAppear() {
     this.applyWindowBar();
-    const params = router.getParams() as Object;
+    const params = this.getUIContext().getRouter().getParams() as Object;
     this.reconnect = NavUtil.param(params, 'mode') === 'reconnect';
     this.serverUrl = await ServerConfigManager.getInstance().getServerUrl();
     await this.loadHistory();
@@ -59,7 +58,7 @@ struct ServerConfigPage {
   }
 
   private confirmClearHistory(): void {
-    AlertDialog.show({
+    this.getUIContext().showAlertDialog({
       title: '清空历史软件源',
       message: '确定要清空全部历史软件源记录吗？',
       primaryButton: {
@@ -68,7 +67,10 @@ struct ServerConfigPage {
         action: () => {
           ServerConfigManager.getInstance().clearServerHistory().then(() => {
             this.serverHistory = [];
-            promptAction.showToast({ message: '已清空历史软件源' });
+            try {
+              this.getUIContext().getPromptAction().showToast({ message: '已清空历史软件源' });
+            } catch (_e) {
+            }
           });
         }
       },
@@ -83,14 +85,20 @@ struct ServerConfigPage {
     } catch (_e) {
     }
     if (!this.serverUrl.trim()) {
-      promptAction.showToast({ message: '请输入软件源地址' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '请输入软件源地址' });
+      } catch (_e) {
+      }
       return;
     }
     this.isLoading = true;
     const ok = await HttpClient.getInstance().testConnection(this.serverUrl);
     this.isLoading = false;
     if (!ok) {
-      promptAction.showToast({ message: '无法连接该源，请检查地址' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '无法连接该源，请检查地址' });
+      } catch (_e) {
+      }
       return;
     }
     await ServerConfigManager.getInstance().setServerUrl(this.serverUrl);
@@ -98,24 +106,36 @@ struct ServerConfigPage {
     FilmApi.clearSiteConfig();
     SiteHeartbeat.getInstance().resetFailures();
     if (this.reconnect) {
-      promptAction.showToast({ message: '已重新接入' });
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '已重新接入' });
+      } catch (_e) {
+      }
       SourceGuard.markClosed();
       try {
-        const len = parseInt(router.getLength());
+        const len = this.getUIContext().getRouter().getStackSize();
         if (len > 1) {
-          router.back();
+          this.getUIContext().getRouter().back();
         } else {
-          router.replaceUrl({ url: 'pages/Index' });
+          this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
         }
       } catch (_e) {
-        router.replaceUrl({ url: 'pages/Index' });
+        try {
+          this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
+        } catch (_err) {
+        }
       }
       SourceGuard.notifyReconnected();
       return;
     }
-    promptAction.showToast({ message: '源已接入' });
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '源已接入' });
+    } catch (_e) {
+    }
     SourceGuard.notifyReconnected();
-    router.replaceUrl({ url: 'pages/Index' });
+    try {
+      this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
+    } catch (_e) {
+    }
   }
 
   build() {
@@ -127,7 +147,10 @@ struct ServerConfigPage {
           if (!this.reconnect) {
             BackIcon({ color: AppTheme.TEXT_PRIMARY })
               .onClick(() => {
-                router.back();
+                try {
+                  this.getUIContext().getRouter().back();
+                } catch (_e) {
+                }
               })
           }
         }

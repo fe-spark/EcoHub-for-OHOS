@@ -22,24 +22,33 @@ export struct FilmRow {
 
   build() {
     Column() {
+      // 标题栏：琥珀色指示条 + 标题 + 查看全部
       Row() {
-        Text(this.title)
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.TEXT_PRIMARY)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
-          .onClick(() => this.openMore())
+        Row({ space: 8 }) {
+          Row()
+            .width(3.5)
+            .height(15)
+            .backgroundColor(AppTheme.ACCENT)
+            .borderRadius(2)
 
-        Row() {
+          Text(this.title)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .layoutWeight(1)
+        .onClick(() => this.openMore())
+
+        Row({ space: 3 }) {
           Text(this.moreText)
             .fontSize(12)
-            .fontColor(AppTheme.ACCENT)
+            .fontColor(AppTheme.TEXT_MUTED)
           AppIcon({
             src: $r('sys.symbol.chevron_right'),
-            iconSize: 12,
-            color: AppTheme.ACCENT
+            iconSize: 11,
+            color: AppTheme.TEXT_MUTED
           })
         }
         .height(28)
@@ -58,9 +67,9 @@ export struct FilmRow {
           .padding({ left: AppTheme.SPACE_LG })
       } else {
         Scroll() {
-          Row({ space: AppTheme.SPACE_SM }) {
+          Row({ space: 10 }) {
             ForEach(this.films, (film: MovieBasicInfo) => {
-              FilmCard({ film: film, cardWidth: 108 })
+              FilmCard({ film: film, cardWidth: 104 })
             }, (film: MovieBasicInfo) => `${film.id}`)
           }
           .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
@@ -76,16 +85,14 @@ export struct FilmRow {
       }
     }
     .width('100%')
-    .padding({ top: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_LG })
+    .padding({ top: AppTheme.SPACE_MD, bottom: AppTheme.SPACE_MD })
     .alignItems(HorizontalAlign.Start)
-    .backgroundColor(AppTheme.BG_ELEVATED)
-    .borderRadius(AppTheme.RADIUS_LG)
-    .clip(true)
-    .margin({
-      left: AppTheme.SPACE_LG,
-      right: AppTheme.SPACE_LG,
-      bottom: AppTheme.SPACE_LG
+    .backgroundColor(AppTheme.BG_CARD)
+    .border({
+      width: { bottom: 0.5 },
+      color: 'rgba(255, 255, 255, 0.05)'
     })
+    .margin({ bottom: AppTheme.SPACE_SM })
   }
 }
 

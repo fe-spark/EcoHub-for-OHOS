@@ -1,4 +1,3 @@
-import { router, promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
 import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
@@ -57,7 +56,7 @@ struct SearchPage {
   }
 
   private applyWindowBar(): void {
-    WindowBar.apply(getContext(this) as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
     });
@@ -67,7 +66,7 @@ struct SearchPage {
     this.applyWindowBar();
     this.loadHistory();
     this.loadHotKeywords();
-    const params = router.getParams();
+    const params = this.getUIContext().getRouter().getParams();
     const initialKw = NavUtil.param(params, 'keyword');
     if (initialKw) {
       this.keyword = initialKw;
@@ -85,7 +84,7 @@ struct SearchPage {
 
   onPageShow(): void {
     this.applyWindowBar();
-    const params = router.getParams();
+    const params = this.getUIContext().getRouter().getParams();
     const initialKw = NavUtil.param(params, 'keyword');
     if (!initialKw && !this.submitted) {
       setTimeout(() => {
@@ -125,7 +124,7 @@ struct SearchPage {
   }
 
   private confirmClearHistory(): void {
-    AlertDialog.show({
+    this.getUIContext().showAlertDialog({
       title: '清空搜索历史',
       message: '确定要清空全部搜索记录吗？',
       primaryButton: {
@@ -134,7 +133,10 @@ struct SearchPage {
         action: () => {
           SearchHistoryManager.clear().then(() => {
             this.loadHistory();
-            promptAction.showToast({ message: '已清空搜索历史' });
+            try {
+              this.getUIContext().getPromptAction().showToast({ message: '已清空搜索历史' });
+            } catch (_e) {
+            }
           });
         }
       },
@@ -147,7 +149,10 @@ struct SearchPage {
     if (!kw) {
       this.refreshing = false;
       if (reset && !fromPull) {
-        promptAction.showToast({ message: '请输入搜索关键词' });
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: '请输入搜索关键词' });
+        } catch (_e) {
+        }
       }
       return;
     }
@@ -201,7 +206,10 @@ struct SearchPage {
         BackIcon({ color: AppTheme.TEXT_PRIMARY })
           .onClick(() => {
             this.hideKeyboard();
-            router.back();
+            try {
+              this.getUIContext().getRouter().back();
+            } catch (_e) {
+            }
           })
 
         Row() {
@@ -446,6 +454,11 @@ struct SearchPage {
               })
             }
             .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.None)
+            .nestedScroll({
+              scrollForward: NestedScrollMode.SELF_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST
+            })
             .width('100%')
             .height('100%')
           } else {
@@ -492,6 +505,11 @@ struct SearchPage {
             .height('100%')
             .padding({ left: 16, right: 16 })
             .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.None)
+            .nestedScroll({
+              scrollForward: NestedScrollMode.SELF_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST
+            })
             .onScrollFrameBegin((offset: number, _state: ScrollState) => {
               this.hideKeyboard();
               return { offsetRemain: offset };

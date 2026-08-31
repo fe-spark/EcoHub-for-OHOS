@@ -204,6 +204,11 @@ export struct DailyUpdatePane {
               }
             }
             .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.None)
+            .nestedScroll({
+              scrollForward: NestedScrollMode.SELF_FIRST,
+              scrollBackward: NestedScrollMode.SELF_FIRST
+            })
             .width('100%')
             .height('100%')
           }
@@ -234,7 +239,7 @@ export struct DailyUpdatePane {
             .width('100%')
             .height('100%')
             .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.Spring)
+            .edgeEffect(EdgeEffect.None)
             .onAreaChange((_oldValue: Area, newValue: Area) => {
               const h = Number(newValue.height);
               if (h > 0) {

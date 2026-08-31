@@ -1,4 +1,4 @@
-import { router } from '@kit.ArkUI';
+import { UIContext } from '@kit.ArkUI';
 import { ServerConfigManager } from './ServerConfigManager';
 
 export interface ServerConfigRouteParams {
@@ -36,15 +36,20 @@ export class SourceGuard {
     SourceGuard.listeners = next;
   }
 
-  public static intercept(): void {
+  public static intercept(uiContext?: UIContext): void {
     if (SourceGuard.skipCount > 0 || SourceGuard.intercepting) {
       return;
     }
     if (!ServerConfigManager.getInstance().getCachedServerUrl()) {
       return;
     }
+    const ctx = uiContext || AppStorage.get<UIContext>('UI_CONTEXT');
+    const r = ctx ? ctx.getRouter() : undefined;
+    if (!r) {
+      return;
+    }
     try {
-      const state = router.getState();
+      const state = r.getState();
       if (state && state.path.indexOf('ServerConfigPage') >= 0) {
         return;
       }
@@ -53,7 +58,7 @@ export class SourceGuard {
     SourceGuard.intercepting = true;
     try {
       const params: ServerConfigRouteParams = { mode: 'reconnect' };
-      router.pushUrl({
+      r.pushUrl({
         url: 'pages/ServerConfigPage',
         params: params
       }, (err: Error) => {
