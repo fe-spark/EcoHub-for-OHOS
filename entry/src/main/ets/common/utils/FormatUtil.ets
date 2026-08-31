@@ -1,4 +1,5 @@
 import { BannerItem, MovieBasicInfo } from '../../model/FilmModels';
+import { ServerConfigManager } from './ServerConfigManager';
 
 export class FormatUtil {
   static text(value: string | number | undefined | null, fallback: string = ''): string {
@@ -18,15 +19,18 @@ export class FormatUtil {
   }
 
   static poster(film: MovieBasicInfo): string {
-    return film.picture || film.poster || film.pictureSlide || '';
+    const raw = film.picture || film.poster || film.pictureSlide || '';
+    return ServerConfigManager.getInstance().resolveMediaUrl(raw);
   }
 
   static bannerPoster(item: BannerItem): string {
-    return item.poster || item.picture || item.pictureSlide || '';
+    const raw = item.poster || item.picture || item.pictureSlide || '';
+    return ServerConfigManager.getInstance().resolveMediaUrl(raw);
   }
 
   static bannerBackdrop(item: BannerItem): string {
-    return item.pictureSlide || item.picture || item.poster || '';
+    const raw = item.pictureSlide || item.picture || item.poster || '';
+    return ServerConfigManager.getInstance().resolveMediaUrl(raw);
   }
 
   static filmId(film: MovieBasicInfo): string {
