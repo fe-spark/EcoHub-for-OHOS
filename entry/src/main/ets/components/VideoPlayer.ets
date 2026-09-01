@@ -69,6 +69,7 @@ export struct VideoPlayer {
   private pageWasHidden: boolean = false;
   private playerW: number = 1;
   private playerH: number = 1;
+  private volumeSub: (() => void) | null = null;
 
   aboutToAppear() {
     this.observer = new PlayerVideoObserver(this.observerHost());
@@ -85,10 +86,21 @@ export struct VideoPlayer {
     this.audioBridge.sync((vol, _max, isMuted) => {
       this.volumeIndex = vol;
       this.muted = isMuted;
+      this.gestures.pan.primeVolume(this.audioBridge.max > 0 ? vol / this.audioBridge.max : 0);
+    });
+    this.volumeSub = PlayerWindow.subscribeVolumeChange((info) => {
+      this.audioBridge.updateFromSystem(info);
+      this.volumeIndex = info.current;
+      this.muted = this.audioBridge.muted;
+      this.gestures.pan.primeVolume(info.max > 0 ? info.current / info.max : 0);
     });
   }
 
   aboutToDisappear() {
+    if (this.volumeSub) {
+      this.volumeSub();
+      this.volumeSub = null;
+    }
     this.watcher.clearAll();
     this.closeSpeedDialog();
     this.state.bootGen++;
@@ -160,6 +172,11 @@ export struct VideoPlayer {
 
   onPageActiveChange(): void {
     if (this.pageActive) {
+      this.audioBridge.sync((vol, _max, isMuted) => {
+        this.volumeIndex = vol;
+        this.muted = isMuted;
+        this.gestures.pan.primeVolume(this.audioBridge.max > 0 ? vol / this.audioBridge.max : 0);
+      });
       if (!this.pageWasHidden || !this.videoUrl || this.state.completed || this.state.errorText) return;
       this.pageWasHidden = false;
       this.state.stalled = false;
@@ -472,7 +489,7 @@ export struct VideoPlayer {
         errorText: this.errorText,
         currentTime: this.currentTime,
         duration: this.duration,
-        muted: this.muted,
+        muted: this.muted || this.volumeIndex <= 0,
         speedLabel: this.speedLabel,
         hasPrev: this.hasPrev,
         hasNext: this.hasNext,

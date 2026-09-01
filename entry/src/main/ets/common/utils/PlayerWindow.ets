@@ -72,13 +72,57 @@ export class PlayerWindow {
   static async getVolume(): Promise<PlayerVolumeInfo> {
     const info = new PlayerVolumeInfo();
     try {
-      const volumeManager = audio.getAudioManager().getVolumeManager();
-      info.max = Math.max(1, volumeManager.getMaxVolumeByStream(audio.StreamUsage.STREAM_USAGE_MOVIE));
-      info.current = Math.min(info.max, Math.max(0, volumeManager.getVolumeByStream(audio.StreamUsage.STREAM_USAGE_MOVIE)));
+      const group = await audio.getAudioManager().getVolumeManager()
+        .getVolumeGroupManager(audio.DEFAULT_VOLUME_GROUP_ID);
+      info.max = Math.max(1, await group.getMaxVolume(audio.AudioVolumeType.MEDIA));
+      info.current = Math.min(info.max, Math.max(0, await group.getVolume(audio.AudioVolumeType.MEDIA)));
     } catch (err) {
       console.error('get volume failed:', JSON.stringify(err));
     }
     return info;
+  }
+
+  static subscribeVolumeChange(callback: (info: PlayerVolumeInfo) => void): () => void {
+    try {
+      let active = true;
+      const volumeManager = audio.getAudioManager().getVolumeManager();
+      let cachedMax = 15;
+      let lastMediaVol = -1;
+
+      PlayerWindow.getVolume().then((initial: PlayerVolumeInfo) => {
+        if (!active) {
+          return;
+        }
+        cachedMax = initial.max;
+        lastMediaVol = initial.current;
+      }).catch(() => {});
+
+      const handler = (event: audio.VolumeEvent) => {
+        if (event.volumeType !== audio.AudioVolumeType.MEDIA || !active) {
+          return;
+        }
+        if (event.volume === lastMediaVol) {
+          return;
+        }
+        lastMediaVol = event.volume;
+        const info = new PlayerVolumeInfo();
+        info.max = Math.max(1, cachedMax);
+        info.current = Math.min(info.max, Math.max(0, event.volume));
+        callback(info);
+      };
+      volumeManager.on('volumeChange', handler);
+      return () => {
+        active = false;
+        try {
+          volumeManager.off('volumeChange', handler);
+        } catch (err) {
+          console.error('off volumeChange failed:', JSON.stringify(err));
+        }
+      };
+    } catch (err) {
+      console.error('subscribe volumeChange failed:', JSON.stringify(err));
+      return () => {};
+    }
   }
 
   static async setKeepScreenOn(context: common.UIAbilityContext | undefined, on: boolean): Promise<void> {

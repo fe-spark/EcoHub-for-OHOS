@@ -354,6 +354,7 @@ export struct PlayDetailPanel {
       ListItem() {
         FilmDetailHeader({
           name: this.name,
+          subTitle: this.subTitle,
           actor: this.actor,
           plot: this.plot,
           descriptor: this.descriptor

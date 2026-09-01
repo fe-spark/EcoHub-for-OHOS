@@ -10,6 +10,7 @@ export class PlayerAudioBridge {
   private volumeMax: number = 15;
   private currentVolume: number = 8;
   private lastVolume: number = 8;
+  private lastSystemVolume: number = -1;
   private isMuted: boolean = false;
 
   get volumeIndex(): number {
@@ -28,6 +29,7 @@ export class PlayerAudioBridge {
     PlayerWindow.getVolume().then((info: PlayerVolumeInfo) => {
       this.volumeMax = info.max;
       this.currentVolume = info.current;
+      this.lastSystemVolume = info.current;
       this.isMuted = info.current <= 0;
       if (info.current > 0) {
         this.lastVolume = info.current;
@@ -38,10 +40,26 @@ export class PlayerAudioBridge {
     });
   }
 
+  updateFromSystem(info: PlayerVolumeInfo): void {
+    const prevSystem = this.lastSystemVolume;
+    this.lastSystemVolume = info.current;
+    this.volumeMax = info.max;
+    this.currentVolume = info.current;
+    if (info.current <= 0) {
+      this.isMuted = true;
+    } else if (prevSystem >= 0 && info.current !== prevSystem) {
+      this.lastVolume = info.current;
+      this.isMuted = false;
+    } else if (prevSystem < 0 && info.current > 0) {
+      this.lastVolume = info.current;
+    }
+  }
+
   applyRatio(ratio: number): number {
     const max = Math.max(1, this.volumeMax);
     const next = Math.round(Math.min(1, Math.max(0, ratio)) * max);
     this.currentVolume = next;
+    this.lastSystemVolume = next;
     this.isMuted = next <= 0;
     if (next > 0) {
       this.lastVolume = next;

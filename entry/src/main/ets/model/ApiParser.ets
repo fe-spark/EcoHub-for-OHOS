@@ -291,23 +291,36 @@ export class ApiParser {
     const detailObj = ApiParser.obj(record, 'detail');
     const descriptorObj = ApiParser.obj(detailObj, 'descriptor');
     const descriptor: MovieDescriptor = {
-      subTitle: ApiParser.str(descriptorObj, 'subTitle'),
-      cName: ApiParser.str(descriptorObj, 'cName'),
-      enName: ApiParser.str(descriptorObj, 'enName'),
-      classTag: ApiParser.str(descriptorObj, 'classTag'),
-      actor: ApiParser.str(descriptorObj, 'actor'),
-      director: ApiParser.str(descriptorObj, 'director'),
-      writer: ApiParser.str(descriptorObj, 'writer'),
-      blurb: ApiParser.str(descriptorObj, 'blurb'),
-      remarks: ApiParser.str(descriptorObj, 'remarks'),
-      releaseDate: ApiParser.str(descriptorObj, 'releaseDate'),
-      area: ApiParser.str(descriptorObj, 'area'),
-      language: ApiParser.str(descriptorObj, 'language'),
-      year: FormatUtil.year(ApiParser.str(descriptorObj, 'year')),
-      state: ApiParser.str(descriptorObj, 'state'),
-      updateTime: ApiParser.str(descriptorObj, 'updateTime'),
-      dbScore: ApiParser.str(descriptorObj, 'dbScore'),
-      content: ApiParser.str(descriptorObj, 'content')
+      subTitle: ApiParser.str(descriptorObj, 'subTitle') || ApiParser.str(detailObj, 'subTitle'),
+      cName: ApiParser.str(descriptorObj, 'cName') || ApiParser.str(detailObj, 'cName') || ApiParser.str(detailObj, 'typeName'),
+      enName: ApiParser.str(descriptorObj, 'enName') || ApiParser.str(detailObj, 'enName'),
+      classTag: ApiParser.str(descriptorObj, 'classTag') || ApiParser.str(detailObj, 'classTag'),
+      actor: ApiParser.str(descriptorObj, 'actor') || ApiParser.str(detailObj, 'actor'),
+      director: ApiParser.str(descriptorObj, 'director') || ApiParser.str(detailObj, 'director'),
+      writer: ApiParser.str(descriptorObj, 'writer') || ApiParser.str(detailObj, 'writer'),
+      blurb: ApiParser.str(descriptorObj, 'blurb') || ApiParser.str(detailObj, 'blurb'),
+      remarks: ApiParser.str(descriptorObj, 'remarks') || ApiParser.str(detailObj, 'remarks') || ApiParser.str(descriptorObj, 'remark') || ApiParser.str(detailObj, 'remark'),
+      releaseDate: ApiParser.str(descriptorObj, 'releaseDate') || ApiParser.str(detailObj, 'releaseDate'),
+      area: ApiParser.str(descriptorObj, 'area') || ApiParser.str(detailObj, 'area'),
+      language: ApiParser.str(descriptorObj, 'language') || ApiParser.str(detailObj, 'language'),
+      year: FormatUtil.year(ApiParser.str(descriptorObj, 'year') || ApiParser.str(detailObj, 'year')),
+      state: ApiParser.str(descriptorObj, 'state') || ApiParser.str(detailObj, 'state'),
+      updateTime: ApiParser.str(descriptorObj, 'updateTime') || ApiParser.str(detailObj, 'updateTime'),
+      dbScore: ApiParser.str(descriptorObj, 'dbScore') ||
+        ApiParser.str(descriptorObj, 'score') ||
+        ApiParser.str(descriptorObj, 'doubanScore') ||
+        ApiParser.str(descriptorObj, 'douban_score') ||
+        ApiParser.str(descriptorObj, 'vod_douban_score') ||
+        ApiParser.str(descriptorObj, 'vod_score') ||
+        ApiParser.str(detailObj, 'dbScore') ||
+        ApiParser.str(detailObj, 'score') ||
+        ApiParser.str(detailObj, 'doubanScore') ||
+        ApiParser.str(detailObj, 'vod_douban_score') ||
+        ApiParser.str(detailObj, 'vod_score'),
+      content: ApiParser.str(descriptorObj, 'content') ||
+        ApiParser.str(detailObj, 'content') ||
+        ApiParser.str(descriptorObj, 'blurb') ||
+        ApiParser.str(detailObj, 'blurb')
     };
     const sourceRaw = ApiParser.list(detailObj, 'list');
     const sources: PlaySource[] = [];
