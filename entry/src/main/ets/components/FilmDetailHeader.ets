@@ -1,6 +1,7 @@
 import { MovieDescriptor } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { AppIcon } from './AppIcon';
+import { FilmDetailDialog } from './FilmDetailDialog';
 
 @Component
 export struct FilmDetailHeader {
@@ -11,10 +12,43 @@ export struct FilmDetailHeader {
   @Prop @Watch('onDataChange') descriptor: MovieDescriptor | null = null;
   @State private cleanPlot: string = '';
   @State private scoreText: string = '';
-  @State private plotOpen: boolean = false;
+  private detailDialog: CustomDialogController | null = null;
 
   aboutToAppear(): void {
     this.syncDerivedState();
+  }
+
+  aboutToDisappear(): void {
+    if (this.detailDialog) {
+      this.detailDialog.close();
+      this.detailDialog = null;
+    }
+  }
+
+  private openDetailDialog(): void {
+    if (this.detailDialog) {
+      this.detailDialog.close();
+      this.detailDialog = null;
+    }
+    this.detailDialog = new CustomDialogController({
+      builder: FilmDetailDialog({
+        name: this.name,
+        scoreText: this.scoreText,
+        tags: this.metaTagsList(),
+        director: this.directorText(),
+        actor: this.actorText(),
+        plot: this.cleanPlot
+      }),
+      autoCancel: true,
+      alignment: DialogAlignment.Bottom,
+      customStyle: true,
+      backgroundColor: Color.Transparent,
+      maskColor: 'rgba(0, 0, 0, 0.65)',
+      cancel: () => {
+        this.detailDialog = null;
+      }
+    });
+    this.detailDialog.open();
   }
 
   onDataChange(): void {
@@ -38,8 +72,21 @@ export struct FilmDetailHeader {
     this.scoreText = (!s || s === '0' || s === '0.0') ? '' : s;
   }
 
-  private canExpandPlot(): boolean {
-    return this.cleanPlot.length > 56 || this.cleanPlot.indexOf('\n') >= 0;
+  private hasDetailInfo(): boolean {
+    return this.directorText() !== '' || this.actorText() !== '' || this.cleanPlot !== '';
+  }
+
+  private detailSnippetText(): string {
+    if (this.actorText() !== '') {
+      return `主演：${this.actorText()}`;
+    }
+    if (this.directorText() !== '') {
+      return `导演：${this.directorText()}`;
+    }
+    if (this.cleanPlot !== '') {
+      return `简介：${this.cleanPlot.replace(/\n+/g, ' ')}`;
+    }
+    return '查看简介 / 主演 / 导演';
   }
 
   private metaTagsList(): string[] {
@@ -100,7 +147,7 @@ export struct FilmDetailHeader {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
 
-        // 评分徽章（有评分展示高亮分值，无评分展示优雅占位）
+        // 评分徽章
         if (this.scoreText !== '') {
           Row({ space: 3 }) {
             Text('★')
@@ -141,134 +188,77 @@ export struct FilmDetailHeader {
 
       // 2. 元数据小胶囊组
       if (this.metaTagsList().length > 0) {
-        Row({ space: 6 }) {
-          ForEach(this.metaTagsList(), (tag: string) => {
-            Text(tag)
-              .fontSize(11)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-              .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-              .backgroundColor(AppTheme.BG_CHIP)
-              .borderRadius(AppTheme.RADIUS_SM)
-          }, (tag: string) => tag)
+        Scroll() {
+          Row({ space: 6 }) {
+            ForEach(this.metaTagsList(), (tag: string) => {
+              Text(tag)
+                .fontSize(11)
+                .fontColor(AppTheme.TEXT_SECONDARY)
+                .padding({ left: 7, right: 7, top: 3, bottom: 3 })
+                .backgroundColor(AppTheme.BG_CHIP)
+                .borderRadius(AppTheme.RADIUS_SM)
+            }, (tag: string) => tag)
+          }
         }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
         .width('100%')
+        .align(Alignment.Start)
         .padding({ left: 12, right: 12, top: 8 })
       }
 
-      // 3. 演职员信息板块
-      if (this.directorText() !== '' || this.actorText() !== '') {
-        Column({ space: 4 }) {
-          if (this.directorText() !== '') {
-            Row({ space: 6 }) {
-              Text('导演')
-                .fontSize(10)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(AppTheme.TEXT_MUTED)
-                .padding({ left: 5, right: 5, top: 1, bottom: 1 })
-                .backgroundColor(AppTheme.BG_CHIP)
-                .borderRadius(3)
-              Text(this.directorText())
-                .fontSize(12)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Center)
-          }
-
-          if (this.actorText() !== '') {
-            Row({ space: 6 }) {
-              Text('主演')
-                .fontSize(10)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(AppTheme.TEXT_MUTED)
-                .padding({ left: 5, right: 5, top: 1, bottom: 1 })
-                .backgroundColor(AppTheme.BG_CHIP)
-                .borderRadius(3)
-              Text(this.actorText())
-                .fontSize(12)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Center)
-          }
-        }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 8 })
-      }
-
-      // 4. 精美卡片式剧情简介与折叠交互（无简介时直接不显示简介模块）
-      if (this.cleanPlot !== '') {
+      // 3. 详细信息卡片导引条（独立整行大热区，带摘要与高亮详情入口）
+      if (this.hasDetailInfo()) {
         Row() {
-          Column() {
-            Row() {
-              Row({ space: 4 }) {
-                Column()
-                  .width(3)
-                  .height(11)
-                  .backgroundColor(AppTheme.ACCENT)
-                  .borderRadius(1.5)
-                Text('剧情简介')
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AppTheme.TEXT_PRIMARY)
-              }
-              .alignItems(VerticalAlign.Center)
-
-              Blank()
-
-              if (this.canExpandPlot()) {
-                Row({ space: 2 }) {
-                  Text(this.plotOpen ? '收起' : '展开')
-                    .fontSize(11)
-                    .fontColor(AppTheme.ACCENT)
-                  AppIcon({
-                    src: this.plotOpen ? $r('sys.symbol.chevron_up') : $r('sys.symbol.chevron_down'),
-                    iconSize: 11,
-                    color: AppTheme.ACCENT
-                  })
-                }
-                .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                .onClick(() => {
-                  this.plotOpen = !this.plotOpen;
-                })
-              }
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Center)
-            .margin({ bottom: 6 })
-
-            Text(this.cleanPlot)
-              .fontSize(12)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-              .lineHeight(19)
-              .width('100%')
-              .maxLines(this.plotOpen ? 30 : 2)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .animation({ duration: 180, curve: Curve.EaseInOut })
-              .onClick(() => {
-                if (this.canExpandPlot()) {
-                  this.plotOpen = !this.plotOpen;
-                }
+          Row() {
+            Row({ space: 6 }) {
+              AppIcon({
+                src: $r('sys.symbol.doc_plaintext'),
+                iconSize: 14,
+                color: AppTheme.ACCENT
               })
+              Text(this.detailSnippetText())
+                .fontSize(12)
+                .fontColor(AppTheme.TEXT_SECONDARY)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
+            }
+            .layoutWeight(1)
+            .alignItems(VerticalAlign.Center)
+
+            Row({ space: 2 }) {
+              Text('详情')
+                .fontSize(12)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ACCENT)
+              AppIcon({
+                src: $r('sys.symbol.chevron_right'),
+                iconSize: 12,
+                color: AppTheme.ACCENT
+              })
+            }
+            .padding({ left: 6, right: 4, top: 3, bottom: 3 })
+            .backgroundColor(AppTheme.ACCENT_SOFT)
+            .borderRadius(AppTheme.RADIUS_SM)
+            .alignItems(VerticalAlign.Center)
+            .margin({ left: 8 })
           }
           .width('100%')
-          .padding(10)
+          .padding({ left: 10, right: 8, top: 8, bottom: 8 })
           .backgroundColor(AppTheme.BG_CARD)
           .borderRadius(AppTheme.RADIUS_MD)
-          .alignItems(HorizontalAlign.Start)
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            this.openDetailDialog();
+          })
         }
         .width('100%')
-        .padding({ left: 12, right: 12, top: 8, bottom: 4 })
+        .padding({ left: 12, right: 12, top: 8 })
       }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding({ bottom: this.cleanPlot !== '' ? 4 : 10 })
+    .padding({ bottom: 4 })
   }
 }

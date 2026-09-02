@@ -166,11 +166,11 @@ export struct PlayerSkin {
         this.skipBtns()
       }
       .width('100%')
-      .height(44)
       .padding({
         left: this.edge(8, this.leftInset),
         right: this.edge(8, this.rightInset),
-        top: this.edge(4, this.topInset)
+        top: this.edge(8, this.topInset),
+        bottom: 8
       })
       .alignItems(VerticalAlign.Center)
       .linearGradient({

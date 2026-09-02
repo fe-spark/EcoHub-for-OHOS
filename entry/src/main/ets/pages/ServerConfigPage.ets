@@ -21,6 +21,7 @@ struct ServerConfigPage {
   @State private serverHistory: string[] = [];
   @State private showHistoryDialog: boolean = false;
   private inputController: TextInputController = new TextInputController();
+  private lastBackPressTime: number = 0;
 
   private applyWindowBar(): void {
     WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
@@ -50,7 +51,24 @@ struct ServerConfigPage {
       this.showHistoryDialog = false;
       return true;
     }
-    return this.reconnect;
+    if (this.reconnect) {
+      const now = Date.now();
+      if (now - this.lastBackPressTime < 2000) {
+        try {
+          const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+          ctx.terminateSelf();
+        } catch (_e) {
+        }
+        return false;
+      }
+      this.lastBackPressTime = now;
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '再按一次退出应用' });
+      } catch (_e) {
+      }
+      return true;
+    }
+    return false;
   }
 
   private async loadHistory(): Promise<void> {
@@ -105,35 +123,22 @@ struct ServerConfigPage {
     await this.loadHistory();
     FilmApi.clearSiteConfig();
     SiteHeartbeat.getInstance().resetFailures();
-    if (this.reconnect) {
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: '已重新接入' });
-      } catch (_e) {
-      }
-      SourceGuard.markClosed();
-      try {
-        const len = this.getUIContext().getRouter().getStackSize();
-        if (len > 1) {
-          this.getUIContext().getRouter().back();
-        } else {
-          this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
-        }
-      } catch (_e) {
-        try {
-          this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
-        } catch (_err) {
-        }
-      }
-      SourceGuard.notifyReconnected();
-      return;
-    }
+    AppStorage.setOrCreate<number>('SOURCE_EPOCH', Date.now());
+    SourceGuard.markClosed();
+    SourceGuard.notifyReconnected();
+
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '源已接入' });
+      this.getUIContext().getPromptAction().showToast({ message: this.reconnect ? '已重新接入' : '源已接入' });
     } catch (_e) {
     }
-    SourceGuard.notifyReconnected();
+
+    const r = this.getUIContext().getRouter();
     try {
-      this.getUIContext().getRouter().replaceUrl({ url: 'pages/Index' });
+      r.clear();
+    } catch (_e) {
+    }
+    try {
+      r.replaceUrl({ url: 'pages/Index' });
     } catch (_e) {
     }
   }
@@ -162,14 +167,11 @@ struct ServerConfigPage {
         Blank().height(24)
 
         Column() {
-          Stack({ alignContent: Alignment.Center }) {
-            Column()
-              .width(72)
-              .height(72)
-              .borderRadius(AppTheme.RADIUS_LG)
-              .backgroundColor(AppTheme.ACCENT)
-            AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 32, color: AppTheme.TEXT_PRIMARY })
-          }
+          Image($r('app.media.startIcon'))
+            .width(72)
+            .height(72)
+            .borderRadius(AppTheme.RADIUS_LG)
+            .clip(true)
 
           Text('EcoHub')
             .fontSize(28)

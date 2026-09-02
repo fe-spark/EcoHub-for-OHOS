@@ -16,7 +16,7 @@ export struct PlayDetailPanel {
   @Prop actor: string = '';
   @Prop plot: string = '';
   @Prop descriptor: MovieDescriptor | null = null;
-  @Prop sources: PlaySource[] = [];
+  @Prop @Watch('onSourcesChange') sources: PlaySource[] = [];
   @Prop @Watch('onPlayIndexChange') playingSourceId: string = '';
   @Prop @Watch('onViewSourceChange') viewingSourceId: string = '';
   @Prop @Watch('onPlayIndexChange') episodeIndex: number = 0;
@@ -24,14 +24,122 @@ export struct PlayDetailPanel {
   onSelectEpisode?: (sourceId: string, index: number) => void;
   @State private groupSourceIds: string[] = [];
   @State private groupIndexes: number[] = [];
+  @State private headerHeight: number = 148;
+  @State private ready: boolean = false;
+  private listScroller: Scroller = new Scroller();
+  private groupScroller: Scroller = new Scroller();
+
+  aboutToAppear(): void {
+    this.syncGroupFromPlayingEpisode();
+    this.checkReadyAndScroll();
+  }
+
+  private onSourcesChange(): void {
+    this.syncGroupFromPlayingEpisode();
+    this.checkReadyAndScroll();
+  }
 
   private onViewSourceChange(): void {
     this.clampGroup(this.viewingSourceId);
+    this.checkReadyAndScroll();
   }
 
   private onPlayIndexChange(): void {
     if (this.viewingSourceId === this.playingSourceId) {
-      this.setGroup(this.viewingSourceId, Math.floor(this.episodeIndex / GROUP_SIZE));
+      this.setGroup(this.viewingSourceId, Math.floor(this.episodeIndex / GROUP_SIZE), false);
+      Promise.resolve().then(() => {
+        this.scrollToFocusedEpisode(true);
+      });
+    }
+  }
+
+  private checkReadyAndScroll(): void {
+    const isTop = (this.groupOf(this.viewingSourceId) === 0 && Math.floor((this.episodeIndex % GROUP_SIZE) / this.epCols()) === 0) ||
+      !this.needsGrouping();
+    if (isTop) {
+      this.ready = true;
+      this.scrollToFocusedEpisode(false);
+    } else {
+      this.ready = false;
+      this.scrollToFocusedEpisode(false);
+      Promise.resolve().then(() => {
+        this.ready = true;
+      });
+    }
+  }
+
+  private syncGroupFromPlayingEpisode(): void {
+    if (!this.viewingSourceId && this.playingSourceId) {
+      this.viewingSourceId = this.playingSourceId;
+    }
+    if (this.viewingSourceId === this.playingSourceId) {
+      const targetGroup = Math.floor(this.episodeIndex / GROUP_SIZE);
+      this.setGroup(this.viewingSourceId, targetGroup, false);
+    } else {
+      this.clampGroup(this.viewingSourceId);
+    }
+  }
+
+  private syncGroupBar(smooth: boolean): void {
+    if (this.needsGrouping()) {
+      try {
+        const g = this.groupOf(this.viewingSourceId);
+        this.groupScroller.scrollToIndex(g, smooth, ScrollAlign.CENTER);
+      } catch (_e) {
+      }
+    }
+  }
+
+  private scrollToFocusedEpisode(smooth: boolean = false): void {
+    const list = this.episodeList();
+    if (list.length === 0) {
+      return;
+    }
+    const g = this.groupOf(this.viewingSourceId);
+    const start = g * GROUP_SIZE;
+    const end = start + GROUP_SIZE;
+    const inGroup = this.viewingSourceId === this.playingSourceId &&
+      this.episodeIndex >= start &&
+      this.episodeIndex < end &&
+      this.episodeIndex < list.length;
+
+    // 1. 同步横向滚动分组栏，使选中的分组胶囊居中进入视野
+    this.syncGroupBar(smooth);
+
+    // 2. 纵向列表定位：基于 headerHeight 与行高精确推移，绝不被吸顶栏遮挡
+    try {
+      if (inGroup) {
+        const localIndex = this.episodeIndex - start;
+        const targetRow = Math.floor(localIndex / this.epCols());
+        const maxRow = Math.max(0, Math.ceil(this.visibleEpisodes().length / this.epCols()) - 1);
+        const safeRow = Math.min(targetRow, maxRow);
+
+        // 第一组首行或无分组前1-2行剧集：保持自然置顶（标题+吸顶栏+首行完整可见，绝不遮挡）
+        if ((g === 0 && safeRow === 0) || (safeRow <= 1 && !this.needsGrouping())) {
+          this.listScroller.scrollToIndex(0, smooth, ScrollAlign.START);
+          return;
+        }
+
+        const rowH = 54;
+        const targetOffset = Math.max(0, this.headerHeight + safeRow * rowH);
+        this.listScroller.scrollTo({
+          xOffset: 0,
+          yOffset: targetOffset,
+          animation: smooth ? { duration: 250, curve: Curve.EaseInOut } : undefined
+        });
+      } else {
+        // 目标分组不含当前剧集时，吸顶对齐到 ListItemGroup 顶部（header groupBar 吸顶，首行展示该组第1行）
+        this.listScroller.scrollTo({
+          xOffset: 0,
+          yOffset: this.headerHeight,
+          animation: smooth ? { duration: 200, curve: Curve.EaseInOut } : undefined
+        });
+      }
+    } catch (_err) {
+      try {
+        this.listScroller.scrollToIndex(0, smooth, ScrollAlign.START);
+      } catch (_e) {
+      }
     }
   }
 
@@ -54,13 +162,19 @@ export struct PlayDetailPanel {
     return index >= 0 ? this.groupIndexes[index] : 0;
   }
 
-  private setGroup(sourceId: string, groupIndex: number): void {
+  private setGroup(sourceId: string, groupIndex: number, scrollReset: boolean = true): void {
     if (!sourceId) {
       return;
     }
     const count = this.groupCount();
     const safe = count <= 0 ? 0 : Math.min(Math.max(groupIndex, 0), count - 1);
-    if (this.groupOf(sourceId) === safe && this.groupSourceIds.indexOf(sourceId) >= 0) {
+    const oldGroup = this.groupOf(sourceId);
+    if (oldGroup === safe && this.groupSourceIds.indexOf(sourceId) >= 0) {
+      if (scrollReset) {
+        Promise.resolve().then(() => {
+          this.scrollToFocusedEpisode(true);
+        });
+      }
       return;
     }
     const ids = this.groupSourceIds.slice();
@@ -74,6 +188,11 @@ export struct PlayDetailPanel {
     }
     this.groupSourceIds = ids;
     this.groupIndexes = values;
+    if (scrollReset) {
+      Promise.resolve().then(() => {
+        this.scrollToFocusedEpisode(true);
+      });
+    }
   }
 
   private groupCount(): number {
@@ -89,7 +208,7 @@ export struct PlayDetailPanel {
   }
 
   private clampGroup(sourceId: string): void {
-    this.setGroup(sourceId, this.groupOf(sourceId));
+    this.setGroup(sourceId, this.groupOf(sourceId), false);
   }
 
   private groupStart(): number {
@@ -102,12 +221,7 @@ export struct PlayDetailPanel {
       return list;
     }
     const start = this.groupStart();
-    const end = Math.min(start + GROUP_SIZE, list.length);
-    const result: MovieUrlInfo[] = [];
-    for (let i = start; i < end; i++) {
-      result.push(list[i]);
-    }
-    return result;
+    return list.slice(start, start + GROUP_SIZE);
   }
 
   private groupLabel(index: number): string {
@@ -118,12 +232,7 @@ export struct PlayDetailPanel {
   }
 
   private groupIndexesOf(): number[] {
-    const count = this.groupCount();
-    const result: number[] = [];
-    for (let i = 0; i < count; i++) {
-      result.push(i);
-    }
-    return result;
+    return Array.from({ length: this.groupCount() }, (_v: Object, i: number) => i);
   }
 
   private usesWideTiles(): boolean {
@@ -145,21 +254,12 @@ export struct PlayDetailPanel {
   }
 
   private colIds(): number[] {
-    const n = this.epCols();
-    const ids: number[] = [];
-    for (let i = 0; i < n; i++) {
-      ids.push(i);
-    }
-    return ids;
+    return Array.from({ length: this.epCols() }, (_v: Object, i: number) => i);
   }
 
   private epRowIds(): number[] {
-    const n = Math.ceil(this.visibleEpisodes().length / this.epCols());
-    const ids: number[] = [];
-    for (let i = 0; i < n; i++) {
-      ids.push(i);
-    }
-    return ids;
+    const total = Math.ceil(this.visibleEpisodes().length / this.epCols());
+    return Array.from({ length: total }, (_v: Object, i: number) => i);
   }
 
   private showEpisodeTitle(name: string): void {
@@ -243,25 +343,22 @@ export struct PlayDetailPanel {
       }
       if (this.needsGrouping()) {
         Column() {
-          Scroll() {
-            Row({ space: 4 }) {
-              ForEach(this.groupIndexesOf(), (index: number) => {
+          List({ space: 4, scroller: this.groupScroller }) {
+            ForEach(this.groupIndexesOf(), (index: number) => {
+              ListItem() {
                 this.groupChip(index)
-              }, (index: number) => `group_${this.viewingSourceId}_${index}`)
-            }
-            .justifyContent(FlexAlign.Start)
-            .padding({ left: 8, right: 12 })
-            .constraintSize({ minHeight: 32 })
+              }
+            }, (index: number) => `group_${this.viewingSourceId}_${index}`)
           }
-          .scrollable(ScrollDirection.Horizontal)
+          .listDirection(Axis.Horizontal)
           .scrollBar(BarState.Off)
-          .align(Alignment.Start)
           .nestedScroll({
             scrollForward: NestedScrollMode.SELF_FIRST,
             scrollBackward: NestedScrollMode.SELF_FIRST
           })
           .width('100%')
           .height(40)
+          .padding({ left: 8, right: 12 })
           .backgroundColor(AppTheme.BG_ELEVATED)
           .borderRadius(AppTheme.RADIUS_MD)
         }
@@ -297,7 +394,8 @@ export struct PlayDetailPanel {
       }, (col: number) => `ep_col_${this.viewingSourceId}_${row}_${col}`)
     }
     .width('100%')
-    .padding({ left: 12, right: 12, bottom: 10 })
+    .height(54)
+    .padding({ left: 12, right: 12, top: 4, bottom: 6 })
   }
 
   @Builder
@@ -312,7 +410,7 @@ export struct PlayDetailPanel {
       .backgroundColor(this.groupOf(this.viewingSourceId) === index ? AppTheme.ACCENT : Color.Transparent)
       .borderRadius(6)
       .onClick(() => {
-        this.setGroup(this.viewingSourceId, index);
+        this.setGroup(this.viewingSourceId, index, true);
       })
   }
 
@@ -350,7 +448,7 @@ export struct PlayDetailPanel {
   }
 
   build() {
-    List() {
+    List({ scroller: this.listScroller }) {
       ListItem() {
         FilmDetailHeader({
           name: this.name,
@@ -360,27 +458,14 @@ export struct PlayDetailPanel {
           descriptor: this.descriptor
         })
       }
-
-      if (this.needsGrouping() || this.sources.length > 0) {
-        ListItemGroup({ header: this.groupBar }) {
-          if (this.episodeList().length === 0) {
-            ListItem() {
-              Text('暂无数据')
-                .fontSize(13)
-                .fontColor(AppTheme.TEXT_MUTED)
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .padding({ top: 32, bottom: 32 })
-            }
-          } else {
-            ForEach(this.epRowIds(), (row: number) => {
-              ListItem() {
-                this.epRow(row)
-              }
-            }, (row: number) => `ep_row_${this.viewingSourceId}_${this.groupStart()}_${row}`)
-          }
+      .onAreaChange((_oldVal: Area, newVal: Area) => {
+        const h = Number(newVal.height);
+        if (h > 0 && Math.abs(this.headerHeight - h) > 1) {
+          this.headerHeight = h;
         }
-      } else {
+      })
+
+      ListItemGroup({ header: this.groupBar }) {
         if (this.episodeList().length === 0) {
           ListItem() {
             Text('暂无数据')
@@ -395,7 +480,7 @@ export struct PlayDetailPanel {
             ListItem() {
               this.epRow(row)
             }
-          }, (row: number) => `ep_row_${this.viewingSourceId}_${row}`)
+          }, (row: number) => `ep_row_${this.viewingSourceId}_${this.groupStart()}_${row}`)
         }
       }
     }
@@ -404,5 +489,10 @@ export struct PlayDetailPanel {
     .height('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .opacity(this.ready ? 1 : 0)
+    .animation({ duration: 150, curve: Curve.EaseOut })
+    .onAppear(() => {
+      this.scrollToFocusedEpisode(false);
+    })
   }
 }

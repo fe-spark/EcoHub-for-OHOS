@@ -3,9 +3,9 @@ import { common, Want } from '@kit.AbilityKit';
 
 export interface PlayRouteParams {
   id: string;
-  sourceId: string;
-  episodeIndex: string;
-  currentTime: string;
+  sourceId?: string;
+  episodeIndex?: string;
+  currentTime?: string;
 }
 
 export interface FilterRouteParams {
@@ -24,17 +24,23 @@ export class NavUtil {
     return ctx ? ctx.getRouter() : undefined;
   }
 
-  static openPlay(id: string | number, sourceId: string = '', episodeIndex: number = 0,
-    currentTime: number = 0, uiContext?: UIContext): void {
+  static openPlay(id: string | number, sourceId: string = '', episodeIndex?: number,
+    currentTime?: number, uiContext?: UIContext): void {
     if (!id && id !== 0) {
       return;
     }
     const params: PlayRouteParams = {
-      id: `${id}`,
-      sourceId: sourceId,
-      episodeIndex: `${episodeIndex}`,
-      currentTime: `${currentTime}`
+      id: `${id}`
     };
+    if (sourceId) {
+      params.sourceId = sourceId;
+    }
+    if (episodeIndex !== undefined && episodeIndex >= 0) {
+      params.episodeIndex = `${episodeIndex}`;
+    }
+    if (currentTime !== undefined && currentTime >= 0) {
+      params.currentTime = `${currentTime}`;
+    }
     try {
       const r = NavUtil.getRouter(uiContext);
       if (r) {

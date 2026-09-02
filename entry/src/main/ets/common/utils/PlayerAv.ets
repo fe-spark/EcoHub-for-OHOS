@@ -11,6 +11,7 @@ export class PlayerAvListener {
   onSeeked: () => void = () => {};
   onBuffer: (buffered: number) => void = (_buffered: number) => {};
   onStalled: (stalled: boolean) => void = (_stalled: boolean) => {};
+  onVideoSize: (width: number, height: number) => void = (_width: number, _height: number) => {};
 }
 
 export class PlayerAv {
@@ -24,6 +25,7 @@ export class PlayerAv {
   private pendingPrepare: boolean = false;
 
   setSurface(id: string): void {
+    console.info(`[PlayerAv] setSurface id: ${id}, hasPlayer: ${!!this.player}, pending: ${this.pendingPrepare}`);
     this.surfaceId = id;
     if (this.player && this.pendingPrepare && id) {
       this.pendingPrepare = false;
@@ -43,8 +45,10 @@ export class PlayerAv {
 
   async open(url: string): Promise<void> {
     const gen = ++this.gen;
+    console.info(`[PlayerAv] open 启动 (gen: ${gen}), url: ${url}`);
     await this.resetPlayer();
     if (gen !== this.gen) {
+      console.info(`[PlayerAv] open 时序被覆盖，丢弃: gen=${gen}, curGen=${this.gen}`);
       return;
     }
     this.url = url;
@@ -52,15 +56,19 @@ export class PlayerAv {
       return;
     }
     try {
+      console.info(`[PlayerAv] 创建 media.createAVPlayer() ...`);
       const player = await media.createAVPlayer();
       if (gen !== this.gen) {
+        console.info(`[PlayerAv] 创建后已过期，释放`);
         player.release();
         return;
       }
       this.player = player;
       this.bind(player, gen);
+      console.info(`[PlayerAv] 设置 player.url: ${url}`);
       player.url = url;
     } catch (err) {
+      console.error(`[PlayerAv] 创建 AVPlayer 异常: ${JSON.stringify(err)}`);
       if (gen === this.gen) {
         this.listener.onError();
       }
@@ -70,6 +78,7 @@ export class PlayerAv {
   play(): void {
     const player = this.player;
     if (player && (player.state === 'prepared' || player.state === 'paused' || player.state === 'completed')) {
+      console.info(`[PlayerAv] 调用 player.play()`);
       player.play();
     }
   }
@@ -77,6 +86,7 @@ export class PlayerAv {
   pause(): void {
     const player = this.player;
     if (player && player.state === 'playing') {
+      console.info(`[PlayerAv] 调用 player.pause()`);
       player.pause();
     }
   }
@@ -88,6 +98,7 @@ export class PlayerAv {
     }
     if (player.state === 'prepared' || player.state === 'playing' || player.state === 'paused' ||
       player.state === 'completed') {
+      console.info(`[PlayerAv] 调用 player.seek(${timeSec}s)`);
       player.seek(Math.floor(Math.max(0, timeSec) * 1000), media.SeekMode.SEEK_CLOSEST);
     }
   }
@@ -100,6 +111,7 @@ export class PlayerAv {
 
   private bind(player: media.AVPlayer, gen: number): void {
     player.on('stateChange', (state: string) => {
+      console.info(`[PlayerAv] stateChange 回调 -> ${state}, gen: ${gen}/${this.gen}, surfaceId: ${this.surfaceId}`);
       if (gen !== this.gen || this.player !== player) {
         return;
       }
@@ -107,22 +119,44 @@ export class PlayerAv {
         if (this.surfaceId) {
           this.prepareWithSurface(player, this.surfaceId);
         } else {
+          console.info(`[PlayerAv] state=initialized 但 surfaceId 为空，进入 pendingPrepare 等待 setSurface`);
           this.pendingPrepare = true;
         }
       } else if (state === 'prepared') {
         const durationMs = player.duration;
         const duration = durationMs > 0 ? durationMs / 1000 : 0;
+        console.info(`[PlayerAv] prepared 完成! duration: ${duration}s, size: ${player.width}x${player.height}`);
         this.applyVolume();
         this.applySpeed();
+        try {
+          player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+        } catch (_e) {
+        }
+        if (player.width > 0 && player.height > 0) {
+          this.listener.onVideoSize(player.width, player.height);
+        }
         this.listener.onPrepared(duration);
       } else if (state === 'playing') {
+        console.info(`[PlayerAv] playing 状态开始`);
         this.listener.onStart();
       } else if (state === 'paused') {
+        console.info(`[PlayerAv] paused 状态暂停`);
         this.listener.onPause();
       } else if (state === 'completed') {
+        console.info(`[PlayerAv] completed 播放完成`);
         this.listener.onFinish();
       } else if (state === 'error') {
+        console.error(`[PlayerAv] error 状态错误`);
         this.listener.onError();
+      }
+    });
+    player.on('videoSizeChange', (width: number, height: number) => {
+      if (gen !== this.gen) {
+        return;
+      }
+      if (width > 0 && height > 0) {
+        console.info(`[PlayerAv] videoSizeChange 原生尺寸回调: ${width}x${height}`);
+        this.listener.onVideoSize(width, height);
       }
     });
     player.on('timeUpdate', (time: number) => {
@@ -149,17 +183,23 @@ export class PlayerAv {
         this.listener.onStalled(false);
       }
     });
-    player.on('error', () => {
+    player.on('error', (err) => {
       if (gen !== this.gen) {
         return;
       }
+      console.error(`[PlayerAv] player error: ${JSON.stringify(err)}`);
       this.listener.onError();
     });
   }
 
   private prepareWithSurface(player: media.AVPlayer, surfaceId: string): void {
-    player.surfaceId = surfaceId;
-    player.prepare();
+    try {
+      player.surfaceId = surfaceId;
+      player.prepare();
+    } catch (err) {
+      console.error(`[PlayerAv] prepareWithSurface 异常: ${JSON.stringify(err)}`);
+      this.listener.onError();
+    }
   }
 
   private applySpeed(): void {
@@ -192,6 +232,7 @@ export class PlayerAv {
     }
     try {
       player.off('stateChange');
+      player.off('videoSizeChange');
       player.off('timeUpdate');
       player.off('seekDone');
       player.off('bufferingUpdate');

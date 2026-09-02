@@ -6,6 +6,8 @@ export struct EmptyState {
   @Prop title: string = '暂无内容';
   @Prop subtitle: string = '';
   @Prop icon: Resource = $r('sys.symbol.film');
+  @Prop actionText: string = '';
+  onAction?: () => void;
 
   build() {
     Column() {
@@ -21,6 +23,17 @@ export struct EmptyState {
           .fontColor(AppTheme.TEXT_MUTED)
           .margin({ top: 8 })
           .textAlign(TextAlign.Center)
+      }
+      if (this.actionText && this.onAction) {
+        Button(this.actionText)
+          .margin({ top: 16 })
+          .backgroundColor(AppTheme.BG_CARD)
+          .fontColor(AppTheme.TEXT_PRIMARY)
+          .onClick(() => {
+            if (this.onAction) {
+              this.onAction();
+            }
+          })
       }
     }
     .width('100%')

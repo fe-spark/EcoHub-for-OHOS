@@ -36,7 +36,7 @@ export class SourceGuard {
     SourceGuard.listeners = next;
   }
 
-  public static intercept(uiContext?: UIContext): void {
+  public static intercept(uiContext?: UIContext, onContinue?: () => void): void {
     if (SourceGuard.skipCount > 0 || SourceGuard.intercepting) {
       return;
     }
@@ -44,16 +44,62 @@ export class SourceGuard {
       return;
     }
     const ctx = uiContext || AppStorage.get<UIContext>('UI_CONTEXT');
-    const r = ctx ? ctx.getRouter() : undefined;
+    if (!ctx) {
+      return;
+    }
+    const r = ctx.getRouter();
     if (!r) {
       return;
     }
     try {
       const state = r.getState();
-      if (state && state.path.indexOf('ServerConfigPage') >= 0) {
+      if (state && ((state.path && state.path.indexOf('ServerConfigPage') >= 0) || (state.name && state.name.indexOf('ServerConfigPage') >= 0))) {
+        return;
+      }
+      // 处于播放页面时采用确认弹窗，不直接抢占全屏观影画面
+      const p = (state && state.path) || '';
+      const n = (state && state.name) || '';
+      if (p.indexOf('PlayPage') >= 0 || n.indexOf('PlayPage') >= 0) {
+        SourceGuard.intercepting = true;
+        ctx.showAlertDialog({
+          title: '软件源失联',
+          message: '检测到当前软件源连接异常，是否前往重新配置？',
+          autoCancel: false,
+          cancel: () => {
+            SourceGuard.intercepting = false;
+            if (onContinue) {
+              onContinue();
+            }
+          },
+          primaryButton: {
+            value: '更换软件源',
+            fontColor: '#FA8C16',
+            action: () => {
+              SourceGuard.doNavigate(ctx);
+            }
+          },
+          secondaryButton: {
+            value: '继续观看',
+            action: () => {
+              SourceGuard.intercepting = false;
+              if (onContinue) {
+                onContinue();
+              }
+            }
+          }
+        });
         return;
       }
     } catch (_err) {
+    }
+    SourceGuard.doNavigate(ctx);
+  }
+
+  private static doNavigate(ctx: UIContext): void {
+    const r = ctx.getRouter();
+    if (!r) {
+      SourceGuard.intercepting = false;
+      return;
     }
     SourceGuard.intercepting = true;
     try {

@@ -1,3 +1,5 @@
+import { PlayerAv } from '../common/utils/PlayerAv';
+
 export type ProgressCallback = (current: number, duration: number) => void;
 
 export class PlayerPlaybackState {
@@ -21,6 +23,8 @@ export class PlayerPlaybackState {
   public seekAt: number = 0;
   public lastToggleAt: number = 0;
   public dragging: boolean = false;
+  public videoWidth: number = 0;
+  public videoHeight: number = 0;
 
   public live(): boolean {
     return this.playerOn && this.bootGen === this.mountGen;
@@ -28,6 +32,10 @@ export class PlayerPlaybackState {
 
   public canPlay(): boolean {
     return this.ready && !this.opening && !this.errorText;
+  }
+
+  public isPortrait(): boolean {
+    return this.videoHeight > 0 && this.videoWidth > 0 && this.videoHeight > this.videoWidth;
   }
 
   public resumeTime(initialTime: number): number {
@@ -56,6 +64,8 @@ export class PlayerPlaybackState {
     this.seekTarget = -1;
     this.seekAt = 0;
     this.lastToggleAt = 0;
+    this.videoWidth = 0;
+    this.videoHeight = 0;
   }
 
   public emitProgress(cb?: ProgressCallback, force: boolean = false): void {
@@ -106,7 +116,7 @@ export class PlayerPlaybackState {
     this.errorText = this.formatError(false, url);
   }
 
-  public seek(time: number, controller: VideoController): void {
+  public seek(time: number, playerAv: PlayerAv): void {
     if (!this.canPlay() || this.duration <= 0) {
       return;
     }
@@ -115,9 +125,9 @@ export class PlayerPlaybackState {
     this.currentTime = next;
     this.seekTarget = next;
     this.seekAt = Date.now();
-    controller.setCurrentTime(next, SeekMode.Accurate);
+    playerAv.seek(next);
     if (this.playRequested) {
-      controller.start();
+      playerAv.play();
     }
   }
 }

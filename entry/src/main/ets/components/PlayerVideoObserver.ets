@@ -1,8 +1,9 @@
+import { PlayerAv } from '../common/utils/PlayerAv';
 import { PlayerPlaybackState, ProgressCallback } from './PlayerPlaybackState';
 import { PlayerStallWatcher } from './PlayerStallWatcher';
 
 export interface PlayerObserverHost {
-  controller: VideoController;
+  playerAv: PlayerAv;
   state: PlayerPlaybackState;
   watcher: PlayerStallWatcher;
   initialTime: number;
@@ -26,22 +27,32 @@ export class PlayerVideoObserver {
     this.host = host;
   }
 
-  handlePrepared(info: PreparedInfo): void {
+  handlePrepared(duration: number): void {
     if (!this.host.state.live()) {
       return;
     }
-    this.host.state.duration = info.duration;
+    this.host.state.duration = duration;
     this.host.state.ready = true;
     this.host.state.opening = false;
     this.host.watcher.clearOpenWatch();
     this.host.state.errorText = '';
     const resumeAt = this.host.state.resumeTime(this.host.initialTime);
     if (resumeAt >= 2) {
-      this.host.state.seek(resumeAt, this.host.controller);
+      this.host.state.seek(resumeAt, this.host.playerAv);
     }
     if (this.host.state.playRequested) {
-      this.host.controller.start();
+      this.host.playerAv.play();
     }
+    this.host.onUIUpdate();
+  }
+
+  handleVideoSize(width: number, height: number): void {
+    if (!this.host.state.live() || width <= 0 || height <= 0) {
+      return;
+    }
+    console.info(`[PlayerVideoObserver] 原生视频分辨率更新: ${width}x${height}, isPortrait: ${height > width}`);
+    this.host.state.videoWidth = width;
+    this.host.state.videoHeight = height;
     this.host.onUIUpdate();
   }
 
@@ -50,7 +61,7 @@ export class PlayerVideoObserver {
       return;
     }
     if (!this.host.state.playRequested) {
-      this.host.controller.pause();
+      this.host.playerAv.pause();
       this.host.state.isPlaying = false;
       this.host.onUIUpdate();
       return;
@@ -86,20 +97,20 @@ export class PlayerVideoObserver {
     this.host.onUIUpdate();
   }
 
-  handleUpdate(info: PlaybackInfo): void {
+  handleTime(time: number): void {
     if (!this.host.state.live()) {
       return;
     }
     this.host.state.opening = false;
-    if (info.time > 0) {
+    if (time > 0) {
       this.host.state.isPlaying = this.host.state.playRequested;
     }
-    this.host.watcher.noteProgress(info.time, this.canStall(), (stalled: boolean) => {
+    this.host.watcher.noteProgress(time, this.canStall(), (stalled: boolean) => {
       this.host.state.stalled = stalled;
       this.host.onUIUpdate();
     }, () => this.canStall());
     const hadSeek = this.host.state.seekTarget >= 0;
-    if (this.host.state.applyTime(info.time)) {
+    if (this.host.state.applyTime(time)) {
       if (hadSeek && this.host.state.seekTarget < 0) {
         this.host.state.seeking = false;
         this.host.armHide();

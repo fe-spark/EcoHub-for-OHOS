@@ -159,7 +159,28 @@ export struct VersionUpdateDialog {
         .padding(AppTheme.SPACE_MD)
         .backgroundColor(AppTheme.BG_CARD)
         .borderRadius(AppTheme.RADIUS_MD)
-        .margin({ bottom: AppTheme.SPACE_LG })
+        .margin({ bottom: AppTheme.SPACE_MD })
+
+        // 侧载安装温馨提示
+        Row() {
+          AppIcon({
+            src: $r('sys.symbol.info_circle'),
+            iconSize: 14,
+            color: AppTheme.ACCENT
+          })
+          Text('下载完成后，需进行侧载安装')
+            .fontSize(11)
+            .lineHeight(16)
+            .fontColor(AppTheme.TEXT_SECONDARY)
+            .margin({ left: 6 })
+            .layoutWeight(1)
+        }
+        .width('100%')
+        .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD, top: 8, bottom: 8 })
+        .backgroundColor(AppTheme.ACCENT_SOFT)
+        .borderRadius(AppTheme.RADIUS_MD)
+        .margin({ bottom: AppTheme.SPACE_MD })
+        .alignItems(VerticalAlign.Center)
 
         // 底部操作区：主按钮「前往更新」+ 次按钮「稍后再说」
         Column({ space: 8 }) {

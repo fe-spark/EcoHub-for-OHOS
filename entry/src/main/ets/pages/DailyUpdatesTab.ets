@@ -227,15 +227,12 @@ export struct DailyUpdatesTab {
               EmptyState({
                 title: '加载失败',
                 subtitle: this.errorText,
-                icon: $r('sys.symbol.info_circle')
-              })
-              Button('重试')
-                .margin({ top: 16 })
-                .backgroundColor(AppTheme.BG_CARD)
-                .fontColor(AppTheme.TEXT_PRIMARY)
-                .onClick(() => {
+                icon: $r('sys.symbol.info_circle'),
+                actionText: '重试',
+                onAction: () => {
                   this.loadMeta();
-                })
+                }
+              })
             }
             .width('100%')
             .alignItems(HorizontalAlign.Center)

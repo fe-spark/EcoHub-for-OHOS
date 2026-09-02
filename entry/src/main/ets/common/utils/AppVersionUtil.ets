@@ -12,7 +12,7 @@ export interface AppUpdateInfo {
 }
 
 export class AppVersionUtil {
-  public static readonly APP_VERSION: string = '1.1.2';
+  public static readonly APP_VERSION: string = '1.1.5';
   private static cachedVersionName: string = '';
 
   /**
@@ -45,9 +45,9 @@ export class AppVersionUtil {
     if (!raw || raw === '*' || raw.toLowerCase() === 'all') {
       return true;
     }
-    const current = (currentVersion || '').trim().toLowerCase();
+    const current = AppVersionUtil.normalizeVersion(currentVersion).toLowerCase();
     const targets = raw.split(/[,;\s\n]+/)
-      .map((item: string) => item.trim().toLowerCase())
+      .map((item: string) => AppVersionUtil.normalizeVersion(item).toLowerCase())
       .filter((item: string) => item.length > 0);
 
     if (targets.length === 0) {
@@ -88,12 +88,58 @@ export class AppVersionUtil {
         return -1;
       }
     }
+
+    // 主版本号相等时，比较预发布版本（Pre-release）
+    const hasPre1 = s1.indexOf('-') >= 0;
+    const hasPre2 = s2.indexOf('-') >= 0;
+    // 正式版优先级严格高于预发布版本（例如 1.1.5 > 1.1.5-beta.1）
+    if (!hasPre1 && hasPre2) {
+      return 1;
+    }
+    if (hasPre1 && !hasPre2) {
+      return -1;
+    }
+    if (hasPre1 && hasPre2) {
+      const pre1 = s1.substring(s1.indexOf('-') + 1).split('+')[0].split('.');
+      const pre2 = s2.substring(s2.indexOf('-') + 1).split('+')[0].split('.');
+      const preLen = Math.max(pre1.length, pre2.length);
+      for (let i = 0; i < preLen; i++) {
+        if (i >= pre1.length) {
+          return -1;
+        }
+        if (i >= pre2.length) {
+          return 1;
+        }
+        const p1 = pre1[i];
+        const p2 = pre2[i];
+        const n1 = parseInt(p1, 10);
+        const n2 = parseInt(p2, 10);
+        const isNum1 = !isNaN(n1) && String(n1) === p1;
+        const isNum2 = !isNaN(n2) && String(n2) === p2;
+        if (isNum1 && isNum2) {
+          if (n1 !== n2) {
+            return n1 > n2 ? 1 : -1;
+          }
+        } else if (isNum1 && !isNum2) {
+          return -1;
+        } else if (!isNum1 && isNum2) {
+          return 1;
+        } else {
+          const cmp = p1.localeCompare(p2);
+          if (cmp !== 0) {
+            return cmp > 0 ? 1 : -1;
+          }
+        }
+      }
+    }
+
     return 0;
   }
 
   private static cachedUpdateInfo: AppUpdateInfo | null = null;
   private static lastCheckTime: number = 0;
   private static readonly CACHE_EXPIRE_MS: number = 10 * 60 * 1000; // 10分钟缓存
+  private static inFlightPromise: Promise<AppUpdateInfo> | null = null;
 
   /**
    * 判定最新版本是否严格高于当前版本
@@ -112,100 +158,124 @@ export class AppVersionUtil {
   /**
    * 检查 GitHub Release 最新版本
    * @param force 是否强制跳过缓存重新请求网络
+   * @param timeoutMs 网络超时时间（毫秒），默认 10000ms
    */
-  static async checkUpdate(force: boolean = false): Promise<AppUpdateInfo> {
+  static async checkUpdate(force: boolean = false, timeoutMs: number = 10000): Promise<AppUpdateInfo> {
     const now = Date.now();
     if (!force && AppVersionUtil.cachedUpdateInfo && (now - AppVersionUtil.lastCheckTime < AppVersionUtil.CACHE_EXPIRE_MS)) {
+      AppStorage.setOrCreate<boolean>('HAS_APP_UPDATE', AppVersionUtil.cachedUpdateInfo.hasUpdate);
+      AppStorage.setOrCreate<AppUpdateInfo>('APP_UPDATE_INFO', AppVersionUtil.cachedUpdateInfo);
       return AppVersionUtil.cachedUpdateInfo;
     }
-    const currentVersion = await AppVersionUtil.getVersionName();
-    const info: AppUpdateInfo = {
-      currentVersion: currentVersion,
-      latestVersion: currentVersion,
-      hasUpdate: false,
-      releaseName: '',
-      releaseNotes: '',
-      releaseUrl: '',
-      downloadUrl: ''
-    };
+    if (!force && AppVersionUtil.inFlightPromise) {
+      return AppVersionUtil.inFlightPromise;
+    }
 
-    const httpRequest = http.createHttp();
-    try {
-      const response = await httpRequest.request(
-        'https://api.github.com/repos/fe-spark/EcoHub-for-OHOS/releases?per_page=10',
-        {
-          method: http.RequestMethod.GET,
-          header: {
-            'Accept': 'application/vnd.github+json',
-            'User-Agent': 'EcoHub-OHOS'
-          },
-          expectDataType: http.HttpDataType.STRING,
-          connectTimeout: 10000,
-          readTimeout: 10000
+    const execute = async (): Promise<AppUpdateInfo> => {
+      const currentVersion = await AppVersionUtil.getVersionName();
+      const info: AppUpdateInfo = {
+        currentVersion: currentVersion,
+        latestVersion: currentVersion,
+        hasUpdate: false,
+        releaseName: '',
+        releaseNotes: '',
+        releaseUrl: '',
+        downloadUrl: ''
+      };
+
+      const httpRequest = http.createHttp();
+      try {
+        const response = await httpRequest.request(
+          'https://api.github.com/repos/fe-spark/EcoHub-for-OHOS/releases?per_page=10',
+          {
+            method: http.RequestMethod.GET,
+            header: {
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'EcoHub-OHOS'
+            },
+            expectDataType: http.HttpDataType.STRING,
+            connectTimeout: timeoutMs,
+            readTimeout: timeoutMs
+          }
+        );
+        if (response.responseCode !== 200 || !response.result) {
+          throw new Error(`HTTP ${response.responseCode}`);
         }
-      );
-      httpRequest.destroy();
-      if (response.responseCode !== 200 || !response.result) {
-        throw new Error(`HTTP ${response.responseCode}`);
-      }
 
-      const releases = JSON.parse(response.result as string) as Array<Record<string, Object>>;
-      if (!Array.isArray(releases) || releases.length === 0) {
-        AppVersionUtil.cachedUpdateInfo = info;
-        AppVersionUtil.lastCheckTime = now;
-        return info;
-      }
-
-      for (let i = 0; i < releases.length; i++) {
-        const item = releases[i];
-        if (item['draft']) {
-          continue;
+        const releases = JSON.parse(response.result as string) as Array<Record<string, Object>>;
+        if (!Array.isArray(releases) || releases.length === 0) {
+          AppVersionUtil.cachedUpdateInfo = info;
+          AppVersionUtil.lastCheckTime = now;
+          AppStorage.setOrCreate<boolean>('HAS_APP_UPDATE', false);
+          AppStorage.setOrCreate<AppUpdateInfo>('APP_UPDATE_INFO', info);
+          return info;
         }
-        // 正式版用户不提示测试版，已装 beta 的才跟 pre-release
-        if (item['prerelease'] && currentVersion.indexOf('-') < 0) {
-          continue;
-        }
-        const tagName = (item['tag_name'] as string) || '';
-        const name = (item['name'] as string) || tagName;
-        const body = (item['body'] as string) || '';
-        const htmlUrl = (item['html_url'] as string) || '';
-        let downloadUrl = htmlUrl;
 
-        const assets = item['assets'] as Array<Record<string, Object>>;
-        if (Array.isArray(assets) && assets.length > 0) {
-          for (let j = 0; j < assets.length; j++) {
-            const assetName = (assets[j]['name'] as string) || '';
-            const browserDownloadUrl = (assets[j]['browser_download_url'] as string) || '';
-            if (assetName.endsWith('.hap') && browserDownloadUrl) {
-              downloadUrl = browserDownloadUrl;
-              if (assetName.includes('signed')) {
-                break;
+        for (let i = 0; i < releases.length; i++) {
+          const item = releases[i];
+          if (item['draft']) {
+            continue;
+          }
+          // 正式版用户不提示测试版，已装 beta 的才跟 pre-release
+          if (item['prerelease'] && currentVersion.indexOf('-') < 0) {
+            continue;
+          }
+          const tagName = (item['tag_name'] as string) || '';
+          const name = (item['name'] as string) || tagName;
+          const body = (item['body'] as string) || '';
+          const htmlUrl = (item['html_url'] as string) || '';
+          let downloadUrl = htmlUrl;
+
+          const assets = item['assets'] as Array<Record<string, Object>>;
+          if (Array.isArray(assets) && assets.length > 0) {
+            for (let j = 0; j < assets.length; j++) {
+              const assetName = (assets[j]['name'] as string) || '';
+              const browserDownloadUrl = (assets[j]['browser_download_url'] as string) || '';
+              if (assetName.endsWith('.hap') && browserDownloadUrl) {
+                downloadUrl = browserDownloadUrl;
+                if (assetName.includes('signed')) {
+                  break;
+                }
               }
             }
           }
-        }
 
-        const normalizedTag = AppVersionUtil.normalizeVersion(tagName);
-        info.latestVersion = normalizedTag;
-        info.releaseName = name || `v${normalizedTag}`;
-        info.releaseNotes = body;
-        info.releaseUrl = htmlUrl;
-        info.downloadUrl = downloadUrl;
-        info.hasUpdate = AppVersionUtil.isNewerVersion(normalizedTag, currentVersion);
-        break;
+          const normalizedTag = AppVersionUtil.normalizeVersion(tagName);
+          info.latestVersion = normalizedTag;
+          info.releaseName = name || `v${normalizedTag}`;
+          info.releaseNotes = body;
+          info.releaseUrl = htmlUrl;
+          info.downloadUrl = downloadUrl;
+          info.hasUpdate = AppVersionUtil.isNewerVersion(normalizedTag, currentVersion);
+          break;
+        }
+        AppVersionUtil.cachedUpdateInfo = info;
+        AppVersionUtil.lastCheckTime = now;
+        AppStorage.setOrCreate<boolean>('HAS_APP_UPDATE', info.hasUpdate);
+        AppStorage.setOrCreate<AppUpdateInfo>('APP_UPDATE_INFO', info);
+        return info;
+      } catch (err) {
+        if (AppVersionUtil.cachedUpdateInfo && !force) {
+          AppStorage.setOrCreate<boolean>('HAS_APP_UPDATE', AppVersionUtil.cachedUpdateInfo.hasUpdate);
+          AppStorage.setOrCreate<AppUpdateInfo>('APP_UPDATE_INFO', AppVersionUtil.cachedUpdateInfo);
+          return AppVersionUtil.cachedUpdateInfo;
+        }
+        if (err instanceof Error) {
+          throw err;
+        }
+        throw new Error('检查版本失败');
+      } finally {
+        httpRequest.destroy();
       }
-      AppVersionUtil.cachedUpdateInfo = info;
-      AppVersionUtil.lastCheckTime = now;
-      return info;
-    } catch (err) {
-      httpRequest.destroy();
-      if (AppVersionUtil.cachedUpdateInfo && !force) {
-        return AppVersionUtil.cachedUpdateInfo;
+    };
+
+    const reqPromise = execute();
+    AppVersionUtil.inFlightPromise = reqPromise;
+    reqPromise.finally(() => {
+      if (AppVersionUtil.inFlightPromise === reqPromise) {
+        AppVersionUtil.inFlightPromise = null;
       }
-      if (err instanceof Error) {
-        throw err;
-      }
-      throw new Error('检查版本失败');
-    }
+    }).catch(() => {});
+    return reqPromise;
   }
 }

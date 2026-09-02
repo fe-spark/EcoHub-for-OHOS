@@ -1,95 +1,48 @@
-import { PlayerSpeed } from '../common/utils/PlayerSpeed';
-
 @Component
 export struct PlayerVideoLayer {
-  @Prop playSrc: string = '';
   @Prop poster: string = '';
-  @Prop speedIndex: number = 1;
-  @Prop autoPlay: boolean = true;
-  @Prop muted: boolean = false;
-  @Prop nonce: number = 0;
-  controller: VideoController = new VideoController();
-  onPreparedCallback?: (info: PreparedInfo) => void;
-  onStartCallback?: () => void;
-  onPauseCallback?: () => void;
-  onUpdateCallback?: (info: PlaybackInfo) => void;
-  onSeekingCallback?: () => void;
-  onSeekedCallback?: () => void;
-  onFinishCallback?: () => void;
-  onErrorCallback?: () => void;
+  @Prop ready: boolean = false;
+  @Prop opening: boolean = true;
+  @Prop videoWidth: number = 0;
+  @Prop videoHeight: number = 0;
+  onSurfaceCreated?: (surfaceId: string) => void;
+  private xComponentController: XComponentController = new XComponentController();
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      if (this.playSrc) {
-        Video({
-          src: this.playSrc,
-          previewUri: this.poster,
-          controller: this.controller,
-          currentProgressRate: PlayerSpeed.of(this.speedIndex)
+      XComponent({
+        id: 'eco_player_surface',
+        type: XComponentType.SURFACE,
+        controller: this.xComponentController
+      })
+        .aspectRatio(this.videoWidth > 0 && this.videoHeight > 0 ? this.videoWidth / this.videoHeight : undefined)
+        .width(this.videoWidth > 0 && this.videoHeight > 0 ? undefined : '100%')
+        .height(this.videoWidth > 0 && this.videoHeight > 0 ? undefined : '100%')
+        .hitTestBehavior(HitTestMode.None)
+        .onLoad(() => {
+          try {
+            const sId = this.xComponentController.getXComponentSurfaceId();
+            console.info(`[PlayerVideoLayer] XComponent onLoad 成功获取 surfaceId: ${sId}`);
+            if (sId && this.onSurfaceCreated) {
+              this.onSurfaceCreated(sId);
+            }
+          } catch (e) {
+            console.error(`[PlayerVideoLayer] 获取 surfaceId 异常: ${JSON.stringify(e)}`);
+          }
         })
-          .id(`eco_player_${this.nonce}`)
-          .width('100%')
-          .height('100%')
-          .autoPlay(this.autoPlay)
-          .controls(false)
-          .muted(this.muted)
-          .objectFit(ImageFit.Contain)
-          .backgroundColor('#000000')
-          .hitTestBehavior(HitTestMode.None)
-          .onPrepared((info: PreparedInfo) => {
-            if (this.onPreparedCallback) {
-              this.onPreparedCallback(info);
-            }
-          })
-          .onStart(() => {
-            if (this.onStartCallback) {
-              this.onStartCallback();
-            }
-          })
-          .onPause(() => {
-            if (this.onPauseCallback) {
-              this.onPauseCallback();
-            }
-          })
-          .onUpdate((info: PlaybackInfo) => {
-            if (this.onUpdateCallback) {
-              this.onUpdateCallback(info);
-            }
-          })
-          .onSeeking(() => {
-            if (this.onSeekingCallback) {
-              this.onSeekingCallback();
-            }
-          })
-          .onSeeked(() => {
-            if (this.onSeekedCallback) {
-              this.onSeekedCallback();
-            }
-          })
-          .onFinish(() => {
-            if (this.onFinishCallback) {
-              this.onFinishCallback();
-            }
-          })
-          .onError(() => {
-            if (this.onErrorCallback) {
-              this.onErrorCallback();
-            }
-          })
-      } else if (this.poster) {
+
+      if (this.poster && (!this.ready || this.opening)) {
         Image(this.poster)
           .width('100%')
           .height('100%')
-          .objectFit(ImageFit.Cover)
-          .opacity(0.35)
-      } else {
-        Column()
-          .width('100%')
-          .height('100%')
+          .objectFit(ImageFit.Contain)
           .backgroundColor('#000000')
+          .hitTestBehavior(HitTestMode.None)
       }
     }
     .width('100%')
     .height('100%')
+    .backgroundColor('#000000')
   }
 }
+

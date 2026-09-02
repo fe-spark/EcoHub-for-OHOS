@@ -74,12 +74,12 @@ struct CustomPlayerPage {
     }
   }
 
-  private setPlayerFull(full: boolean): void {
+  private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
     if (this.playerFull === full) {
       return;
     }
     this.playerFull = full;
-    PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full);
+    PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
   private play(): void {
@@ -189,7 +189,7 @@ struct CustomPlayerPage {
         rightInset: this.playerFull ? this.rightInset : 0,
         bottomInset: this.playerFull ? this.bottomInset : 0,
         onBack: () => this.setPlayerFull(false),
-        onFullscreenChange: (full: boolean) => this.setPlayerFull(full)
+        onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait)
       })
         .width('100%')
         .aspectRatio(this.playerFull ? this.viewW / Math.max(this.viewH, 1) : 16 / 9)

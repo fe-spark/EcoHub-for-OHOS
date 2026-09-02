@@ -26,6 +26,7 @@ struct SearchPage {
   @State searchHistory: string[] = [];
   @State hotKeywords: string[] = [];
   @State private refreshing: boolean = false;
+  @State private errorText: string = '';
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
@@ -165,6 +166,7 @@ struct SearchPage {
     }
     if (reset) {
       HttpClient.getInstance().trackView('search', kw);
+      this.errorText = '';
     }
     this.fetchLock = true;
     if (reset) {
@@ -182,11 +184,23 @@ struct SearchPage {
     try {
       const result = await FilmApi.searchFilm(kw, nextPage);
       this.submitted = kw;
+      this.errorText = '';
       this.page = result.page;
       this.list = reset ? result.list : this.list.concat(result.list);
       ok = true;
     } catch (err) {
-      this.list = reset && !fromPull ? [] : this.list;
+      const errorMsg = err instanceof Error ? err.message : '网络连接失败，请稍后重试';
+      if (reset) {
+        this.submitted = kw;
+        this.errorText = errorMsg;
+        this.list = reset && !fromPull ? [] : this.list;
+      }
+      try {
+        this.getUIContext().getPromptAction().showToast({
+          message: reset ? `搜索失败: ${errorMsg}` : `加载更多失败: ${errorMsg}`
+        });
+      } catch (_e) {
+      }
     } finally {
       this.fetchLock = false;
       this.loading = false;
@@ -237,8 +251,9 @@ struct SearchPage {
             .enterKeyType(EnterKeyType.Search)
             .onChange((val: string) => {
               this.keyword = val;
-              if (!val.trim() && this.submitted) {
+              if (!val.trim() && (this.submitted || this.errorText)) {
                 this.submitted = '';
+                this.errorText = '';
                 this.list = [];
               }
             })
@@ -260,6 +275,7 @@ struct SearchPage {
             .onClick(() => {
               this.keyword = '';
               this.submitted = '';
+              this.errorText = '';
               this.list = [];
               this.hideKeyboard();
             })
@@ -295,6 +311,42 @@ struct SearchPage {
 
       if (this.loading) {
         LoadingView({ label: '正在搜索' })
+      } else if (this.errorText) {
+        Refresh({ refreshing: $$this.refreshing }) {
+          Scroll() {
+            Column() {
+              Blank().height(80)
+              EmptyState({
+                title: '搜索失败',
+                subtitle: this.errorText,
+                icon: $r('sys.symbol.info_circle'),
+                actionText: '重新搜索',
+                onAction: () => {
+                  this.doSearch(true);
+                }
+              })
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
+          }
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
+          .width('100%')
+          .height('100%')
+        }
+        .onRefreshing(() => {
+          if (this.fetchLock) {
+            this.refreshing = false;
+            return;
+          }
+          this.doSearch(true, true);
+        })
+        .pullToRefresh(!this.fetchLock)
+        .layoutWeight(1)
       } else if (!this.submitted) {
         Scroll() {
           Column() {

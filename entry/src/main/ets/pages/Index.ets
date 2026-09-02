@@ -26,7 +26,7 @@ struct Index {
   @State showNotice: boolean = false;
   @State noticeTitle: string = '站点公告';
   @State noticeContent: string = '';
-  @State private hasAppUpdate: boolean = false;
+  @StorageLink('HAS_APP_UPDATE') private hasAppUpdate: boolean = false;
   private hasDismissedNotice: boolean = false;
   @State private tabReady: boolean[] = [true, false, false];
   @State private topInset: number = 0;
@@ -44,7 +44,7 @@ struct Index {
   }
 
   private async checkNotice(config: BasicConfig): Promise<void> {
-    if (!config.noticeEnabled || config.noticeShowInApp === false || !config.noticeContent || !config.noticeContent.trim()) {
+    if (config.state === false || !config.noticeEnabled || config.noticeShowInApp === false || !config.noticeContent || !config.noticeContent.trim()) {
       this.showNotice = false;
       return;
     }
@@ -70,6 +70,7 @@ struct Index {
 
   async aboutToAppear() {
     this.applyWindowBar();
+    this.hasDismissedNotice = AppStorage.get<boolean>('NOTICE_DISMISSED_SESSION') === true;
     this.configCb = (config: BasicConfig) => {
       this.siteName = config.siteName || 'EcoHub';
       this.siteOpen = config.state !== false;
@@ -77,9 +78,6 @@ struct Index {
       this.checkNotice(config);
     };
     FilmApi.onConfigChange(this.configCb);
-    AppVersionUtil.checkUpdate(false).then((info) => {
-      this.hasAppUpdate = info.hasUpdate;
-    }).catch(() => {});
     const url = await ServerConfigManager.getInstance().getServerUrl();
     if (!url) {
       try {
@@ -106,11 +104,9 @@ struct Index {
   }
 
   onPageHide(): void {
-    SiteHeartbeat.getInstance().stop();
   }
 
   aboutToDisappear(): void {
-    SiteHeartbeat.getInstance().stop();
     FilmApi.offConfigChange(this.configCb);
     SourceGuard.offReconnect(this.reconnectCb);
   }
@@ -313,6 +309,7 @@ struct Index {
           content: this.noticeContent,
           onClose: () => {
             this.hasDismissedNotice = true;
+            AppStorage.setOrCreate<boolean>('NOTICE_DISMISSED_SESSION', true);
             this.showNotice = false;
           }
         })

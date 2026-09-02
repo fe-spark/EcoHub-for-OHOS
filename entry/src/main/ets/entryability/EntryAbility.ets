@@ -2,6 +2,7 @@ import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.Ab
 import { window } from '@kit.ArkUI';
 import { HistoryManager } from '../common/utils/HistoryManager';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 
 
 export default class EntryAbility extends UIAbility {
@@ -10,6 +11,20 @@ export default class EntryAbility extends UIAbility {
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
     } catch (_e) {
     }
+  }
+
+  onForeground(): void {
+    if (ServerConfigManager.getInstance().getCachedServerUrl()) {
+      SiteHeartbeat.getInstance().start();
+    }
+  }
+
+  onBackground(): void {
+    SiteHeartbeat.getInstance().stop();
+  }
+
+  onDestroy(): void {
+    SiteHeartbeat.getInstance().stop();
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {

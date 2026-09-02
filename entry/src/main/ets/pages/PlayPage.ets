@@ -15,6 +15,7 @@ import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
+import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 
 @Entry
 @Component
@@ -68,38 +69,48 @@ struct PlayPage {
     });
   }
 
-  aboutToAppear() {
+  async aboutToAppear(): Promise<void> {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
     if (this.filmId) {
       HttpClient.getInstance().trackView('play', this.filmId);
     }
-    const sourceId = NavUtil.param(params, 'sourceId');
-    const hasEpisodeParam = NavUtil.param(params, 'episodeIndex') !== '';
-    const hasCurrentTimeParam = NavUtil.param(params, 'currentTime') !== '';
-    this.episodeIndex = Number(NavUtil.param(params, 'episodeIndex', '0')) || 0;
-    this.initialTime = Number(NavUtil.param(params, 'currentTime', '0')) || 0;
-    this.lastCurrentTime = this.initialTime;
+    const paramSourceId = NavUtil.param(params, 'sourceId');
+    const paramEpisodeStr = NavUtil.param(params, 'episodeIndex');
+    const paramTimeStr = NavUtil.param(params, 'currentTime');
 
-    if (!sourceId && !hasEpisodeParam && !hasCurrentTimeParam && this.filmId) {
-      HistoryManager.find(this.filmId).then((prev: HistoryItem | null) => {
-        let sid = sourceId;
+    let targetSourceId = paramSourceId;
+    let targetEpisodeIndex = paramEpisodeStr !== '' ? Number(paramEpisodeStr) : -1;
+    let targetTime = paramTimeStr !== '' ? Number(paramTimeStr) : -1;
+
+    // 优先读取本地播放历史记录（若路由未显式指定，直接使用历史的源、剧集与进度）
+    if (this.filmId) {
+      try {
+        const prev = await HistoryManager.find(this.filmId);
         if (prev) {
-          sid = prev.sourceId || '';
-          this.episodeIndex = prev.episodeIndex || 0;
-          const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
-          this.initialTime = isEnded ? 0 : (prev.currentTime || 0);
-          this.lastCurrentTime = this.initialTime;
+          if (!targetSourceId && prev.sourceId) {
+            targetSourceId = prev.sourceId;
+          }
+          if (targetEpisodeIndex < 0 && prev.episodeIndex !== undefined && prev.episodeIndex !== null) {
+            targetEpisodeIndex = prev.episodeIndex;
+          }
+          if (targetTime < 0) {
+            const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
+            targetTime = isEnded ? 0 : (prev.currentTime || 0);
+          }
           this.lastDuration = prev.duration || 0;
         }
-        this.loadPlay(sid);
-        this.loadRelate();
-      });
-    } else {
-      this.loadPlay(sourceId);
-      this.loadRelate();
+      } catch (_e) {
+      }
     }
+
+    this.episodeIndex = Math.max(0, targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0);
+    this.initialTime = Math.max(0, targetTime >= 0 ? targetTime : 0);
+    this.lastCurrentTime = this.initialTime;
+
+    this.loadPlay(targetSourceId);
+    this.loadRelate();
 
     this.reconnectCb = () => {
       this.persistEnabled = false;
@@ -117,39 +128,29 @@ struct PlayPage {
   onPageShow(): void {
     this.applyWindowBar();
     this.playerActive = true;
+    SiteHeartbeat.getInstance().start();
   }
 
   onPageHide(): void {
     this.playerActive = false;
-    if (this.lastCurrentTime > 0) {
-      this.persistHistory(this.lastCurrentTime, this.lastDuration);
-    }
+    if (this.lastCurrentTime > 0) this.persistHistory(this.lastCurrentTime, this.lastDuration);
   }
 
   onBackPress(): boolean {
-    if (this.playerFull) {
-      this.setPlayerFull(false);
-      return true;
-    }
+    if (this.playerFull) { this.setPlayerFull(false); return true; }
     return false;
   }
 
   aboutToDisappear(): void {
-    if (this.playerFull) {
-      this.setPlayerFull(false);
-    }
-    if (this.lastCurrentTime > 0) {
-      this.persistHistory(this.lastCurrentTime, this.lastDuration);
-    }
+    if (this.playerFull) this.setPlayerFull(false);
+    if (this.lastCurrentTime > 0) this.persistHistory(this.lastCurrentTime, this.lastDuration);
     SourceGuard.offReconnect(this.reconnectCb);
   }
 
-  private setPlayerFull(full: boolean): void {
-    if (this.playerFull === full) {
-      return;
-    }
+  private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
+    if (this.playerFull === full) return;
     this.playerFull = full;
-    PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full);
+    PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
   private async loadPlay(sourceId: string): Promise<void> {
@@ -260,10 +261,7 @@ struct PlayPage {
 
   private hasNext(): boolean {
     const source = this.findSource(this.playingSourceId);
-    if (!source) {
-      return false;
-    }
-    return this.episodeIndex < source.linkList.length - 1;
+    return !!source && this.episodeIndex < source.linkList.length - 1;
   }
 
   private hasPrev(): boolean {
@@ -272,10 +270,7 @@ struct PlayPage {
 
   private playPrev(): void {
     if (!this.hasPrev()) {
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' });
-      } catch (_e) {
-      }
+      try { this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' }); } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex - 1);
@@ -283,10 +278,7 @@ struct PlayPage {
 
   private playNext(): void {
     if (!this.hasNext()) {
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' });
-      } catch (_e) {
-      }
+      try { this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' }); } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex + 1);
@@ -294,49 +286,37 @@ struct PlayPage {
 
   private currentEpisodeName(): string {
     const source = this.findSource(this.playingSourceId);
-    if (!source || this.episodeIndex >= source.linkList.length) {
-      return '';
-    }
-    return source.linkList[this.episodeIndex].episode;
+    return (source && this.episodeIndex < source.linkList.length) ? source.linkList[this.episodeIndex].episode : '';
   }
 
   private persistHistory(currentTime?: number, duration?: number): void {
-    if (!this.persistEnabled || !this.filmId || !this.name) {
-      return;
-    }
-    if (!ServerConfigManager.getInstance().storageScope()) {
+    if (!this.persistEnabled || !this.filmId || !this.name || !ServerConfigManager.getInstance().storageScope()) {
       return;
     }
     const seq = ++this.historySeq;
     const filmId = this.filmId;
-    const name = this.name;
-    const picture = this.picture;
     const sourceId = this.playingSourceId;
     const source = this.findSource(sourceId);
-    const sourceName = source ? source.name : this.sourceName;
     const episodeIndex = this.episodeIndex;
     const fallback: MovieUrlInfo = { episode: this.playTitle, link: this.playUrl };
-    const episode: MovieUrlInfo = source && source.linkList.length > episodeIndex ?
-      source.linkList[episodeIndex] : fallback;
+    const episode: MovieUrlInfo = source && source.linkList.length > episodeIndex ? source.linkList[episodeIndex] : fallback;
+
     HistoryManager.find(filmId).then((previous: HistoryItem | null) => {
       if (seq !== this.historySeq || !this.persistEnabled) {
         return;
       }
-      const cur = currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0);
-      const dur = duration !== undefined ? duration : (previous ? previous.duration : 0);
-      const item: HistoryItem = {
+      HistoryManager.save({
         id: filmId,
-        name: name,
-        picture: picture,
+        name: this.name,
+        picture: this.picture,
         sourceId: sourceId,
-        sourceName: sourceName,
+        sourceName: source ? source.name : this.sourceName,
         episodeIndex: episodeIndex,
         episode: episode.episode,
-        currentTime: cur,
-        duration: dur,
+        currentTime: currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0),
+        duration: duration !== undefined ? duration : (previous ? previous.duration : 0),
         timeStamp: Date.now()
-      };
-      HistoryManager.save(item);
+      });
     });
   }
 
@@ -346,11 +326,15 @@ struct PlayPage {
       return;
     }
     this.filmId = id;
+    this.name = '';
+    this.sources = [];
+    this.playUrl = '';
     this.episodeIndex = 0;
     this.initialTime = 0;
     this.lastCurrentTime = 0;
     this.lastDuration = 0;
     this.activeTab = 0;
+    this.loading = true;
     this.loadPlay('');
     this.loadRelate();
   }
@@ -414,7 +398,7 @@ struct PlayPage {
           },
           onPrev: () => this.playPrev(),
           onNext: () => this.playNext(),
-          onFullscreenChange: (full: boolean) => this.setPlayerFull(full),
+          onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
           onProgress: (current: number, duration: number) => {
             this.lastCurrentTime = current;
             this.lastDuration = duration;
@@ -430,9 +414,7 @@ struct PlayPage {
 
         if (!this.playerFull) {
           Column()
-            .width('100%')
-            .height(8)
-            .backgroundColor(AppTheme.BG_ELEVATED)
+            .width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
 
           Row() {
             this.playTabItem('详情', 0)
@@ -498,10 +480,7 @@ struct PlayPage {
     }
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.playerFull ? 0 : this.topInset,
-      bottom: this.playerFull ? 0 : this.bottomInset
-    })
+    .padding({ top: this.playerFull ? 0 : this.topInset, bottom: this.playerFull ? 0 : this.bottomInset })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
   }
 }

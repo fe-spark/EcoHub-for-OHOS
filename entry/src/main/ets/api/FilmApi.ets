@@ -69,26 +69,32 @@ export class FilmApi {
     if (!force && FilmApi.siteConfig) {
       return FilmApi.siteConfig;
     }
-    if (FilmApi.configPromise) {
+    if (!force && FilmApi.configPromise) {
       return FilmApi.configPromise;
     }
-    FilmApi.configPromise = (async () => {
-      try {
-        const res = await HttpClient.getInstance().get('/config/basic', undefined, timeout);
-        if (res.code !== 0 || !res.data) {
-          throw new Error(res.msg || '站点配置获取失败');
-        }
-        const config = ApiParser.parseBasicConfig(res.data as Object);
-        FilmApi.siteConfig = config;
-        for (let i = 0; i < FilmApi.configListeners.length; i++) {
+    const execute = async (): Promise<BasicConfig> => {
+      const res = await HttpClient.getInstance().get('/config/basic', undefined, timeout);
+      if (res.code !== 0 || !res.data) {
+        throw new Error(res.msg || '站点配置获取失败');
+      }
+      const config = ApiParser.parseBasicConfig(res.data as Object);
+      FilmApi.siteConfig = config;
+      for (let i = 0; i < FilmApi.configListeners.length; i++) {
+        try {
           FilmApi.configListeners[i](config);
+        } catch (_e) {
         }
-        return config;
-      } finally {
+      }
+      return config;
+    };
+    const reqPromise = execute();
+    FilmApi.configPromise = reqPromise;
+    reqPromise.finally(() => {
+      if (FilmApi.configPromise === reqPromise) {
         FilmApi.configPromise = null;
       }
-    })();
-    return FilmApi.configPromise;
+    }).catch(() => {});
+    return reqPromise;
   }
 
   static clearSiteConfig(): void {

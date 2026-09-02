@@ -30,7 +30,11 @@ export struct ProfileTab {
   @State private appVersion: string = '1.0.0';
   @State private isCheckingVersion: boolean = false;
   @State private showUpdateDialog: boolean = false;
-  @State private updateInfo: AppUpdateInfo = {
+  @State private isConfigLoading: boolean = true;
+  @State private isLogoLoading: boolean = false;
+  @State private logoLoadFailed: boolean = false;
+  @StorageLink('HAS_APP_UPDATE') private hasAppUpdate: boolean = false;
+  @StorageLink('APP_UPDATE_INFO') private updateInfo: AppUpdateInfo = {
     currentVersion: '',
     latestVersion: '',
     hasUpdate: false,
@@ -47,6 +51,10 @@ export struct ProfileTab {
       this.appVersion = v;
     }).catch(() => {});
     this.configCb = (config: BasicConfig) => {
+      this.isConfigLoading = false;
+      this.logoLoadFailed = false;
+      this.isLogoLoading = !!(config.logo && config.logo.trim());
+      this.sourceUrl = ServerConfigManager.getInstance().getCachedServerUrl();
       this.config = config;
     };
     FilmApi.onConfigChange(this.configCb);
@@ -59,6 +67,7 @@ export struct ProfileTab {
     // 进入「我的」页面时静默检查是否有更新，用于红点提示
     AppVersionUtil.checkUpdate(false).then((info) => {
       this.updateInfo = info;
+      this.hasAppUpdate = info.hasUpdate;
     }).catch(() => {});
   }
 
@@ -69,10 +78,16 @@ export struct ProfileTab {
 
   private async loadSiteConfig(): Promise<void> {
     this.sourceUrl = ServerConfigManager.getInstance().getCachedServerUrl();
+    this.isConfigLoading = true;
     try {
       this.config = await FilmApi.getSiteConfig(false);
+      this.logoLoadFailed = false;
+      this.isLogoLoading = !!(this.config.logo && this.config.logo.trim());
     } catch (err) {
       console.error('load site config failed');
+      this.isLogoLoading = false;
+    } finally {
+      this.isConfigLoading = false;
     }
   }
 
@@ -81,7 +96,7 @@ export struct ProfileTab {
       return;
     }
     // 如果已经获取到有新版本且不是强制刷新，直接弹出升级弹窗
-    if (!force && this.updateInfo.hasUpdate) {
+    if (!force && this.hasAppUpdate) {
       this.showUpdateDialog = true;
       return;
     }
@@ -93,6 +108,7 @@ export struct ProfileTab {
     try {
       const info = await AppVersionUtil.checkUpdate(true);
       this.updateInfo = info;
+      this.hasAppUpdate = info.hasUpdate;
       if (info.hasUpdate) {
         this.showUpdateDialog = true;
       } else {
@@ -221,26 +237,49 @@ export struct ProfileTab {
         .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
 
         Row() {
-          if (this.config.logo) {
-            Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo))
-              .width(56)
-              .height(56)
-              .objectFit(ImageFit.Cover)
-              .borderRadius(AppTheme.RADIUS_LG)
-              .backgroundColor(AppTheme.BG_CARD)
-          } else {
-            Stack({ alignContent: Alignment.Center }) {
-              Column()
+          Stack({ alignContent: Alignment.Center }) {
+            if (this.isConfigLoading) {
+              LoadingProgress()
+                .width(22)
+                .height(22)
+                .color(AppTheme.ACCENT)
+            } else if (this.config.logo && this.config.logo.trim() && !this.logoLoadFailed) {
+              Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo.trim()))
                 .width(56)
                 .height(56)
+                .objectFit(ImageFit.Cover)
                 .borderRadius(AppTheme.RADIUS_LG)
-                .backgroundColor(AppTheme.ACCENT)
-              Text(this.logoLetter())
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.TEXT_PRIMARY)
+                .clip(true)
+                .backgroundColor(AppTheme.BG_CARD)
+                .onComplete(() => {
+                  this.isLogoLoading = false;
+                })
+                .onError(() => {
+                  this.isLogoLoading = false;
+                  this.logoLoadFailed = true;
+                })
+
+              if (this.isLogoLoading) {
+                LoadingProgress()
+                  .width(22)
+                  .height(22)
+                  .color(AppTheme.ACCENT)
+              }
+            } else {
+              Image($r('app.media.startIcon'))
+                .width(56)
+                .height(56)
+                .objectFit(ImageFit.Cover)
+                .borderRadius(AppTheme.RADIUS_LG)
+                .clip(true)
+                .backgroundColor(AppTheme.BG_CARD)
             }
           }
+          .width(56)
+          .height(56)
+          .borderRadius(AppTheme.RADIUS_LG)
+          .clip(true)
+          .backgroundColor(AppTheme.BG_CARD)
 
           Column() {
             Text(this.config.siteName)
@@ -325,16 +364,57 @@ export struct ProfileTab {
           }
           this.menuLine()
           Column() {
-            this.menuRow(
-              $r('sys.symbol.arrow_counterclockwise'),
-              '版本检查',
-              this.isCheckingVersion
+            Row() {
+              Row() {
+                AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 18, color: AppTheme.ACCENT })
+              }
+              .width(36)
+              .height(36)
+              .justifyContent(FlexAlign.Center)
+              .backgroundColor(AppTheme.ACCENT_SOFT)
+              .borderRadius(18)
+
+              Row() {
+                Text('版本检查')
+                  .fontSize(15)
+                  .fontColor(AppTheme.TEXT_PRIMARY)
+
+                if (this.hasAppUpdate) {
+                  Row() {
+                    Text('NEW')
+                      .fontSize(10)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppTheme.TEXT_PRIMARY)
+                  }
+                  .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                  .backgroundColor(AppTheme.DANGER)
+                  .borderRadius(AppTheme.RADIUS_PILL)
+                  .margin({ left: AppTheme.SPACE_SM })
+                  .justifyContent(FlexAlign.Center)
+                }
+              }
+              .layoutWeight(1)
+              .margin({ left: AppTheme.SPACE_MD })
+              .alignItems(VerticalAlign.Center)
+
+              Text(this.isCheckingVersion
                 ? '检查中...'
-                : (this.updateInfo.hasUpdate ? `发现新版本 v${this.updateInfo.latestVersion}` : `v${this.appVersion}`),
-              this.updateInfo.hasUpdate,
-              'NEW',
-              this.updateInfo.hasUpdate
-            )
+                : (this.hasAppUpdate ? `发现新版本 v${this.updateInfo.latestVersion}` : `v${this.appVersion}`))
+                .fontSize(13)
+                .fontColor(this.hasAppUpdate ? AppTheme.ACCENT : AppTheme.TEXT_MUTED)
+                .fontWeight(this.hasAppUpdate ? FontWeight.Medium : FontWeight.Normal)
+                .margin({ right: AppTheme.SPACE_SM })
+
+              AppIcon({
+                src: $r('sys.symbol.chevron_right'),
+                iconSize: 14,
+                color: AppTheme.TEXT_MUTED
+              })
+            }
+            .width('100%')
+            .height(56)
+            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+            .alignItems(VerticalAlign.Center)
           }
           .onClick(() => {
             this.handleCheckVersion();

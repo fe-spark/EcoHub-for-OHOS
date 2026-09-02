@@ -9,21 +9,29 @@ export class PlayerVolumeInfo {
 }
 
 export class PlayerWindow {
-  static async setFullscreen(context: common.UIAbilityContext | undefined, full: boolean): Promise<void> {
+  static async setFullscreen(context: common.UIAbilityContext | undefined, full: boolean, isPortrait: boolean = false): Promise<void> {
     if (!context) {
       return;
     }
+    console.info(`[PlayerWindow] setFullscreen -> full: ${full}, isPortrait: ${isPortrait}`);
     try {
       const win = await window.getLastWindow(context);
       if (full) {
         await win.setWindowSystemBarEnable([]);
-        await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_LANDSCAPE);
+        if (isPortrait) {
+          console.info(`[PlayerWindow] 执行竖屏全屏 -> setPreferredOrientation(PORTRAIT)`);
+          await win.setPreferredOrientation(window.Orientation.PORTRAIT);
+        } else {
+          console.info(`[PlayerWindow] 执行横屏全屏 -> setPreferredOrientation(AUTO_ROTATION_LANDSCAPE)`);
+          await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_LANDSCAPE);
+        }
       } else {
+        console.info(`[PlayerWindow] 退出全屏 -> 恢复 PORTRAIT`);
         await win.setPreferredOrientation(window.Orientation.PORTRAIT);
         WindowBar.apply(context);
       }
     } catch (err) {
-      console.error('player fullscreen failed:', JSON.stringify(err));
+      console.error('[PlayerWindow] player fullscreen failed:', JSON.stringify(err));
     }
   }
 
