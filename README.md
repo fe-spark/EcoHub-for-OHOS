@@ -10,6 +10,12 @@
 > 
 > 相关项目：[EcoHub 主仓库（服务端 + Web）](https://github.com/fe-spark/EcoHub) · [EcoHub for Android](https://github.com/fe-spark/EcoHub-for-Android)
 
+<div align="center">
+
+<img src="./preview.jpg" alt="EcoHub for OHOS 截图" width="360" />
+
+</div>
+
 ---
 
 ## 📥 下载安装
