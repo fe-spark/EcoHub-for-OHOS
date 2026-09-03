@@ -320,22 +320,46 @@ struct PlayPage {
     });
   }
 
-  private openRelated(film: MovieBasicInfo): void {
+  private async openRelated(film: MovieBasicInfo): Promise<void> {
     const id = FormatUtil.filmId(film);
     if (!id || id === this.filmId) {
       return;
     }
     this.filmId = id;
+    HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
     this.name = '';
     this.sources = [];
     this.playUrl = '';
-    this.episodeIndex = 0;
-    this.initialTime = 0;
-    this.lastCurrentTime = 0;
-    this.lastDuration = 0;
     this.activeTab = 0;
     this.loading = true;
-    this.loadPlay('');
+
+    let targetSourceId = '';
+    let targetEpisodeIndex = -1;
+    let targetTime = -1;
+
+    try {
+      const prev = await HistoryManager.find(this.filmId);
+      if (prev) {
+        if (prev.sourceId) {
+          targetSourceId = prev.sourceId;
+        }
+        if (prev.episodeIndex !== undefined && prev.episodeIndex !== null && prev.episodeIndex >= 0) {
+          targetEpisodeIndex = prev.episodeIndex;
+        }
+        if (targetTime < 0) {
+          const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
+          targetTime = isEnded ? 0 : (prev.currentTime || 0);
+        }
+        this.lastDuration = prev.duration || 0;
+      }
+    } catch (_e) {
+    }
+
+    this.episodeIndex = Math.max(0, targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0);
+    this.initialTime = Math.max(0, targetTime >= 0 ? targetTime : 0);
+    this.lastCurrentTime = this.initialTime;
+
+    this.loadPlay(targetSourceId);
     this.loadRelate();
   }
 
