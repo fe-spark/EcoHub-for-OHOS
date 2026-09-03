@@ -1,15 +1,19 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { util } from '@kit.ArkTS';
 
 const PREF_NAME = 'ecohub_settings';
 const KEY_SERVER_URL = 'server_base_url';
 const KEY_SERVER_HISTORY = 'server_url_history';
+const KEY_DEVICE_ID = 'device_unique_id';
 const MAX_SERVER_HISTORY = 10;
 
 export class ServerConfigManager {
   private static instance: ServerConfigManager;
   private pref: preferences.Preferences | null = null;
   private cachedUrl: string = '';
+  private cachedDeviceId: string = '';
+  private deviceIdInflight: Promise<string> | null = null;
 
   private constructor() {
   }
@@ -43,6 +47,52 @@ export class ServerConfigManager {
     } catch (err) {
       return '';
     }
+  }
+
+  public async getDeviceId(): Promise<string> {
+    if (this.cachedDeviceId) {
+      return this.cachedDeviceId;
+    }
+    if (this.deviceIdInflight) {
+      return this.deviceIdInflight;
+    }
+    this.deviceIdInflight = this.loadOrCreateDeviceId();
+    try {
+      return await this.deviceIdInflight;
+    } finally {
+      this.deviceIdInflight = null;
+    }
+  }
+
+  private async loadOrCreateDeviceId(): Promise<string> {
+    if (this.cachedDeviceId) {
+      return this.cachedDeviceId;
+    }
+    if (!this.pref) {
+      return '';
+    }
+    try {
+      let id = (await this.pref.get(KEY_DEVICE_ID, '')) as string;
+      if (!id) {
+        id = this.newDeviceId();
+        await this.pref.put(KEY_DEVICE_ID, id);
+        await this.pref.flush();
+      }
+      this.cachedDeviceId = id;
+      return id;
+    } catch (_err) {
+      return '';
+    }
+  }
+
+  private newDeviceId(): string {
+    let rand = '';
+    try {
+      rand = util.generateRandomUUID(true).replace(/-/g, '');
+    } catch (_err) {
+      rand = Math.floor(Math.random() * 0x100000000).toString(36);
+    }
+    return `ohos_${Date.now().toString(36)}_${rand}`;
   }
 
   public getCachedServerUrl(): string {

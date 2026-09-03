@@ -74,7 +74,7 @@ struct PlayPage {
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
     if (this.filmId) {
-      HttpClient.getInstance().trackView('play', this.filmId);
+      HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
     }
     const paramSourceId = NavUtil.param(params, 'sourceId');
     const paramEpisodeStr = NavUtil.param(params, 'episodeIndex');

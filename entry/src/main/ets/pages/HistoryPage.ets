@@ -2,6 +2,7 @@ import { HistoryItem } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { HistoryManager } from '../common/utils/HistoryManager';
+import { HttpClient } from '../common/network/HttpClient';
 import { NavUtil } from '../common/utils/NavUtil';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { SourceGuard } from '../common/utils/SourceGuard';
@@ -31,6 +32,7 @@ struct HistoryPage {
 
   aboutToAppear() {
     this.applyWindowBar();
+    HttpClient.getInstance().trackView('browse', '', 'HistoryPage');
     this.sourceCb = () => {
       this.reload(false);
     };

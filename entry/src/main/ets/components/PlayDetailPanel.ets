@@ -28,20 +28,24 @@ export struct PlayDetailPanel {
   @State private ready: boolean = false;
   private listScroller: Scroller = new Scroller();
   private groupScroller: Scroller = new Scroller();
+  private sourceScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.syncGroupFromPlayingEpisode();
     this.checkReadyAndScroll();
+    this.syncSourceBar(false);
   }
 
   private onSourcesChange(): void {
     this.syncGroupFromPlayingEpisode();
     this.checkReadyAndScroll();
+    this.syncSourceBar(false);
   }
 
   private onViewSourceChange(): void {
     this.clampGroup(this.viewingSourceId);
     this.checkReadyAndScroll();
+    this.syncSourceBar(true);
   }
 
   private onPlayIndexChange(): void {
@@ -84,8 +88,21 @@ export struct PlayDetailPanel {
     if (this.needsGrouping()) {
       try {
         const g = this.groupOf(this.viewingSourceId);
-        this.groupScroller.scrollToIndex(g, smooth, ScrollAlign.CENTER);
-      } catch (_e) {
+        this.groupScroller.scrollToIndex(g, smooth, ScrollAlign.START);
+      } catch (_e) {}
+    }
+  }
+
+  private syncSourceBar(smooth: boolean): void {
+    if (this.sources.length === 0) {
+      return;
+    }
+    for (let i = 0; i < this.sources.length; i++) {
+      if (this.sources[i].id === this.viewingSourceId) {
+        try {
+          this.sourceScroller.scrollToIndex(i, smooth, ScrollAlign.START);
+        } catch (_err) {}
+        break;
       }
     }
   }
@@ -103,8 +120,9 @@ export struct PlayDetailPanel {
       this.episodeIndex < end &&
       this.episodeIndex < list.length;
 
-    // 1. 同步横向滚动分组栏，使选中的分组胶囊居中进入视野
+    // 1. 同步横向滚动分组栏与播放源栏，使选中的胶囊进入视野首位
     this.syncGroupBar(smooth);
+    this.syncSourceBar(smooth);
 
     // 2. 纵向列表定位：基于 headerHeight 与行高精确推移，绝不被吸顶栏遮挡
     try {
@@ -309,34 +327,28 @@ export struct PlayDetailPanel {
 
   @Builder
   sourceRow() {
-    Scroll() {
-      Row({ space: 8 }) {
-        ForEach(this.sources, (source: PlaySource) => {
+    List({ space: 8, scroller: this.sourceScroller }) {
+      ForEach(this.sources, (source: PlaySource) => {
+        ListItem() {
           this.sourceChip(source)
-        }, (source: PlaySource) => source.id)
-      }
-      .justifyContent(FlexAlign.Start)
-      .padding({ left: 12, right: 16 })
-      .constraintSize({ minHeight: 32 })
+        }
+      }, (source: PlaySource) => source.id)
     }
-    .scrollable(ScrollDirection.Horizontal)
+    .listDirection(Axis.Horizontal)
+    .alignListItem(ListItemAlign.Center)
     .scrollBar(BarState.Off)
-    .align(Alignment.Start)
-    .nestedScroll({
-      scrollForward: NestedScrollMode.SELF_FIRST,
-      scrollBackward: NestedScrollMode.SELF_FIRST
-    })
+    .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
     .width('100%')
-    .height(36)
+    .height(32)
+    .contentEndOffset(AppTheme.SPACE_LG)
+    .padding({ left: 12, right: 16 })
     .margin({ top: 8 })
   }
 
   @Builder
   groupBar() {
     Column() {
-      Divider()
-        .color(AppTheme.BORDER)
-        .width('100%')
+      Divider().color(AppTheme.BORDER).width('100%')
 
       if (this.sources.length > 0) {
         this.sourceRow()
@@ -351,14 +363,13 @@ export struct PlayDetailPanel {
             }, (index: number) => `group_${this.viewingSourceId}_${index}`)
           }
           .listDirection(Axis.Horizontal)
+          .alignListItem(ListItemAlign.Center)
           .scrollBar(BarState.Off)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
-          })
+          .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
           .width('100%')
           .height(40)
-          .padding({ left: 8, right: 12 })
+          .contentEndOffset(AppTheme.SPACE_LG)
+          .padding({ left: 8, right: 12, top: 4, bottom: 4 })
           .backgroundColor(AppTheme.BG_ELEVATED)
           .borderRadius(AppTheme.RADIUS_MD)
         }
@@ -380,9 +391,7 @@ export struct PlayDetailPanel {
       .layoutWeight(1)
       .constraintSize({ minWidth: 0 })
     } else {
-      Column()
-        .layoutWeight(1)
-        .constraintSize({ minWidth: 0 })
+      Column().layoutWeight(1).constraintSize({ minWidth: 0 })
     }
   }
 
@@ -411,6 +420,7 @@ export struct PlayDetailPanel {
       .borderRadius(6)
       .onClick(() => {
         this.setGroup(this.viewingSourceId, index, true);
+        this.syncGroupBar(true);
       })
   }
 
@@ -428,16 +438,8 @@ export struct PlayDetailPanel {
       .textOverflow({ overflow: TextOverflow.Ellipsis })
       .backgroundColor(this.isEpisodeOn(index) ? AppTheme.ACCENT_SOFT : AppTheme.BG_CARD)
       .borderRadius(AppTheme.RADIUS_MD)
-      .border({
-        width: this.isEpisodeOn(index) ? 2 : 0,
-        color: AppTheme.ACCENT
-      })
-      .gesture(
-        LongPressGesture({ repeat: false })
-          .onAction(() => {
-            this.showEpisodeTitle(ep.episode);
-          })
-      )
+      .border({ width: this.isEpisodeOn(index) ? 2 : 0, color: AppTheme.ACCENT })
+      .gesture(LongPressGesture({ repeat: false }).onAction(() => { this.showEpisodeTitle(ep.episode); }))
       .onClick(() => {
         if (this.isEpisodeOn(index) || !this.onSelectEpisode) {
           this.showEpisodeTitle(ep.episode);
@@ -493,6 +495,7 @@ export struct PlayDetailPanel {
     .animation({ duration: 150, curve: Curve.EaseOut })
     .onAppear(() => {
       this.scrollToFocusedEpisode(false);
+      this.syncSourceBar(false);
     })
   }
 }

@@ -165,7 +165,7 @@ struct SearchPage {
       return;
     }
     if (reset) {
-      HttpClient.getInstance().trackView('search', kw);
+      HttpClient.getInstance().trackView('search', kw, 'SearchPage');
       this.errorText = '';
     }
     this.fetchLock = true;

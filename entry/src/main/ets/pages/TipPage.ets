@@ -1,4 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
+import { HttpClient } from '../common/network/HttpClient';
 import { BasicConfig, TipChannel } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
@@ -90,6 +91,7 @@ struct TipPage {
 
   async aboutToAppear() {
     this.applyWindowBar();
+    HttpClient.getInstance().trackView('browse', '', 'TipPage');
     this.reconnectCb = () => {
       this.loadConfig();
     };

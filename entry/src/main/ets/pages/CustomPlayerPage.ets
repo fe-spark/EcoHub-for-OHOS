@@ -1,4 +1,5 @@
 import { AppTheme } from '../common/constants/AppTheme';
+import { HttpClient } from '../common/network/HttpClient';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { PageHeader } from '../components/PageHeader';
 import { AppIcon } from '../components/AppIcon';
@@ -36,6 +37,7 @@ struct CustomPlayerPage {
 
   aboutToAppear() {
     this.applyWindowBar();
+    HttpClient.getInstance().trackView('browse', '', 'CustomPlayerPage');
     this.checkParams();
   }
 

@@ -10,6 +10,73 @@ import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 
+function toHexByte(n: number): string {
+  const v = Math.round(Math.min(1, Math.max(0, n)) * 255);
+  const hex = v.toString(16);
+  return hex.length < 2 ? `0${hex}` : hex;
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = h / 60;
+  const x = c * (1 - Math.abs(hp % 2 - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hp < 1) {
+    r = c;
+    g = x;
+  } else if (hp < 2) {
+    r = x;
+    g = c;
+  } else if (hp < 3) {
+    g = c;
+    b = x;
+  } else if (hp < 4) {
+    g = x;
+    b = c;
+  } else if (hp < 5) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+  const m = l - c / 2;
+  return `#${toHexByte(r + m)}${toHexByte(g + m)}${toHexByte(b + m)}`;
+}
+
+function shuffleHues(count: number): number[] {
+  const n = Math.max(count, 1);
+  const start = Math.random() * 360;
+  const step = 360 / n;
+  const hues: number[] = [];
+  for (let i = 0; i < n; i++) {
+    hues.push((start + i * step) % 360);
+  }
+  for (let i = hues.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = hues[i];
+    hues[i] = hues[j];
+    hues[j] = tmp;
+  }
+  return hues;
+}
+
+function hueLightness(h: number): number {
+  const toYellow = Math.min(Math.abs(h - 60), 360 - Math.abs(h - 60));
+  const toLime = Math.min(Math.abs(h - 100), 360 - Math.abs(h - 100));
+  if (Math.min(toYellow, toLime) < 40) {
+    return 0.15;
+  }
+  return 0.20 + Math.random() * 0.04;
+}
+
+function darkHexFromHue(h: number): string {
+  const s = 0.52 + Math.random() * 0.14;
+  return hslToHex(h, s, hueLightness(h));
+}
+
 @Component
 export struct RecommendTab {
   onOpenSearch?: () => void;
@@ -28,6 +95,7 @@ export struct RecommendTab {
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
+  @State private glyphColors: Record<string, string> = {};
 
   aboutToAppear() {
     this.reconnectCb = () => {
@@ -58,6 +126,7 @@ export struct RecommendTab {
       this.banners = home.banners;
       this.sections = home.content;
       this.reloadToken = Date.now();
+      this.rebuildGlyphColors(home.content);
       ok = true;
       if (fromPull && this.banners.length > 0) {
         this.currentBannerIndex = 0;
@@ -96,20 +165,66 @@ export struct RecommendTab {
     return list;
   }
 
+  private lastGlyph(name: string): string {
+    const text = (name || '').trim();
+    return text ? text.substring(text.length - 1) : '';
+  }
+
+  private rebuildGlyphColors(sections: HomeSection[]): void {
+    const visible: HomeSection[] = [];
+    for (let i = 0; i < sections.length; i++) {
+      if (sections[i].nav.show !== false) {
+        visible.push(sections[i]);
+      }
+    }
+    const hues = shuffleHues(visible.length);
+    const next: Record<string, string> = {};
+    for (let i = 0; i < visible.length; i++) {
+      const nav = visible[i].nav;
+      next[`${nav.id}_${nav.name}`] = darkHexFromHue(hues[i]);
+    }
+    this.glyphColors = next;
+  }
+
+  private glyphBg(id: number, name: string): string {
+    const color = this.glyphColors[`${id}_${name}`];
+    return color ? color : '#1B2434';
+  }
+
   @Builder
   categoryEntry(section: HomeSection) {
-    Row() {
+    Row({ space: 6 }) {
+      if (this.lastGlyph(section.nav.name)) {
+        Row() {
+          Text(this.lastGlyph(section.nav.name))
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#F4F4F5')
+        }
+        .width(22)
+        .height(22)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(VerticalAlign.Center)
+        .backgroundColor(this.glyphBg(section.nav.id, section.nav.name))
+        .borderRadius(11)
+        .border({ width: 1, color: 'rgba(255, 255, 255, 0.18)' })
+        .clip(true)
+      }
       Text(section.nav.name)
         .fontSize(13)
         .fontWeight(FontWeight.Medium)
         .fontColor(AppTheme.TEXT_PRIMARY)
         .maxLines(1)
     }
-    .height(34)
-    .padding({ left: 16, right: 16 })
-    .backgroundColor(AppTheme.BG_CARD)
-    .borderRadius(AppTheme.RADIUS_PILL)
-    .border({ width: 1, color: AppTheme.BORDER })
+    .height(36)
+    .padding({ left: 8, right: 12 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor('rgba(255, 255, 255, 0.06)')
+    .backdropBlur(24)
+    .borderRadius(AppTheme.RADIUS_MD)
+    .clip(true)
+    .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
     .onClick(() => {
       NavUtil.openFilter(section.nav.id);
     })
@@ -433,7 +548,7 @@ export struct RecommendTab {
                     this.currentBannerIndex = index % this.banners.length;
                   })
                   .width('100%')
-                  .height(this.banners.length > 1 ? 360 : 380)
+                  .height(this.banners.length > 1 ? 430 : 450)
 
                   // 居中指示条（置于首尾露出轮播图下方，按真实数据数量显示点数）
                   if (this.banners.length > 1) {
@@ -464,7 +579,7 @@ export struct RecommendTab {
                     Row({ space: AppTheme.SPACE_SM }) {
                       ForEach(this.visibleSections(), (section: HomeSection) => {
                         this.categoryEntry(section)
-                      }, (section: HomeSection) => `cat_${section.nav.id}`)
+                      }, (section: HomeSection) => `cat_${section.nav.id}_${this.reloadToken}`)
                     }
                     .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
                     .justifyContent(FlexAlign.Start)

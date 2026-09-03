@@ -1,4 +1,5 @@
 import { http } from '@kit.NetworkKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { ServerConfigManager } from '../utils/ServerConfigManager';
 import { QueryParams } from '../utils/QueryParams';
 import { SourceGuard } from '../utils/SourceGuard';
@@ -11,8 +12,13 @@ export interface ApiResponse {
 }
 
 interface TrackViewPayload {
+  source: string;
   action: string;
   resource: string;
+  page: string;
+  app_version?: string;
+  device_model?: string;
+  device_id?: string;
 }
 
 export class HttpClient {
@@ -60,11 +66,27 @@ export class HttpClient {
     return this.send(url, timeout);
   }
 
-  public trackView(action: string, resource: string = ''): void {
-    this.sendTrack(action, resource).catch(() => {});
+  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = ''): void {
+    this.sendTrack(action, resource, page, deviceModel).catch(() => {});
   }
 
-  private async sendTrack(action: string, resource: string): Promise<void> {
+  private resolveDeviceModel(customModel: string = ''): string {
+    if (customModel && customModel.trim().length > 0) {
+      return customModel.trim();
+    }
+    try {
+      const market = (deviceInfo.marketName || '').trim();
+      const product = (deviceInfo.productModel || '').trim();
+      if (market && product && market !== product) {
+        return `${market} (${product})`;
+      }
+      return market || product || '';
+    } catch (_err) {
+      return '';
+    }
+  }
+
+  private async sendTrack(action: string, resource: string, page: string, deviceModel: string): Promise<void> {
     const manager = ServerConfigManager.getInstance();
     let url = '';
     try {
@@ -74,18 +96,40 @@ export class HttpClient {
     }
     const httpRequest = http.createHttp();
     const userAgent = await this.resolveUserAgent();
+    let version = '';
+    try {
+      version = await AppVersionUtil.getVersionName();
+    } catch (_err) {}
+
+    let deviceId = '';
+    try {
+      deviceId = await manager.getDeviceId();
+    } catch (_err) {}
+
+    const resolvedModel = this.resolveDeviceModel(deviceModel);
+
     const payload: TrackViewPayload = {
+      source: 'harmony',
       action: action,
-      resource: resource
+      resource: resource,
+      page: page || action,
+      app_version: version,
+      device_model: resolvedModel,
+      device_id: deviceId
     };
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': userAgent
+      };
+      if (deviceId) {
+        headers['X-Device-Id'] = deviceId;
+        headers['Device-Id'] = deviceId;
+      }
       await httpRequest.request(url, {
         method: http.RequestMethod.POST,
-        header: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': userAgent
-        },
+        header: headers,
         extraData: payload,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 5000,
@@ -117,14 +161,23 @@ export class HttpClient {
   private async send(url: string, timeout: number): Promise<ApiResponse> {
     const httpRequest = http.createHttp();
     const userAgent = await this.resolveUserAgent();
+    let deviceId = '';
+    try {
+      deviceId = await ServerConfigManager.getInstance().getDeviceId();
+    } catch (_err) {}
+    const header: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': userAgent
+    };
+    if (deviceId) {
+      header['X-Device-Id'] = deviceId;
+      header['Device-Id'] = deviceId;
+    }
     try {
       const response = await httpRequest.request(url, {
         method: http.RequestMethod.GET,
-        header: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': userAgent
-        },
+        header: header,
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: timeout,
         readTimeout: timeout

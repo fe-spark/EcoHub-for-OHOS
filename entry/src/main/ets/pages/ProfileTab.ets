@@ -2,6 +2,7 @@ import { FilmApi } from '../api/FilmApi';
 import { BasicConfig } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { NavUtil } from '../common/utils/NavUtil';
 import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
@@ -335,20 +336,14 @@ export struct ProfileTab {
             this.menuRow($r('sys.symbol.clock_fill'), '观看历史')
           }
           .onClick(() => {
-            try {
-              this.getUIContext().getRouter().pushUrl({ url: 'pages/HistoryPage' });
-            } catch (_e) {
-            }
+            NavUtil.openHistory(this.getUIContext());
           })
           this.menuLine()
           Column() {
             this.menuRow($r('sys.symbol.play_circle_fill'), '自定义播放')
           }
           .onClick(() => {
-            try {
-              this.getUIContext().getRouter().pushUrl({ url: 'pages/CustomPlayerPage' });
-            } catch (_e) {
-            }
+            NavUtil.openCustomPlayer('', this.getUIContext());
           })
           if (this.config.tipEnabled) {
             this.menuLine()
@@ -356,10 +351,7 @@ export struct ProfileTab {
               this.menuRow($r('sys.symbol.gift'), this.config.tipTitle || '赞赏支持')
             }
             .onClick(() => {
-              try {
-                this.getUIContext().getRouter().pushUrl({ url: 'pages/TipPage' });
-              } catch (_e) {
-              }
+              NavUtil.openTip(this.getUIContext());
             })
           }
           this.menuLine()

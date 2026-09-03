@@ -58,7 +58,7 @@ struct FilterPage {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.pid = NavUtil.param(params, 'Pid');
-    HttpClient.getInstance().trackView('classify', this.pid);
+    HttpClient.getInstance().trackView('classify', this.pid, 'FilterPage');
     const category = NavUtil.param(params, 'Category');
     const sort = NavUtil.param(params, 'Sort');
     if (category) {

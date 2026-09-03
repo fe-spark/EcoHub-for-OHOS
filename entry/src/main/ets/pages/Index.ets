@@ -87,7 +87,7 @@ struct Index {
       return;
     }
     await this.loadSite(false);
-    HttpClient.getInstance().trackView('browse');
+    HttpClient.getInstance().trackView('browse', '', 'IndexPage');
     SiteHeartbeat.getInstance().start();
     this.reconnectCb = () => {
       this.loadSite(false);
