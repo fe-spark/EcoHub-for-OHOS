@@ -5,6 +5,9 @@ import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 
 
+const CUSTOM_FONT_FAMILY: string = 'CalligraphyFont';
+const CUSTOM_FONT_RAWFILE: string = 'fonts/CalligraphyFont.ttf';
+
 export default class EntryAbility extends UIAbility {
   onCreate(_want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     try {
@@ -38,6 +41,13 @@ export default class EntryAbility extends UIAbility {
         }
         windowStage.getMainWindow().then((win: window.Window) => {
           AppStorage.setOrCreate('UI_CONTEXT', win.getUIContext());
+          try {
+            win.getUIContext().getFont().registerFont({
+              familyName: CUSTOM_FONT_FAMILY,
+              familySrc: $rawfile(CUSTOM_FONT_RAWFILE)
+            });
+          } catch (_e) {
+          }
           win.setWindowSystemBarEnable(['status', 'navigation']);
           win.setWindowLayoutFullScreen(true);
           win.setWindowSystemBarProperties({

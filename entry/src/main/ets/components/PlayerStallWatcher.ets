@@ -1,18 +1,13 @@
 export class PlayerStallWatcher {
+  private static readonly HIDE_DELAY_MS: number = 3000;
+  private static readonly TIP_DURATION_MS: number = 1000;
+  private static readonly OPEN_TIMEOUT_MS: number = 12000;
+  private static readonly SEEK_TIMEOUT_MS: number = 8000;
+
   private hideTimer: number = -1;
-  private stallTimer: number = -1;
   private tipTimer: number = -1;
   private openTimer: number = -1;
-  private lastProgressTime: number = -1;
-  private isStalled: boolean = false;
-
-  public get stalled(): boolean {
-    return this.isStalled;
-  }
-
-  public set stalled(val: boolean) {
-    this.isStalled = val;
-  }
+  private seekTimer: number = -1;
 
   public armHide(callback: () => void, canHide: boolean): void {
     this.clearHide();
@@ -22,29 +17,13 @@ export class PlayerStallWatcher {
     this.hideTimer = setTimeout(() => {
       this.hideTimer = -1;
       callback();
-    }, 3000);
+    }, PlayerStallWatcher.HIDE_DELAY_MS);
   }
 
   public clearHide(): void {
     if (this.hideTimer >= 0) {
       clearTimeout(this.hideTimer);
       this.hideTimer = -1;
-    }
-  }
-
-  public showTip(message: string, kind: number, onUpdate: (msg: string, k: number) => void, onClear: () => void): void {
-    this.clearTip();
-    onUpdate(message, kind);
-    this.tipTimer = setTimeout(() => {
-      this.tipTimer = -1;
-      onClear();
-    }, 1000);
-  }
-
-  public clearTip(): void {
-    if (this.tipTimer >= 0) {
-      clearTimeout(this.tipTimer);
-      this.tipTimer = -1;
     }
   }
 
@@ -56,7 +35,7 @@ export class PlayerStallWatcher {
     this.openTimer = setTimeout(() => {
       this.openTimer = -1;
       callback();
-    }, 12000);
+    }, PlayerStallWatcher.OPEN_TIMEOUT_MS);
   }
 
   public clearOpenWatch(): void {
@@ -66,50 +45,44 @@ export class PlayerStallWatcher {
     }
   }
 
-  public resetStallWatch(): void {
-    this.clearStallWatch();
-    this.isStalled = false;
-    this.lastProgressTime = -1;
-  }
-
-  public clearStallWatch(): void {
-    if (this.stallTimer >= 0) {
-      clearTimeout(this.stallTimer);
-      this.stallTimer = -1;
-    }
-  }
-
-  public noteProgress(time: number, canStall: boolean, onStallChanged: (stalled: boolean) => void,
-    stillValid: () => boolean): void {
-    if (time >= 0) {
-      const moved = this.lastProgressTime < 0 || Math.abs(time - this.lastProgressTime) > 0.001;
-      this.lastProgressTime = time;
-      if (!moved) {
-        return;
-      }
-    }
-    if (this.isStalled) {
-      this.isStalled = false;
-      onStallChanged(false);
-    }
-    this.clearStallWatch();
-    if (!canStall) {
+  public armSeekWatch(callback: () => void, isSeeking: boolean): void {
+    this.clearSeekWatch();
+    if (!isSeeking) {
       return;
     }
-    this.stallTimer = setTimeout(() => {
-      this.stallTimer = -1;
-      if (!stillValid()) {
-        return;
-      }
-      this.isStalled = true;
-      onStallChanged(true);
-    }, 2500);
+    this.seekTimer = setTimeout(() => {
+      this.seekTimer = -1;
+      callback();
+    }, PlayerStallWatcher.SEEK_TIMEOUT_MS);
+  }
+
+  public clearSeekWatch(): void {
+    if (this.seekTimer >= 0) {
+      clearTimeout(this.seekTimer);
+      this.seekTimer = -1;
+    }
+  }
+
+  public showTip(message: string, kind: number, onUpdate: (msg: string, k: number) => void, onClear: () => void): void {
+    this.clearTip();
+    onUpdate(message, kind);
+    this.tipTimer = setTimeout(() => {
+      this.tipTimer = -1;
+      onClear();
+    }, PlayerStallWatcher.TIP_DURATION_MS);
+  }
+
+  public clearTip(): void {
+    if (this.tipTimer >= 0) {
+      clearTimeout(this.tipTimer);
+      this.tipTimer = -1;
+    }
   }
 
   public clearAll(): void {
     this.clearHide();
-    this.clearStallWatch();
     this.clearTip();
     this.clearOpenWatch();
+    this.clearSeekWatch();
   }
 }

@@ -10,72 +10,19 @@ import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 
-function toHexByte(n: number): string {
-  const v = Math.round(Math.min(1, Math.max(0, n)) * 255);
-  const hex = v.toString(16);
-  return hex.length < 2 ? `0${hex}` : hex;
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = h / 60;
-  const x = c * (1 - Math.abs(hp % 2 - 1));
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  if (hp < 1) {
-    r = c;
-    g = x;
-  } else if (hp < 2) {
-    r = x;
-    g = c;
-  } else if (hp < 3) {
-    g = c;
-    b = x;
-  } else if (hp < 4) {
-    g = x;
-    b = c;
-  } else if (hp < 5) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  const m = l - c / 2;
-  return `#${toHexByte(r + m)}${toHexByte(g + m)}${toHexByte(b + m)}`;
-}
-
-function shuffleHues(count: number): number[] {
-  const n = Math.max(count, 1);
-  const start = Math.random() * 360;
-  const step = 360 / n;
-  const hues: number[] = [];
-  for (let i = 0; i < n; i++) {
-    hues.push((start + i * step) % 360);
-  }
-  for (let i = hues.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = hues[i];
-    hues[i] = hues[j];
-    hues[j] = tmp;
-  }
-  return hues;
-}
-
-function hueLightness(h: number): number {
-  const toYellow = Math.min(Math.abs(h - 60), 360 - Math.abs(h - 60));
-  const toLime = Math.min(Math.abs(h - 100), 360 - Math.abs(h - 100));
-  if (Math.min(toYellow, toLime) < 40) {
-    return 0.15;
-  }
-  return 0.20 + Math.random() * 0.04;
-}
-
-function darkHexFromHue(h: number): string {
-  const s = 0.52 + Math.random() * 0.14;
-  return hslToHex(h, s, hueLightness(h));
-}
+const CATEGORY_FONT_FAMILY: string = 'CalligraphyFont';
+const CATEGORY_ICON_SIZE: number = 17;
+const CATEGORY_ICON_RADIUS: number = 8.5;
+const CATEGORY_TAG_HEIGHT: number = 32;
+const CATEGORY_GLYPH_SIZE: number = 10;
+const CATEGORY_LABEL_SIZE: number = 12.5;
+const CATEGORY_ICON_BG: string = 'rgba(250, 140, 22, 0.12)';
+const CATEGORY_ICON_BORDER: string = 'rgba(250, 140, 22, 0.28)';
+const CATEGORY_ICON_BORDER_WIDTH: number = 0.6;
+const CATEGORY_CHIP_BG: string = 'rgba(255, 255, 255, 0.05)';
+const CATEGORY_CHIP_BORDER: string = 'rgba(255, 255, 255, 0.10)';
+const CATEGORY_CHIP_BORDER_WIDTH: number = 0.8;
+const CATEGORY_CHIP_BLUR: number = 20;
 
 @Component
 export struct RecommendTab {
@@ -95,7 +42,6 @@ export struct RecommendTab {
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
-  @State private glyphColors: Record<string, string> = {};
 
   aboutToAppear() {
     this.reconnectCb = () => {
@@ -126,7 +72,6 @@ export struct RecommendTab {
       this.banners = home.banners;
       this.sections = home.content;
       this.reloadToken = Date.now();
-      this.rebuildGlyphColors(home.content);
       ok = true;
       if (fromPull && this.banners.length > 0) {
         this.currentBannerIndex = 0;
@@ -165,66 +110,50 @@ export struct RecommendTab {
     return list;
   }
 
-  private lastGlyph(name: string): string {
+  private categoryGlyph(name: string): string {
     const text = (name || '').trim();
-    return text ? text.substring(text.length - 1) : '';
-  }
-
-  private rebuildGlyphColors(sections: HomeSection[]): void {
-    const visible: HomeSection[] = [];
-    for (let i = 0; i < sections.length; i++) {
-      if (sections[i].nav.show !== false) {
-        visible.push(sections[i]);
-      }
+    if (!text) {
+      return '';
     }
-    const hues = shuffleHues(visible.length);
-    const next: Record<string, string> = {};
-    for (let i = 0; i < visible.length; i++) {
-      const nav = visible[i].nav;
-      next[`${nav.id}_${nav.name}`] = darkHexFromHue(hues[i]);
-    }
-    this.glyphColors = next;
-  }
-
-  private glyphBg(id: number, name: string): string {
-    const color = this.glyphColors[`${id}_${name}`];
-    return color ? color : '#1B2434';
+    const chars = Array.from(text);
+    return chars.length > 0 ? chars[0] : '';
   }
 
   @Builder
   categoryEntry(section: HomeSection) {
-    Row({ space: 6 }) {
-      if (this.lastGlyph(section.nav.name)) {
+    Row({ space: AppTheme.SPACE_SM - 2 }) {
+      if (this.categoryGlyph(section.nav.name)) {
         Row() {
-          Text(this.lastGlyph(section.nav.name))
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#F4F4F5')
+          Text(this.categoryGlyph(section.nav.name))
+            .fontFamily(CATEGORY_FONT_FAMILY)
+            .fontSize(CATEGORY_GLYPH_SIZE)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.ACCENT)
         }
-        .width(22)
-        .height(22)
+        .width(CATEGORY_ICON_SIZE)
+        .height(CATEGORY_ICON_SIZE)
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
-        .backgroundColor(this.glyphBg(section.nav.id, section.nav.name))
-        .borderRadius(11)
-        .border({ width: 1, color: 'rgba(255, 255, 255, 0.18)' })
+        .borderRadius(CATEGORY_ICON_RADIUS)
+        .backgroundColor(CATEGORY_ICON_BG)
+        .border({ width: CATEGORY_ICON_BORDER_WIDTH, color: CATEGORY_ICON_BORDER })
         .clip(true)
       }
       Text(section.nav.name)
-        .fontSize(13)
+        .fontSize(CATEGORY_LABEL_SIZE)
         .fontWeight(FontWeight.Medium)
         .fontColor(AppTheme.TEXT_PRIMARY)
         .maxLines(1)
     }
-    .height(36)
-    .padding({ left: 8, right: 12 })
+    .height(CATEGORY_TAG_HEIGHT)
+    .padding({ left: AppTheme.SPACE_SM - 2, right: AppTheme.SPACE_MD - 1 })
     .justifyContent(FlexAlign.Center)
     .alignItems(VerticalAlign.Center)
-    .backgroundColor('rgba(255, 255, 255, 0.06)')
-    .backdropBlur(24)
-    .borderRadius(AppTheme.RADIUS_MD)
+    .backgroundColor(CATEGORY_CHIP_BG)
+    .backdropBlur(CATEGORY_CHIP_BLUR)
+    .borderRadius(AppTheme.RADIUS_PILL)
     .clip(true)
-    .border({ width: 1, color: 'rgba(255, 255, 255, 0.12)' })
+    .border({ width: CATEGORY_CHIP_BORDER_WIDTH, color: CATEGORY_CHIP_BORDER })
     .onClick(() => {
       NavUtil.openFilter(section.nav.id);
     })

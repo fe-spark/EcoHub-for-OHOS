@@ -8,13 +8,25 @@ export class PlayerAvListener {
   onTime: (time: number) => void = (_time: number) => {};
   onFinish: () => void = () => {};
   onError: () => void = () => {};
-  onSeeked: () => void = () => {};
+  onSeeked: (timeSec: number, seq: number) => void = (_timeSec: number, _seq: number) => {};
   onBuffer: (buffered: number) => void = (_buffered: number) => {};
   onStalled: (stalled: boolean) => void = (_stalled: boolean) => {};
   onVideoSize: (width: number, height: number) => void = (_width: number, _height: number) => {};
 }
 
+class PendingSeek {
+  seq: number = 0;
+  timeSec: number = 0;
+
+  constructor(seq: number, timeSec: number) {
+    this.seq = seq;
+    this.timeSec = timeSec;
+  }
+}
+
 export class PlayerAv {
+  static readonly MS_PER_SEC: number = 1000;
+
   readonly listener: PlayerAvListener = new PlayerAvListener();
   private player: media.AVPlayer | undefined = undefined;
   private surfaceId: string = '';
@@ -23,6 +35,8 @@ export class PlayerAv {
   private speedIndex: number = 1;
   private muted: boolean = false;
   private pendingPrepare: boolean = false;
+  private seekGen: number = 0;
+  private pendingSeeks: PendingSeek[] = [];
 
   setSurface(id: string): void {
     console.info(`[PlayerAv] setSurface id: ${id}, hasPlayer: ${!!this.player}, pending: ${this.pendingPrepare}`);
@@ -91,16 +105,35 @@ export class PlayerAv {
     }
   }
 
-  seek(timeSec: number): void {
+  seek(timeSec: number): number {
     const player = this.player;
     if (!player) {
+      return 0;
+    }
+    if (player.state !== 'prepared' && player.state !== 'playing' && player.state !== 'paused' &&
+      player.state !== 'completed') {
+      return 0;
+    }
+    const target = Math.max(0, timeSec);
+    const seq = ++this.seekGen;
+    this.pendingSeeks.push(new PendingSeek(seq, target));
+    console.info(`[PlayerAv] 调用 player.seek(${target}s) seq=${seq}`);
+    try {
+      player.seek(Math.floor(target * PlayerAv.MS_PER_SEC), media.SeekMode.SEEK_CLOSEST);
+      return seq;
+    } catch (e) {
+      console.error(`[PlayerAv] 调用 player.seek 异常: ${JSON.stringify(e)}`);
+      this.removePendingSeek(seq);
+      return 0;
+    }
+  }
+
+  abandonSeeksUpTo(seq: number): void {
+    if (seq <= 0) {
+      this.pendingSeeks = [];
       return;
     }
-    if (player.state === 'prepared' || player.state === 'playing' || player.state === 'paused' ||
-      player.state === 'completed') {
-      console.info(`[PlayerAv] 调用 player.seek(${timeSec}s)`);
-      player.seek(Math.floor(Math.max(0, timeSec) * 1000), media.SeekMode.SEEK_CLOSEST);
-    }
+    this.pendingSeeks = this.pendingSeeks.filter((pending: PendingSeek) => pending.seq > seq);
   }
 
   async release(): Promise<void> {
@@ -124,7 +157,7 @@ export class PlayerAv {
         }
       } else if (state === 'prepared') {
         const durationMs = player.duration;
-        const duration = durationMs > 0 ? durationMs / 1000 : 0;
+        const duration = durationMs > 0 ? durationMs / PlayerAv.MS_PER_SEC : 0;
         console.info(`[PlayerAv] prepared 完成! duration: ${duration}s, size: ${player.width}x${player.height}`);
         this.applyVolume();
         this.applySpeed();
@@ -163,20 +196,21 @@ export class PlayerAv {
       if (gen !== this.gen) {
         return;
       }
-      this.listener.onTime(time / 1000);
+      this.listener.onTime(time / PlayerAv.MS_PER_SEC);
     });
-    player.on('seekDone', (_time: number) => {
+    player.on('seekDone', (timeMs: number) => {
       if (gen !== this.gen) {
         return;
       }
-      this.listener.onSeeked();
+      const timeSec = timeMs >= 0 ? timeMs / PlayerAv.MS_PER_SEC : 0;
+      this.listener.onSeeked(timeSec, this.takePendingSeek(timeSec));
     });
     player.on('bufferingUpdate', (infoType: media.BufferingInfoType, value: number) => {
       if (gen !== this.gen) {
         return;
       }
       if (infoType === media.BufferingInfoType.CACHED_DURATION) {
-        this.listener.onBuffer(value / 1000);
+        this.listener.onBuffer(value / PlayerAv.MS_PER_SEC);
       } else if (infoType === media.BufferingInfoType.BUFFERING_START) {
         this.listener.onStalled(true);
       } else if (infoType === media.BufferingInfoType.BUFFERING_END) {
@@ -223,10 +257,37 @@ export class PlayerAv {
     }
   }
 
+  private takePendingSeek(landedSec: number): number {
+    if (this.pendingSeeks.length === 0) {
+      return 0;
+    }
+    let best = 0;
+    let bestDist = Math.abs(this.pendingSeeks[0].timeSec - landedSec);
+    for (let i = 1; i < this.pendingSeeks.length; i++) {
+      const dist = Math.abs(this.pendingSeeks[i].timeSec - landedSec);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    }
+    const matched: PendingSeek = this.pendingSeeks.splice(best, 1)[0];
+    return matched.seq;
+  }
+
+  private removePendingSeek(seq: number): void {
+    for (let i = this.pendingSeeks.length - 1; i >= 0; i--) {
+      if (this.pendingSeeks[i].seq === seq) {
+        this.pendingSeeks.splice(i, 1);
+        return;
+      }
+    }
+  }
+
   private async resetPlayer(): Promise<void> {
     const player = this.player;
     this.player = undefined;
     this.pendingPrepare = false;
+    this.pendingSeeks = [];
     if (!player) {
       return;
     }

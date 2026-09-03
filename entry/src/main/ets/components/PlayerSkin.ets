@@ -21,9 +21,10 @@ export struct PlayerSkin {
   @Prop duration: number = 0;
   @Prop muted: boolean = false;
   @Prop speedLabel: string = '1.0x';
+  @Prop scaleLabel: string = '适应';
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
-  @Prop @Watch('onLongPressWatch') longPressing: boolean = false;
+  @Prop longPressing: boolean = false;
   @Prop feedback: string = '';
   @Prop feedbackKind: number = PlayerTipKind.NONE;
   @Prop topInset: number = 0;
@@ -39,6 +40,7 @@ export struct PlayerSkin {
   onPrev?: () => void;
   onNext?: () => void;
   onSpeed?: () => void;
+  onScale?: () => void;
   onRetry?: () => void;
   onErrorDetail?: () => void;
   onSeekBack?: () => void;
@@ -53,30 +55,6 @@ export struct PlayerSkin {
   onPanMove?: (event: GestureEvent) => void;
   onPanEnd?: () => void;
   onPanCancel?: () => void;
-  @State private speedTick: number = 0;
-  private speedTimer: number = -1;
-
-  aboutToDisappear(): void {
-    this.clearSpeedTimer();
-  }
-
-  onLongPressWatch(): void {
-    this.clearSpeedTimer();
-    if (!this.longPressing) {
-      this.speedTick = 0;
-      return;
-    }
-    this.speedTimer = setInterval(() => {
-      this.speedTick = (this.speedTick + 1) % 3;
-    }, 180);
-  }
-
-  private clearSpeedTimer(): void {
-    if (this.speedTimer >= 0) {
-      clearInterval(this.speedTimer);
-      this.speedTimer = -1;
-    }
-  }
 
   private continuing(): boolean {
     return this.playRequested && !this.completed && !this.errorText;
@@ -93,6 +71,16 @@ export struct PlayerSkin {
       return false;
     }
     return this.seeking || this.stalled;
+  }
+
+  private canRetryLoad(): boolean {
+    if (this.errorText) {
+      return false;
+    }
+    if (this.opening) {
+      return true;
+    }
+    return this.continuing() && this.stalled && !this.seeking;
   }
 
   private showCenterPlay(): boolean {
@@ -140,12 +128,19 @@ export struct PlayerSkin {
       .selectedColor(AppTheme.ACCENT)
       .enabled(this.duration > 0 && this.ready)
       .onChange((value: number, mode: SliderChangeMode) => {
-        if (mode === SliderChangeMode.Begin && this.onSeekStart) {
-          this.onSeekStart(value);
-        } else if (mode === SliderChangeMode.Moving && this.onSeekUpdate) {
-          this.onSeekUpdate(value);
-        } else if (this.onSeekEnd) {
-          this.onSeekEnd(value);
+        this.currentTime = value;
+        if (mode === SliderChangeMode.Begin) {
+          if (this.onSeekStart) {
+            this.onSeekStart(value);
+          }
+        } else if (mode === SliderChangeMode.Moving) {
+          if (this.onSeekUpdate) {
+            this.onSeekUpdate(value);
+          }
+        } else if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
+          if (this.onSeekEnd) {
+            this.onSeekEnd(value);
+          }
         }
       })
   }
@@ -222,6 +217,7 @@ export struct PlayerSkin {
               .margin({ left: 4 })
               .maxLines(1)
             Blank()
+            PlayerChip({ label: this.scaleLabel, canTap: this.ready, onTap: this.onScale })
             PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
             PlayerIconBtn({
               src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
@@ -320,13 +316,16 @@ export struct PlayerSkin {
   centerGroup() {
     Column({ space: 12 }) {
       if (this.longPressing) {
-        PlayerTip({ message: this.speedLabel, kind: PlayerTipKind.SPEED, speedTick: this.speedTick })
+        PlayerTip({ message: this.speedLabel, kind: PlayerTipKind.SPEED })
       } else if (this.feedback) {
         PlayerTip({ message: this.feedback, kind: this.feedbackKind })
       }
-      if (this.loading()) {
-        PlayerLoadingCard({ opening: this.opening })
-      }
+      PlayerLoadingCard({
+        visible: this.loading(),
+        opening: this.opening,
+        allowRetry: this.canRetryLoad(),
+        onRetry: this.onRetry
+      })
       if (this.showCenterPlay()) {
         this.centerPlay()
       }

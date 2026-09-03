@@ -12,6 +12,7 @@ export interface PlayerObserverHost {
   onEnded?: () => void;
   syncKeepScreen: () => void;
   armHide: () => void;
+  armSeekWatch: () => void;
   revealHud: () => void;
   onUIUpdate: () => void;
 }
@@ -31,14 +32,15 @@ export class PlayerVideoObserver {
     if (!this.host.state.live()) {
       return;
     }
+    this.host.watcher.clearOpenWatch();
     this.host.state.duration = duration;
     this.host.state.ready = true;
     this.host.state.opening = false;
-    this.host.watcher.clearOpenWatch();
     this.host.state.errorText = '';
     const resumeAt = this.host.state.resumeTime(this.host.initialTime);
     if (resumeAt >= 2) {
       this.host.state.seek(resumeAt, this.host.playerAv);
+      this.host.armSeekWatch();
     }
     if (this.host.state.playRequested) {
       this.host.playerAv.play();
@@ -73,10 +75,6 @@ export class PlayerVideoObserver {
     if (this.host.state.seekTarget < 0) {
       this.host.state.seeking = false;
     }
-    this.host.watcher.noteProgress(-1, this.canStall(), (stalled: boolean) => {
-      this.host.state.stalled = stalled;
-      this.host.onUIUpdate();
-    }, () => this.canStall());
     this.host.syncKeepScreen();
     this.host.armHide();
     this.host.onUIUpdate();
@@ -88,7 +86,6 @@ export class PlayerVideoObserver {
     }
     this.host.state.isPlaying = false;
     this.host.state.stalled = false;
-    this.host.watcher.clearStallWatch();
     this.host.syncKeepScreen();
     if (!this.host.state.playRequested) {
       this.host.revealHud();
@@ -105,18 +102,30 @@ export class PlayerVideoObserver {
     if (time > 0) {
       this.host.state.isPlaying = this.host.state.playRequested;
     }
-    this.host.watcher.noteProgress(time, this.canStall(), (stalled: boolean) => {
-      this.host.state.stalled = stalled;
-      this.host.onUIUpdate();
-    }, () => this.canStall());
-    const hadSeek = this.host.state.seekTarget >= 0;
-    if (this.host.state.applyTime(time)) {
-      if (hadSeek && this.host.state.seekTarget < 0) {
-        this.host.state.seeking = false;
-        this.host.armHide();
-      }
+    this.host.state.applyTime(time);
+    this.host.state.emitProgress(this.host.onProgress);
+    this.host.onUIUpdate();
+  }
+
+  handleSeeked(timeSec: number, seq: number): void {
+    if (!this.host.state.live()) {
+      return;
+    }
+    if (seq <= 0 || seq !== this.host.state.seekSeq) {
+      console.info(`[PlayerVideoObserver] 忽略过期 seekDone: seq=${seq}, current=${this.host.state.seekSeq}`);
+      return;
+    }
+    this.host.watcher.clearSeekWatch();
+    const hadSeek = this.host.state.seekTarget >= 0 || this.host.state.seeking;
+    this.host.state.seekTarget = -1;
+    this.host.state.seeking = false;
+    if (timeSec >= 0) {
+      this.host.state.currentTime = timeSec;
     }
     this.host.state.emitProgress(this.host.onProgress);
+    if (hadSeek) {
+      this.host.armHide();
+    }
     this.host.onUIUpdate();
   }
 
@@ -128,7 +137,10 @@ export class PlayerVideoObserver {
     this.host.state.playRequested = false;
     this.host.state.completed = true;
     this.host.state.stalled = false;
-    this.host.watcher.clearStallWatch();
+    this.host.state.seeking = false;
+    this.host.state.seekTarget = -1;
+    this.host.state.seekSeq = 0;
+    this.host.watcher.clearSeekWatch();
     if (this.host.state.duration > 0) {
       this.host.state.currentTime = this.host.state.duration;
     }
@@ -146,20 +158,19 @@ export class PlayerVideoObserver {
     if (!this.host.state.live()) {
       return;
     }
+    this.host.watcher.clearOpenWatch();
     const wasReady = this.host.state.ready;
     this.host.state.isPlaying = false;
     this.host.state.playRequested = false;
     this.host.state.opening = false;
-    this.host.watcher.clearOpenWatch();
     this.host.state.ready = false;
+    this.host.state.seeking = false;
+    this.host.state.seekTarget = -1;
+    this.host.state.seekSeq = 0;
+    this.host.watcher.clearSeekWatch();
     this.host.state.errorText = this.host.state.formatError(wasReady, this.host.videoUrl);
     this.host.revealHud();
     this.host.syncKeepScreen();
     this.host.onUIUpdate();
-  }
-
-  private canStall(): boolean {
-    const s = this.host.state;
-    return s.playRequested && s.isPlaying && !s.completed && !s.errorText && !s.dragging && s.seekTarget < 0;
   }
 }

@@ -14,6 +14,7 @@ export class PlayerTipKind {
   static readonly BRIGHT: number = 3;
   static readonly SPEED: number = 4;
   static readonly VOLUME: number = 5;
+  static readonly SCALE: number = 6;
 }
 
 export class PlayerPanResult {

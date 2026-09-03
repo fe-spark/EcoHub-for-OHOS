@@ -11,6 +11,9 @@ import { PlayerPlaybackState } from './PlayerPlaybackState';
 import { PlayerSkinEvents, PlayerSkinView } from './PlayerSkinView';
 import { PlayerObserverHost, PlayerVideoObserver } from './PlayerVideoObserver';
 import { PlayerSpeedSheet } from './PlayerSpeedSheet';
+import { PlayerScale, PlayerScaleMode } from '../common/utils/PlayerScale';
+import { PlayerScaleController } from './PlayerScaleController';
+import { PlayerScaleSheet } from './PlayerScaleSheet';
 import { PlayerAv } from '../common/utils/PlayerAv';
 
 @Component
@@ -36,6 +39,9 @@ export struct VideoPlayer {
   onNext?: () => void;
   onFullscreenChange?: (full: boolean, isPortrait?: boolean) => void;
 
+  private static readonly SEEK_STEP_SEC: number = 10;
+  private static readonly PLAY_TOGGLE_DEBOUNCE_MS: number = 280;
+
   @State private duration: number = 0;
   @State private currentTime: number = 0;
   @State private isPlaying: boolean = false;
@@ -58,15 +64,19 @@ export struct VideoPlayer {
   @State private feedbackKind: number = PlayerTipKind.NONE;
   @State private speedIndex: number = 1;
   @State private speedLabel: string = '1.0x';
+  @State private scaleMode: number = PlayerScaleMode.FIT;
+  @State private scaleLabel: string = '适应';
   @State private playSrc: string = '';
   @State private playerOn: boolean = false;
   @State private speedOpenSeq: number = 0;
+  @State private scaleOpenSeq: number = 0;
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
   private audioBridge: PlayerAudioBridge = new PlayerAudioBridge();
   private gestures: PlayerGestureCoordinator = new PlayerGestureCoordinator();
   private speedCtrl: PlayerSpeedController = new PlayerSpeedController();
+  private scaleCtrl: PlayerScaleController = new PlayerScaleController();
   private state: PlayerPlaybackState = new PlayerPlaybackState();
   private observer: PlayerVideoObserver | null = null;
   private pageWasHidden: boolean = false;
@@ -83,11 +93,11 @@ export struct VideoPlayer {
     this.state.reset(this.videoUrl);
     this.state.playerOn = !!this.videoUrl;
     this.syncFromState();
-    this.armOpenWatch();
     this.armHide();
     this.playerAv.setMuted(this.muted || this.volumeIndex <= 0);
     this.playerAv.setSpeedIndex(this.speedIndex);
     if (this.videoUrl) {
+      this.armOpenWatch();
       this.playerAv.open(this.videoUrl);
     }
     this.audioBridge.sync((vol, _max, isMuted) => {
@@ -124,8 +134,12 @@ export struct VideoPlayer {
     this.playerAv.listener.onError = () => {
       if (this.observer) this.observer.handleError();
     };
+    this.playerAv.listener.onSeeked = (timeSec: number, seq: number) => {
+      if (this.observer) this.observer.handleSeeked(timeSec, seq);
+    };
     this.playerAv.listener.onVideoSize = (w: number, h: number) => {
       if (this.observer) this.observer.handleVideoSize(w, h);
+      this.scaleLabel = this.scaleCtrl.label(this.isPortraitVideo());
     };
     this.playerAv.listener.onStalled = (stalled: boolean) => {
       if (this.state.live()) {
@@ -143,6 +157,7 @@ export struct VideoPlayer {
     this.playerAv.release();
     this.watcher.clearAll();
     this.closeSpeedDialog();
+    this.closeScaleDialog();
     this.state.bootGen++;
     if (this.currentTime > 0) this.state.emitProgress(this.onProgress, true);
     const ctx = this.ctx();
@@ -175,6 +190,7 @@ export struct VideoPlayer {
       onEnded: this.onEnded,
       syncKeepScreen: () => this.syncKeepScreen(),
       armHide: () => this.armHide(),
+      armSeekWatch: () => this.armSeekWatch(),
       revealHud: () => { this.showHud = true; this.watcher.clearHide(); },
       onUIUpdate: () => this.syncFromState()
     };
@@ -196,11 +212,13 @@ export struct VideoPlayer {
   }
 
   private resetPlayState(): void {
+    this.watcher.clearOpenWatch();
+    this.watcher.clearSeekWatch();
     this.state.reset(this.videoUrl);
     this.syncFromState();
     this.showHud = true;
-    this.watcher.resetStallWatch();
     this.closeSpeedDialog();
+    this.closeScaleDialog();
     this.speedCtrl.reset();
     this.speedIndex = this.speedCtrl.index;
     this.speedLabel = this.speedCtrl.label;
@@ -223,15 +241,14 @@ export struct VideoPlayer {
       if (!this.pageWasHidden || !this.videoUrl || this.state.completed || this.state.errorText) return;
       this.pageWasHidden = false;
       this.state.stalled = false;
-      this.watcher.resetStallWatch();
       this.syncFromState();
       if (this.state.playRequested) this.playerAv.play();
     } else {
       this.pageWasHidden = true;
       this.state.stalled = false;
-      this.watcher.clearStallWatch();
       this.watcher.clearHide();
       this.closeSpeedDialog();
+      this.closeScaleDialog();
       this.syncFromState();
       if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
       if (this.state.isPlaying) this.playerAv.pause();
@@ -259,12 +276,12 @@ export struct VideoPlayer {
 
   private togglePlay(): void {
     const now = Date.now();
-    if (now - this.state.lastToggleAt < 280) return;
+    if (now - this.state.lastToggleAt < VideoPlayer.PLAY_TOGGLE_DEBOUNCE_MS) return;
     this.state.lastToggleAt = now;
     if (!this.state.canPlay() && !this.state.completed) return;
     if (this.state.completed) {
       this.state.playRequested = true; this.state.completed = false; this.state.currentTime = 0;
-      this.syncFromState(); this.state.seek(0, this.playerAv); this.syncFromState(); this.pulseHud();
+      this.syncFromState(); this.seekTo(0); this.pulseHud();
       return;
     }
     if (this.state.playRequested) {
@@ -301,7 +318,10 @@ export struct VideoPlayer {
   }
 
   private retry(): void {
-    this.state.prepareRetry(); this.watcher.resetStallWatch(); this.syncFromState(); this.showHud = true; this.remountPlayer();
+    this.state.prepareRetry();
+    this.syncFromState();
+    this.showHud = true;
+    this.remountPlayer();
   }
 
   private remountPlayer(): void {
@@ -323,6 +343,8 @@ export struct VideoPlayer {
   private armOpenWatch(): void {
     this.watcher.armOpenWatch(() => {
       if (this.state.live() && this.state.opening && !this.state.ready && !this.state.errorText) {
+        console.warn('[VideoPlayer] 视频打开超时(12s)，触发自动降级 failOpen');
+        this.watcher.clearSeekWatch();
         this.state.failOpen(this.videoUrl);
         this.syncFromState();
         this.syncKeepScreen();
@@ -331,12 +353,39 @@ export struct VideoPlayer {
   }
 
   private seekTo(time: number): void {
+    const prevSeq = this.state.seekSeq;
     this.state.seek(time, this.playerAv);
+    if (this.state.seeking && this.state.seekSeq !== prevSeq) {
+      this.armSeekWatch();
+    } else if (!this.state.seeking) {
+      this.watcher.clearSeekWatch();
+    }
     this.syncFromState();
+  }
+
+  private armSeekWatch(): void {
+    this.watcher.armSeekWatch(() => {
+      if (!this.state.live() || !this.state.seeking) {
+        return;
+      }
+      console.warn('[VideoPlayer] seek 超时，解除 seeking 锁定，等待 timeUpdate 校准');
+      this.playerAv.abandonSeeksUpTo(this.state.seekSeq);
+      this.state.seeking = false;
+      this.state.seekTarget = -1;
+      this.state.seekSeq = 0;
+      this.syncFromState();
+      this.armHide();
+    }, this.state.seeking);
+  }
+
+  private isPortraitVideo(): boolean {
+    return this.state.isPortrait();
   }
 
   private openSpeedDialog(): void { this.speedCtrl.setShowing(true); this.speedOpenSeq += 1; }
   private closeSpeedDialog(): void { this.speedCtrl.setShowing(false); this.speedOpenSeq = 0; }
+  private openScaleDialog(): void { this.scaleCtrl.setShowing(true); this.scaleOpenSeq += 1; }
+  private closeScaleDialog(): void { this.scaleCtrl.setShowing(false); this.scaleOpenSeq = 0; }
 
   private panMove(event: GestureEvent): void {
     const res = this.gestures.move(event, this.longPressing, this.fullNow(), this.duration, this.playerW, this.playerH);
@@ -371,15 +420,16 @@ export struct VideoPlayer {
       onPrev: () => { if (this.onPrev) this.onPrev(); },
       onNext: () => { if (this.onNext) this.onNext(); },
       onSpeed: () => this.openSpeedDialog(),
+      onScale: () => this.openScaleDialog(),
       onRetry: () => this.retry(),
       onErrorDetail: () => { this.getUIContext().showAlertDialog({ title: '报错详情', message: this.errorText, confirm: { value: '知道了', action: () => {} } }); },
-      onSeekBack: () => { this.seekTo(this.currentTime - 10); this.pulseHud(); },
-      onSeekForward: () => { this.seekTo(this.currentTime + 10); this.pulseHud(); },
+      onSeekBack: () => { this.seekTo(this.currentTime - VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
+      onSeekForward: () => { this.seekTo(this.currentTime + VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
       onSeekStart: (val) => { this.state.dragging = true; this.currentTime = val; this.state.currentTime = val; this.watcher.clearHide(); this.showHud = true; },
       onSeekUpdate: (val) => { this.currentTime = val; this.state.currentTime = val; },
-      onSeekEnd: (val) => { this.seekTo(val); this.state.dragging = false; this.pulseHud(); },
+      onSeekEnd: (val) => { this.currentTime = val; this.state.currentTime = val; this.seekTo(val); this.state.dragging = false; this.pulseHud(); },
       onToggleHud: () => {
-        if (this.speedCtrl.showing || this.gestures.pan.mode > 1 || this.longPressing) return;
+        if (this.speedCtrl.showing || this.scaleCtrl.showing || this.gestures.pan.mode > 1 || this.longPressing) return;
         if (this.showHud) {
           if (!this.playRequested || this.completed) return;
           this.showHud = false; this.watcher.clearHide();
@@ -419,6 +469,9 @@ export struct VideoPlayer {
         opening: this.opening,
         videoWidth: this.videoWidth,
         videoHeight: this.videoHeight,
+        scaleMode: this.fullNow() ? this.scaleMode : PlayerScaleMode.FIT,
+        containerWidth: this.playerW,
+        containerHeight: this.playerH,
         onSurfaceCreated: (sId: string) => {
           console.info(`[VideoPlayer] 关联主播放器 Surface: ${sId}`);
           this.playerAv.setSurface(sId);
@@ -439,6 +492,23 @@ export struct VideoPlayer {
         onClosed: () => this.speedCtrl.setShowing(false)
       })
 
+      PlayerScaleSheet({
+        openSeq: this.scaleOpenSeq,
+        scaleMode: this.scaleMode,
+        isPortrait: this.isPortraitVideo(),
+        onPick: (mode: number) => {
+          this.scaleCtrl.pick(mode);
+          this.scaleMode = mode;
+          this.scaleLabel = this.scaleCtrl.label(this.isPortraitVideo());
+          this.closeScaleDialog();
+          this.pulseHud();
+          this.watcher.showTip(`画面：${PlayerScale.label(mode, this.isPortraitVideo())}`, PlayerTipKind.SCALE,
+            (msg, k) => { this.feedback = msg; this.feedbackKind = k; },
+            () => { this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE; });
+        },
+        onClosed: () => this.scaleCtrl.setShowing(false)
+      })
+
       PlayerSkinView({
         isFull: this.fullNow(),
         showHud: this.showHud,
@@ -455,6 +525,7 @@ export struct VideoPlayer {
         duration: this.duration,
         muted: this.muted || this.volumeIndex <= 0,
         speedLabel: this.speedLabel,
+        scaleLabel: this.scaleCtrl.label(this.isPortraitVideo()),
         hasPrev: this.hasPrev,
         hasNext: this.hasNext,
         longPressing: this.longPressing,
@@ -475,6 +546,7 @@ export struct VideoPlayer {
     .onAreaChange((_old: Area, area: Area) => {
       this.playerW = Number(area.width);
       this.playerH = Number(area.height);
+      this.scaleLabel = this.scaleCtrl.label(this.isPortraitVideo());
     })
   }
 }

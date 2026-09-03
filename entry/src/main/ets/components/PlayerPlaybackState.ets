@@ -3,6 +3,11 @@ import { PlayerAv } from '../common/utils/PlayerAv';
 export type ProgressCallback = (current: number, duration: number) => void;
 
 export class PlayerPlaybackState {
+  static readonly MIN_RESUME_THRESHOLD_SEC: number = 2;
+  static readonly PROGRESS_PERSIST_INTERVAL_MS: number = 3000;
+  static readonly END_PROGRESS_THRESHOLD_SEC: number = 1;
+  static readonly SEEK_DEBOUNCE_DELTA_SEC: number = 0.3;
+
   public duration: number = 0;
   public currentTime: number = 0;
   public isPlaying: boolean = false;
@@ -21,6 +26,7 @@ export class PlayerPlaybackState {
   public lastPersist: number = 0;
   public seekTarget: number = -1;
   public seekAt: number = 0;
+  public seekSeq: number = 0;
   public lastToggleAt: number = 0;
   public dragging: boolean = false;
   public videoWidth: number = 0;
@@ -39,7 +45,7 @@ export class PlayerPlaybackState {
   }
 
   public resumeTime(initialTime: number): number {
-    return this.currentTime >= 2 ? this.currentTime : initialTime;
+    return this.currentTime >= PlayerPlaybackState.MIN_RESUME_THRESHOLD_SEC ? this.currentTime : initialTime;
   }
 
   public formatError(wasReady: boolean, url: string): string {
@@ -63,6 +69,7 @@ export class PlayerPlaybackState {
     this.dragging = false;
     this.seekTarget = -1;
     this.seekAt = 0;
+    this.seekSeq = 0;
     this.lastToggleAt = 0;
     this.videoWidth = 0;
     this.videoHeight = 0;
@@ -73,7 +80,8 @@ export class PlayerPlaybackState {
       return;
     }
     const now = Date.now();
-    if (!force && now - this.lastPersist < 3000 && this.currentTime < this.duration - 1) {
+    if (!force && now - this.lastPersist < PlayerPlaybackState.PROGRESS_PERSIST_INTERVAL_MS &&
+      this.currentTime < this.duration - PlayerPlaybackState.END_PROGRESS_THRESHOLD_SEC) {
       return;
     }
     this.lastPersist = now;
@@ -84,15 +92,8 @@ export class PlayerPlaybackState {
     if (this.dragging) {
       return false;
     }
-    if (this.seekTarget >= 0) {
-      const delta = Math.abs(time - this.seekTarget);
-      const elapsed = Date.now() - this.seekAt;
-      const settled = delta <= 1.2 || elapsed > 1800;
-      if (!settled) {
-        return false;
-      }
-      this.seekTarget = -1;
-      this.seeking = false;
+    if (this.seeking || this.seekTarget >= 0) {
+      return false;
     }
     this.currentTime = time;
     return true;
@@ -108,11 +109,17 @@ export class PlayerPlaybackState {
     this.stalled = false;
     this.seeking = false;
     this.seekTarget = -1;
+    this.seekAt = 0;
+    this.seekSeq = 0;
   }
 
   public failOpen(url: string): void {
     this.opening = false;
     this.playRequested = false;
+    this.seeking = false;
+    this.seekTarget = -1;
+    this.seekAt = 0;
+    this.seekSeq = 0;
     this.errorText = this.formatError(false, url);
   }
 
@@ -121,11 +128,22 @@ export class PlayerPlaybackState {
       return;
     }
     const next = Math.min(this.duration, Math.max(0, time));
-    this.seeking = true;
+    if (this.seeking && Math.abs(next - this.seekTarget) < PlayerPlaybackState.SEEK_DEBOUNCE_DELTA_SEC) {
+      return;
+    }
+    const seq = playerAv.seek(next);
     this.currentTime = next;
+    if (seq <= 0) {
+      this.seeking = false;
+      this.seekTarget = -1;
+      this.seekAt = 0;
+      this.seekSeq = 0;
+      return;
+    }
+    this.seekSeq = seq;
+    this.seeking = true;
     this.seekTarget = next;
     this.seekAt = Date.now();
-    playerAv.seek(next);
     if (this.playRequested) {
       playerAv.play();
     }

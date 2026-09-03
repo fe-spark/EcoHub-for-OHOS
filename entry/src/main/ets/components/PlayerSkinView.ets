@@ -8,6 +8,7 @@ export interface PlayerSkinEvents {
   onPrev: () => void;
   onNext: () => void;
   onSpeed: () => void;
+  onScale: () => void;
   onRetry: () => void;
   onErrorDetail: () => void;
   onSeekBack: () => void;
@@ -41,6 +42,7 @@ export struct PlayerSkinView {
   @Prop duration: number = 0;
   @Prop muted: boolean = false;
   @Prop speedLabel: string = '1.0x';
+  @Prop scaleLabel: string = '适应';
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -71,6 +73,7 @@ export struct PlayerSkinView {
       duration: this.duration,
       muted: this.muted,
       speedLabel: this.speedLabel,
+      scaleLabel: this.scaleLabel,
       hasPrev: this.hasPrev,
       hasNext: this.hasNext,
       longPressing: this.longPressing,
@@ -88,6 +91,7 @@ export struct PlayerSkinView {
       onPrev: () => { if (this.events) this.events.onPrev(); },
       onNext: () => { if (this.events) this.events.onNext(); },
       onSpeed: () => { if (this.events) this.events.onSpeed(); },
+      onScale: () => { if (this.events) this.events.onScale(); },
       onRetry: () => { if (this.events) this.events.onRetry(); },
       onErrorDetail: () => { if (this.events) this.events.onErrorDetail(); },
       onSeekBack: () => { if (this.events) this.events.onSeekBack(); },

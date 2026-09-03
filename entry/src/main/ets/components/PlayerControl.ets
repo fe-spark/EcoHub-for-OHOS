@@ -2,6 +2,7 @@ import { BackIcon } from './BackIcon';
 
 @Component
 export struct PlayerIconBtn {
+  private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop src: Resource = $r('sys.symbol.play_fill');
   @Prop iconSize: number = 18;
   @Prop boxSize: number = 36;
@@ -9,16 +10,17 @@ export struct PlayerIconBtn {
   @Prop prominent: boolean = false;
   @Prop canTap: boolean = true;
   onTap?: () => void;
-  private armed: boolean = true;
+  private lastTapAt: number = 0;
 
   private handleTap(): void {
-    if (!this.canTap || !this.armed) {
+    if (!this.canTap) {
       return;
     }
-    this.armed = false;
-    setTimeout(() => {
-      this.armed = true;
-    }, 120);
+    const now = Date.now();
+    if (now - this.lastTapAt < PlayerIconBtn.TAP_DEBOUNCE_MS) {
+      return;
+    }
+    this.lastTapAt = now;
     if (this.onTap) {
       this.onTap();
     }
@@ -59,20 +61,22 @@ export struct PlayerIconBtn {
 
 @Component
 export struct PlayerLabelBtn {
+  private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop src: Resource = $r('sys.symbol.play_fill');
   @Prop label: string = '';
   @Prop canTap: boolean = true;
   onTap?: () => void;
-  private armed: boolean = true;
+  private lastTapAt: number = 0;
 
   private handleTap(): void {
-    if (!this.canTap || !this.armed) {
+    if (!this.canTap) {
       return;
     }
-    this.armed = false;
-    setTimeout(() => {
-      this.armed = true;
-    }, 120);
+    const now = Date.now();
+    if (now - this.lastTapAt < PlayerLabelBtn.TAP_DEBOUNCE_MS) {
+      return;
+    }
+    this.lastTapAt = now;
     if (this.onTap) {
       this.onTap();
     }
@@ -105,19 +109,18 @@ export struct PlayerLabelBtn {
 
 @Component
 export struct PlayerTextBtn {
+  private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop label: string = '';
   @Prop boxSize: number = 52;
   onTap?: () => void;
-  private armed: boolean = true;
+  private lastTapAt: number = 0;
 
   private handleTap(): void {
-    if (!this.armed) {
+    const now = Date.now();
+    if (now - this.lastTapAt < PlayerTextBtn.TAP_DEBOUNCE_MS) {
       return;
     }
-    this.armed = false;
-    setTimeout(() => {
-      this.armed = true;
-    }, 120);
+    this.lastTapAt = now;
     if (this.onTap) {
       this.onTap();
     }
@@ -147,19 +150,21 @@ export struct PlayerTextBtn {
 
 @Component
 export struct PlayerChip {
+  private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop label: string = '';
   @Prop canTap: boolean = true;
   onTap?: () => void;
-  private armed: boolean = true;
+  private lastTapAt: number = 0;
 
   private handleTap(): void {
-    if (!this.canTap || !this.armed) {
+    if (!this.canTap) {
       return;
     }
-    this.armed = false;
-    setTimeout(() => {
-      this.armed = true;
-    }, 120);
+    const now = Date.now();
+    if (now - this.lastTapAt < PlayerChip.TAP_DEBOUNCE_MS) {
+      return;
+    }
+    this.lastTapAt = now;
     if (this.onTap) {
       this.onTap();
     }
@@ -182,17 +187,16 @@ export struct PlayerChip {
 
 @Component
 export struct PlayerBackBtn {
+  private static readonly TAP_DEBOUNCE_MS: number = 120;
   onTap?: () => void;
-  private armed: boolean = true;
+  private lastTapAt: number = 0;
 
   private handleTap(): void {
-    if (!this.armed) {
+    const now = Date.now();
+    if (now - this.lastTapAt < PlayerBackBtn.TAP_DEBOUNCE_MS) {
       return;
     }
-    this.armed = false;
-    setTimeout(() => {
-      this.armed = true;
-    }, 120);
+    this.lastTapAt = now;
     if (this.onTap) {
       this.onTap();
     }
