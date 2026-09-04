@@ -31,6 +31,8 @@ struct Index {
   @State private tabReady: boolean[] = [true, false, false];
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  @State private leftInset: number = 0;
+  @State private rightInset: number = 0;
   private reconnectCb: () => void = () => {};
   private configCb: (config: BasicConfig) => void = () => {};
 
@@ -62,9 +64,11 @@ struct Index {
   }
 
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     });
   }
 
@@ -259,7 +263,7 @@ struct Index {
           .width('100%')
           .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
-          .padding({ left: 24, right: 24, top: 24, bottom: this.bottomInset + 24 })
+          .padding({ left: 24 + this.leftInset, right: 24 + this.rightInset, top: 24, bottom: this.bottomInset + 24 })
         } else {
           Stack() {
             if (this.tabReady[0]) {
@@ -282,6 +286,7 @@ struct Index {
           }
           .width('100%')
           .layoutWeight(1)
+          .padding({ left: this.leftInset, right: this.rightInset })
 
           Column() {
             Row() {
@@ -291,8 +296,11 @@ struct Index {
             }
             .width('100%')
             .height(AppTheme.TAB_HEIGHT)
+            .padding({ left: this.leftInset, right: this.rightInset })
+            .constraintSize({ maxWidth: 600 })
           }
           .width('100%')
+          .alignItems(HorizontalAlign.Center)
           .padding({ bottom: this.bottomInset })
           .backgroundColor(AppTheme.BG_ELEVATED)
           .border({ width: { top: 0.5 }, color: 'rgba(255,255,255,0.06)' })

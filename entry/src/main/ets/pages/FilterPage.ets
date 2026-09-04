@@ -14,8 +14,7 @@ import { FilmCard } from '../components/FilmCard';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
 import { RefreshHint } from '../common/utils/RefreshHint';
-
-const GRID_COLS = 3;
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry
 @Component
@@ -41,16 +40,24 @@ struct FilterPage {
   @State private selectedValues: string[] = [];
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  @State private leftInset: number = 0;
+  @State private rightInset: number = 0;
   @State private fetchLock: boolean = false;
   @State private listHeight: number = 0;
   @State private showTopFab: boolean = false;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
   private reconnectCb: () => void = () => {};
   private scroller: Scroller = new Scroller();
 
+  private gridCols(): number { return Breakpoint.gridCols(this.widthBp, this.windowWidth); }
+
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     });
   }
 
@@ -61,26 +68,15 @@ struct FilterPage {
     HttpClient.getInstance().trackView('classify', this.pid, 'FilterPage');
     const category = NavUtil.param(params, 'Category');
     const sort = NavUtil.param(params, 'Sort');
-    if (category) {
-      this.setSelected('Category', category);
-    }
-    if (sort) {
-      this.setSelected('Sort', sort);
-    }
+    if (category) this.setSelected('Category', category);
+    if (sort) this.setSelected('Sort', sort);
     this.loadData(true, false);
-    this.reconnectCb = () => {
-      this.loadData(true, false);
-    };
+    this.reconnectCb = () => { this.loadData(true, false); };
     SourceGuard.onReconnect(this.reconnectCb);
   }
 
-  onPageShow(): void {
-    this.applyWindowBar();
-  }
-
-  aboutToDisappear(): void {
-    SourceGuard.offReconnect(this.reconnectCb);
-  }
+  onPageShow(): void { this.applyWindowBar(); }
+  aboutToDisappear(): void { SourceGuard.offReconnect(this.reconnectCb); }
 
   private selectedOf(key: string): string {
     const index = this.selectedKeys.indexOf(key);
@@ -89,9 +85,7 @@ struct FilterPage {
 
   private isChipOn(key: string, value: string): boolean {
     let current = this.selectedOf(key);
-    if (key === 'Sort' && !current) {
-      current = 'update_stamp';
-    }
+    if (key === 'Sort' && !current) current = 'update_stamp';
     return current === value;
   }
 
@@ -165,11 +159,8 @@ struct FilterPage {
   }
 
   private selectedFor(key: string): string {
-    let value = this.selectedOf(key);
-    if (key === 'Sort' && !value) {
-      return 'update_stamp';
-    }
-    return value;
+    const value = this.selectedOf(key);
+    return (key === 'Sort' && !value) ? 'update_stamp' : value;
   }
 
   private async loadData(reset: boolean, fromPull: boolean = false): Promise<void> {
@@ -181,10 +172,7 @@ struct FilterPage {
       return;
     }
     const page = reset ? 1 : this.current + 1;
-    if (!reset && (this.loadingMore || page > this.pageCount)) {
-      return;
-    }
-    if (this.fetchLock) {
+    if ((!reset && (this.loadingMore || page > this.pageCount)) || this.fetchLock) {
       return;
     }
     this.fetchLock = true;
@@ -263,12 +251,7 @@ struct FilterPage {
   }
 
   private rowIds(): number[] {
-    const n = Math.ceil(this.films.length / GRID_COLS);
-    const ids: number[] = [];
-    for (let i = 0; i < n; i++) {
-      ids.push(i);
-    }
-    return ids;
+    return Breakpoint.rowIds(this.films.length, this.gridCols());
   }
 
   private scrollToTop(): void {
@@ -299,9 +282,9 @@ struct FilterPage {
   @Builder
   filmRow(row: number) {
     Row({ space: AppTheme.SPACE_SM }) {
-      this.filmCell(row * GRID_COLS)
-      this.filmCell(row * GRID_COLS + 1)
-      this.filmCell(row * GRID_COLS + 2)
+      ForEach(Breakpoint.colIds(this.gridCols()), (col: number) => {
+        this.filmCell(row * this.gridCols() + col)
+      }, (col: number) => `film_col_${this.gridCols()}_${row}_${col}`)
     }
     .width('100%')
     .alignItems(VerticalAlign.Top)
@@ -438,7 +421,7 @@ struct FilterPage {
                     ListItem() {
                       this.filmRow(row)
                     }
-                  }, (row: number) => `film_row_${row}_${this.films[row * GRID_COLS].id}`)
+                  }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
                 }
 
                 ListItem() {
@@ -486,7 +469,12 @@ struct FilterPage {
       }
       .width('100%')
       .height('100%')
-      .padding({ top: this.topInset, bottom: this.bottomInset })
+      .padding({
+        top: this.topInset,
+        bottom: this.bottomInset,
+        left: this.leftInset,
+        right: this.rightInset
+      })
       .backgroundColor(AppTheme.BG)
 
       if (!this.loading) {
@@ -494,6 +482,7 @@ struct FilterPage {
           visible: this.showTopFab,
           src: $r('sys.symbol.arrow_up'),
           bottom: this.bottomInset + AppTheme.SPACE_LG,
+          right: this.rightInset + AppTheme.SPACE_LG,
           onClickFab: () => {
             this.scrollToTop();
           }

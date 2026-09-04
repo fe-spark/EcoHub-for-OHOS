@@ -11,21 +11,9 @@ import { VersionUpdateDialog } from '../components/VersionUpdateDialog';
 @Component
 export struct ProfileTab {
   @State private config: BasicConfig = {
-    siteName: 'EcoHub',
-    siteUrl: '',
-    logo: '',
-    keyword: '',
-    describe: '',
-    state: true,
-    hint: '',
-    tipEnabled: false,
-    tipTitle: '赞赏支持',
-    tipMessage: '',
-    tipChannels: [],
-    noticeEnabled: false,
-    noticeTitle: '站点公告',
-    noticeContent: '',
-    noticeVersion: '1'
+    siteName: 'EcoHub', siteUrl: '', logo: '', keyword: '', describe: '', state: true, hint: '',
+    tipEnabled: false, tipTitle: '赞赏支持', tipMessage: '', tipChannels: [],
+    noticeEnabled: false, noticeTitle: '站点公告', noticeContent: '', noticeVersion: '1'
   };
   @State private sourceUrl: string = '';
   @State private appVersion: string = '1.0.0';
@@ -36,13 +24,8 @@ export struct ProfileTab {
   @State private logoLoadFailed: boolean = false;
   @StorageLink('HAS_APP_UPDATE') private hasAppUpdate: boolean = false;
   @StorageLink('APP_UPDATE_INFO') private updateInfo: AppUpdateInfo = {
-    currentVersion: '',
-    latestVersion: '',
-    hasUpdate: false,
-    releaseName: '',
-    releaseNotes: '',
-    releaseUrl: '',
-    downloadUrl: ''
+    currentVersion: '', latestVersion: '', hasUpdate: false,
+    releaseName: '', releaseNotes: '', releaseUrl: '', downloadUrl: ''
   };
   private configCb: (config: BasicConfig) => void = () => {};
   private reconnectCb: () => void = () => {};
@@ -129,23 +112,46 @@ export struct ProfileTab {
   }
 
   private sourceHost(): string {
-    if (!this.sourceUrl) {
-      return '未配置';
-    }
-    let host = ServerConfigManager.stripApiSuffix(
-      ServerConfigManager.getInstance().normalizeRaw(this.sourceUrl)
-    );
-    if (host.indexOf('https://') === 0) {
-      host = host.substring(8);
-    } else if (host.indexOf('http://') === 0) {
-      host = host.substring(7);
-    }
+    if (!this.sourceUrl) return '未配置';
+    let host = ServerConfigManager.stripApiSuffix(ServerConfigManager.getInstance().normalizeRaw(this.sourceUrl));
+    if (host.indexOf('https://') === 0) host = host.substring(8);
+    else if (host.indexOf('http://') === 0) host = host.substring(7);
     return host || '未配置';
   }
 
   private logoLetter(): string {
     const name = this.config.siteName ? this.config.siteName : 'E';
     return name.substring(0, 1);
+  }
+
+  @Builder
+  sourceActionChip(icon: Resource, title: string, onClickChip: () => void) {
+    Row() {
+      Row() {
+        AppIcon({ src: icon, iconSize: 15, color: AppTheme.ACCENT })
+      }
+      .width(28)
+      .height(28)
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor(AppTheme.ACCENT_SOFT)
+      .borderRadius(14)
+
+      Text(title)
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppTheme.TEXT_PRIMARY)
+        .margin({ left: 8 })
+    }
+    .layoutWeight(1)
+    .height(44)
+    .padding({ left: 12, right: 12 })
+    .backgroundColor(AppTheme.BG_CARD)
+    .borderRadius(AppTheme.RADIUS_MD)
+    .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.06)' })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      onClickChip();
+    })
   }
 
   @Builder
@@ -224,121 +230,143 @@ export struct ProfileTab {
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      Column() {
-        Row() {
-          AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 20, color: AppTheme.ACCENT })
-          Text('我的')
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .margin({ left: AppTheme.SPACE_SM })
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
+      Scroll() {
+        Column() {
+          Row() {
+            AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 20, color: AppTheme.ACCENT })
+            Text('我的')
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .margin({ left: AppTheme.SPACE_SM })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
 
-        Row() {
-          Stack({ alignContent: Alignment.Center }) {
-            if (this.isConfigLoading) {
-              LoadingProgress()
-                .width(22)
-                .height(22)
-                .color(AppTheme.ACCENT)
-            } else if (this.config.logo && this.config.logo.trim() && !this.logoLoadFailed) {
-              Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo.trim()))
-                .width(56)
-                .height(56)
-                .objectFit(ImageFit.Cover)
-                .borderRadius(AppTheme.RADIUS_LG)
-                .clip(true)
-                .backgroundColor(AppTheme.BG_CARD)
-                .onComplete(() => {
-                  this.isLogoLoading = false;
-                })
-                .onError(() => {
-                  this.isLogoLoading = false;
-                  this.logoLoadFailed = true;
-                })
-
-              if (this.isLogoLoading) {
+        Column() {
+          Row() {
+            Stack({ alignContent: Alignment.Center }) {
+              if (this.isConfigLoading) {
                 LoadingProgress()
                   .width(22)
                   .height(22)
                   .color(AppTheme.ACCENT)
+              } else if (this.config.logo && this.config.logo.trim() && !this.logoLoadFailed) {
+                Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo.trim()))
+                  .width(56)
+                  .height(56)
+                  .objectFit(ImageFit.Cover)
+                  .borderRadius(AppTheme.RADIUS_LG)
+                  .clip(true)
+                  .backgroundColor(AppTheme.BG_CARD)
+                  .onComplete(() => {
+                    this.isLogoLoading = false;
+                  })
+                  .onError(() => {
+                    this.isLogoLoading = false;
+                    this.logoLoadFailed = true;
+                  })
+
+                if (this.isLogoLoading) {
+                  LoadingProgress()
+                    .width(22)
+                    .height(22)
+                    .color(AppTheme.ACCENT)
+                }
+              } else {
+                Image($r('app.media.startIcon'))
+                  .width(56)
+                  .height(56)
+                  .objectFit(ImageFit.Cover)
+                  .borderRadius(AppTheme.RADIUS_LG)
+                  .clip(true)
+                  .backgroundColor(AppTheme.BG_CARD)
               }
-            } else {
-              Image($r('app.media.startIcon'))
-                .width(56)
-                .height(56)
-                .objectFit(ImageFit.Cover)
-                .borderRadius(AppTheme.RADIUS_LG)
-                .clip(true)
-                .backgroundColor(AppTheme.BG_CARD)
             }
-          }
-          .width(56)
-          .height(56)
-          .borderRadius(AppTheme.RADIUS_LG)
-          .clip(true)
-          .backgroundColor(AppTheme.BG_CARD)
+            .width(56)
+            .height(56)
+            .borderRadius(AppTheme.RADIUS_LG)
+            .clip(true)
+            .backgroundColor(AppTheme.BG_CARD)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.1)' })
 
-          Column() {
-            Text(this.config.siteName)
-              .width('100%')
-              .fontSize(18)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text('当前软件源')
-              .width('100%')
-              .fontSize(12)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-              .margin({ top: AppTheme.SPACE_XS })
-            Text(this.sourceHost())
-              .width('100%')
-              .fontSize(13)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .margin({ top: AppTheme.SPACE_XS })
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-          .constraintSize({ minWidth: 0 })
-          .margin({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_SM })
+            Column() {
+              Text(this.config.siteName || 'EcoHub')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.TEXT_PRIMARY)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          AppIcon({
-            src: $r('sys.symbol.chevron_right'),
-            iconSize: 16,
-            color: AppTheme.TEXT_SECONDARY
+              Row() {
+                Text('软件源')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(AppTheme.ACCENT)
+                Text(this.sourceHost())
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_SECONDARY)
+                  .margin({ left: 6 })
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              .padding({ left: 8, right: 10, top: 4, bottom: 4 })
+              .backgroundColor('rgba(255, 255, 255, 0.05)')
+              .borderRadius(AppTheme.RADIUS_SM)
+              .margin({ top: 6 })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            .constraintSize({ minWidth: 0 })
+            .margin({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_SM })
+
+            Row() {
+              AppIcon({
+                src: $r('sys.symbol.chevron_right'),
+                iconSize: 14,
+                color: AppTheme.TEXT_MUTED
+              })
+            }
+            .width(28)
+            .height(28)
+            .borderRadius(14)
+            .backgroundColor('rgba(255, 255, 255, 0.04)')
+            .justifyContent(FlexAlign.Center)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            try {
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
+            } catch (_e) {
+            }
           })
+
+          Divider()
+            .color('rgba(255, 255, 255, 0.08)')
+            .margin({ top: 12, bottom: 12 })
+
+          Row({ space: AppTheme.SPACE_SM }) {
+            this.sourceActionChip($r('sys.symbol.star_fill'), '我的收藏', () => {
+              NavUtil.openFavorite(this.getUIContext());
+            })
+
+            this.sourceActionChip($r('sys.symbol.clock_fill'), '观看历史', () => {
+              NavUtil.openHistory(this.getUIContext());
+            })
+          }
+          .width('100%')
         }
         .width('100%')
         .padding(AppTheme.SPACE_LG)
-        .alignItems(VerticalAlign.Center)
         .clip(true)
-        .linearGradient({
-          angle: 135,
-          colors: [['rgba(250, 140, 22, 0.28)', 0], [AppTheme.BG_CARD, 1]]
-        })
+        .backgroundColor(AppTheme.BG_ELEVATED)
         .borderRadius(AppTheme.RADIUS_LG)
+        .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.08)' })
         .margin({ bottom: AppTheme.SPACE_LG })
-        .onClick(() => {
-          try {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
-          } catch (_e) {
-          }
-        })
 
         Column() {
-          Column() {
-            this.menuRow($r('sys.symbol.clock_fill'), '观看历史')
-          }
-          .onClick(() => {
-            NavUtil.openHistory(this.getUIContext());
-          })
-          this.menuLine()
           Column() {
             this.menuRow($r('sys.symbol.play_circle_fill'), '自定义播放')
           }
@@ -418,10 +446,16 @@ export struct ProfileTab {
         .clip(true)
       }
       .width('100%')
-      .height('100%')
-      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+      .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
+      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_LG })
       .alignItems(HorizontalAlign.Start)
-      .backgroundColor(AppTheme.BG)
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
+    .align(Alignment.Top)
+    .backgroundColor(AppTheme.BG)
 
       if (this.showUpdateDialog) {
         VersionUpdateDialog({

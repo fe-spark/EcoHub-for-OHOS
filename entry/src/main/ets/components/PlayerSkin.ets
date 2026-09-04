@@ -31,6 +31,7 @@ export struct PlayerSkin {
   @Prop leftInset: number = 0;
   @Prop rightInset: number = 0;
   @Prop bottomInset: number = 0;
+  @Prop edgeHud: boolean = false;
   @Prop ready: boolean = false;
   @Prop stalled: boolean = false;
   onBack?: () => void;
@@ -91,8 +92,12 @@ export struct PlayerSkin {
     return this.showHud && this.ready && !this.errorText;
   }
 
+  private cinemaHud(): boolean {
+    return this.isFull || this.edgeHud;
+  }
+
   private showTopFull(): boolean {
-    return this.isFull && this.showHud && !this.errorText;
+    return this.isFull && (this.showHud || !!this.errorText);
   }
 
   private timeText(): string {
@@ -101,6 +106,12 @@ export struct PlayerSkin {
 
   private edge(base: number, inset: number): number {
     return Math.max(base, inset);
+  }
+
+  private handleCast(): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '正在开发中' });
+    } catch (_e) {}
   }
 
   private progressPercent(): number {
@@ -150,6 +161,7 @@ export struct PlayerSkin {
     if (this.showTopFull()) {
       Row() {
         PlayerBackBtn({ onTap: this.onBack })
+          .zIndex(999)
         Text(this.title)
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
@@ -206,7 +218,7 @@ export struct PlayerSkin {
   @Builder
   bottomBar() {
     if (this.showBottom()) {
-      if (this.isFull) {
+      if (this.cinemaHud()) {
         Column({ space: 2 }) {
           this.sliderBar()
           Row() {
@@ -226,7 +238,8 @@ export struct PlayerSkin {
               onTap: this.onMute
             })
             PlayerIconBtn({
-              src: $r('sys.symbol.arrow_down_right_and_arrow_up_left'),
+              src: this.isFull ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') :
+                $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
               iconSize: 18,
               boxSize: 44,
               onTap: this.onFull
@@ -333,7 +346,7 @@ export struct PlayerSkin {
   }
 
   build() {
-    Stack() {
+    Stack({ alignContent: Alignment.TopStart }) {
       PlayerGestureLayer({
         onPlay: this.onPlay,
         onToggleHud: this.onToggleHud,
@@ -355,26 +368,6 @@ export struct PlayerSkin {
           .hitTestBehavior(HitTestMode.None)
       }
 
-      Column() {
-        this.topBar()
-        Column() {
-          this.centerGroup()
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .hitTestBehavior(HitTestMode.Transparent)
-        this.bottomBar()
-      }
-      .width('100%')
-      .height('100%')
-      .hitTestBehavior(HitTestMode.Transparent)
-
-      if (!this.isFull && this.showBack) {
-        PlayerBackBtn({ onTap: this.onBack })
-          .position({ x: 4, y: 4 })
-      }
-
       if (this.errorText) {
         PlayerErrorPad({
           onRetry: () => {
@@ -388,6 +381,50 @@ export struct PlayerSkin {
             }
           }
         })
+      }
+
+      Column() {
+        this.centerGroup()
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .hitTestBehavior(HitTestMode.Transparent)
+      .zIndex(10)
+
+      Column() {
+        this.topBar()
+        Blank().hitTestBehavior(HitTestMode.None)
+        this.bottomBar()
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+      .hitTestBehavior(HitTestMode.Transparent)
+      .zIndex(11)
+
+      if (!this.isFull) {
+        Row() {
+          if (this.showBack) {
+            PlayerBackBtn({ onTap: this.onBack })
+          }
+          Blank().hitTestBehavior(HitTestMode.None)
+          PlayerIconBtn({
+            src: $r('sys.symbol.wireless_projection'),
+            iconSize: 20,
+            boxSize: 40,
+            onTap: () => this.handleCast()
+          })
+        }
+        .width('100%')
+        .padding({
+          left: this.edge(4, this.leftInset),
+          right: this.edge(4, this.rightInset),
+          top: this.edge(4, this.topInset)
+        })
+        .hitTestBehavior(HitTestMode.Transparent)
+        .zIndex(999)
       }
     }
     .width('100%')

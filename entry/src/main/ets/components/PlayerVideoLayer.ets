@@ -44,9 +44,9 @@ export struct PlayerVideoLayer {
     const hasLayer = W > 0 && H > 0;
     const hasVideo = this.videoWidth > 0 && this.videoHeight > 0;
     const isPortrait = this.isPortraitMode(hasVideo, hasLayer, W, H);
-    const fallbackRatio = isPortrait ? PlayerScale.RATIO_9_16 : PlayerScale.RATIO_16_9;
-    const videoRatio = hasVideo ? (this.videoWidth / this.videoHeight) : fallbackRatio;
-    const containerRatio = hasLayer ? (W / H) : fallbackRatio;
+    const fallbackRatio: number = isPortrait ? PlayerScale.RATIO_9_16 : PlayerScale.RATIO_16_9;
+    const videoRatio: number = hasVideo ? (this.videoWidth / this.videoHeight) : fallbackRatio;
+    const containerRatio: number = hasLayer ? (W / H) : fallbackRatio;
     return { W, H, hasLayer, isPortrait, videoRatio, containerRatio };
   }
 
@@ -54,12 +54,6 @@ export struct PlayerVideoLayer {
     const d = this.getDimensions();
     if (!d.hasLayer) {
       return PlayerVideoLayer.FULL_PERCENT;
-    }
-    if (this.scaleMode === PlayerScaleMode.COVER) {
-      if (d.videoRatio >= d.containerRatio) {
-        return d.H * d.videoRatio;
-      }
-      return d.W;
     }
     if (d.videoRatio >= d.containerRatio) {
       return d.W;
@@ -72,12 +66,6 @@ export struct PlayerVideoLayer {
     if (!d.hasLayer) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    if (this.scaleMode === PlayerScaleMode.COVER) {
-      if (d.videoRatio >= d.containerRatio) {
-        return d.H;
-      }
-      return d.W / d.videoRatio;
-    }
     if (d.videoRatio >= d.containerRatio) {
       return d.W / d.videoRatio;
     }
@@ -86,40 +74,46 @@ export struct PlayerVideoLayer {
 
   private calcScaleX(): number {
     const d = this.getDimensions();
-    if (!d.hasLayer || this.scaleMode === PlayerScaleMode.FIT || this.scaleMode === PlayerScaleMode.COVER) {
+    if (!d.hasLayer || this.scaleMode === PlayerScaleMode.FIT) {
       return 1;
     }
     const baseW = d.videoRatio >= d.containerRatio ? d.W : d.H * d.videoRatio;
     if (baseW <= 0) {
       return 1;
     }
+    if (this.scaleMode === PlayerScaleMode.COVER) {
+      const baseH = d.videoRatio >= d.containerRatio ? d.W / d.videoRatio : d.H;
+      if (baseH <= 0) {
+        return 1;
+      }
+      return d.videoRatio >= d.containerRatio ? (d.H / baseH) : (d.W / baseW);
+    }
     if (this.scaleMode === PlayerScaleMode.STRETCH) {
       return d.W / baseW;
     }
-    const targetRatio = (this.scaleMode === PlayerScaleMode.RATIO_16_9)
-      ? (d.isPortrait ? PlayerScale.RATIO_9_16 : PlayerScale.RATIO_16_9)
-      : (d.isPortrait ? PlayerScale.RATIO_3_4 : PlayerScale.RATIO_4_3);
-    const targetW = targetRatio >= d.containerRatio ? d.W : d.H * targetRatio;
-    return targetW / baseW;
+    return 1;
   }
 
   private calcScaleY(): number {
     const d = this.getDimensions();
-    if (!d.hasLayer || this.scaleMode === PlayerScaleMode.FIT || this.scaleMode === PlayerScaleMode.COVER) {
+    if (!d.hasLayer || this.scaleMode === PlayerScaleMode.FIT) {
       return 1;
     }
     const baseH = d.videoRatio >= d.containerRatio ? d.W / d.videoRatio : d.H;
     if (baseH <= 0) {
       return 1;
     }
+    if (this.scaleMode === PlayerScaleMode.COVER) {
+      const baseW = d.videoRatio >= d.containerRatio ? d.W : d.H * d.videoRatio;
+      if (baseW <= 0) {
+        return 1;
+      }
+      return d.videoRatio >= d.containerRatio ? (d.H / baseH) : (d.W / baseW);
+    }
     if (this.scaleMode === PlayerScaleMode.STRETCH) {
       return d.H / baseH;
     }
-    const targetRatio = (this.scaleMode === PlayerScaleMode.RATIO_16_9)
-      ? (d.isPortrait ? PlayerScale.RATIO_9_16 : PlayerScale.RATIO_16_9)
-      : (d.isPortrait ? PlayerScale.RATIO_3_4 : PlayerScale.RATIO_4_3);
-    const targetH = targetRatio >= d.containerRatio ? d.W / targetRatio : d.H;
-    return targetH / baseH;
+    return 1;
   }
 
   build() {
@@ -135,6 +129,7 @@ export struct PlayerVideoLayer {
           x: this.calcScaleX(),
           y: this.calcScaleY()
         })
+        .animation({ duration: 200, curve: Curve.EaseOut })
         .hitTestBehavior(HitTestMode.None)
         .onLoad(() => {
           try {

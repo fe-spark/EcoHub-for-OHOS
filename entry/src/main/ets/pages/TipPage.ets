@@ -80,12 +80,16 @@ struct TipPage {
   @State private loading: boolean = true;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  @State private leftInset: number = 0;
+  @State private rightInset: number = 0;
   private reconnectCb: () => void = () => {};
 
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     });
   }
 
@@ -163,13 +167,21 @@ struct TipPage {
             }
           }, (item: TipChannel) => item.key)
         }
+        .width('100%')
+        .constraintSize({ maxWidth: 640 })
         .layoutWeight(1)
         .scrollBar(BarState.Off)
       }
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.topInset, bottom: this.bottomInset })
+    .padding({
+      top: this.topInset,
+      bottom: this.bottomInset,
+      left: this.leftInset,
+      right: this.rightInset
+    })
+    .alignItems(HorizontalAlign.Center)
     .backgroundColor(AppTheme.BG)
   }
 }

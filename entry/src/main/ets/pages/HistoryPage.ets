@@ -12,6 +12,7 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { AppIcon } from '../components/AppIcon';
 import { RefreshHint } from '../common/utils/RefreshHint';
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry
 @Component
@@ -21,12 +22,17 @@ struct HistoryPage {
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  @State private leftInset: number = 0;
+  @State private rightInset: number = 0;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private sourceCb: () => void = () => {};
 
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     });
   }
 
@@ -222,8 +228,10 @@ struct HistoryPage {
             })
           }, (item: HistoryItem) => `${item.id}_${item.timeStamp}_${Math.floor(item.currentTime)}_${item.sourceId}_${item.episodeIndex}`)
         }
+        .lanes(Breakpoint.listLanes(this.widthBp), 12)
         .width('100%')
         .height('100%')
+        .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
         .padding({ left: 16, right: 16, bottom: 16 })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.None)
@@ -245,7 +253,12 @@ struct HistoryPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.topInset, bottom: this.bottomInset })
+    .padding({
+      top: this.topInset,
+      bottom: this.bottomInset,
+      left: this.leftInset,
+      right: this.rightInset
+    })
     .backgroundColor(AppTheme.BG)
   }
 }

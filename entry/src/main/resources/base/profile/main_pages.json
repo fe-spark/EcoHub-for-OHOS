@@ -7,6 +7,7 @@
     "pages/FilterPage",
     "pages/PlayPage",
     "pages/HistoryPage",
+    "pages/FavoritePage",
     "pages/CustomPlayerPage",
     "pages/TipPage"
   ]

@@ -1,17 +1,23 @@
 import { MovieBasicInfo } from '../model/FilmModels';
+import { Breakpoint } from '../common/utils/Breakpoint';
 import { FilmCard } from './FilmCard';
 
 @Component
 export struct FilmGrid {
   @Prop films: MovieBasicInfo[] = [];
-  @Prop columns: number = 3;
+  @Prop columns: number = 0;
   @Prop nestedRefresh: boolean = false;
   @Prop embedInScroll: boolean = false;
   onReachEnd?: () => void;
   onClickFilm?: (film: MovieBasicInfo) => void;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+
+  private resolvedCols(): number {
+    return this.columns > 0 ? this.columns : Breakpoint.gridCols(this.widthBp);
+  }
 
   private onIndexChange(_first: number, last: number): void {
-    if (this.onReachEnd && last >= this.films.length - 3) {
+    if (this.onReachEnd && last >= this.films.length - this.resolvedCols()) {
       this.onReachEnd();
     }
   }
@@ -30,7 +36,7 @@ export struct FilmGrid {
     Grid() {
       this.filmItems()
     }
-    .columnsTemplate(this.columns === 3 ? '1fr 1fr 1fr' : '1fr 1fr')
+    .columnsTemplate(Breakpoint.columnsTemplate(this.resolvedCols()))
     .columnsGap(8)
     .rowsGap(12)
     .width('100%')

@@ -24,6 +24,16 @@ export class NavUtil {
     return ctx ? ctx.getRouter() : undefined;
   }
 
+  static openFavorite(uiContext?: UIContext): void {
+    try {
+      const r = NavUtil.getRouter(uiContext);
+      if (r) {
+        r.pushUrl({ url: 'pages/FavoritePage' });
+      }
+    } catch (_e) {
+    }
+  }
+
   static openHistory(uiContext?: UIContext): void {
     try {
       const r = NavUtil.getRouter(uiContext);

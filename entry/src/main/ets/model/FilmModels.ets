@@ -201,3 +201,17 @@ export interface SearchResult {
   list: MovieBasicInfo[];
   page: PageInfo;
 }
+
+export interface FavoriteItem {
+  id: string;
+  name: string;
+  picture: string;
+  cName?: string;
+  remarks?: string;
+  year?: string;
+  area?: string;
+  subTitle?: string;
+  actor?: string;
+  director?: string;
+  createdAt: number;
+}
