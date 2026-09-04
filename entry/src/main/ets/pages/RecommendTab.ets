@@ -39,6 +39,14 @@ export struct RecommendTab {
   @State private reloadToken: number = 0;
   @State private headerAlpha: number = 0;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+  @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
+  @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
+  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
+
+  @State private pullDistance: number = 0;
+  @State private isPulling: boolean = false;
+  private touchStartY: number = 0;
+  private touchStartX: number = 0;
 
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
@@ -79,7 +87,12 @@ export struct RecommendTab {
     } finally {
       this.fetchLock = false;
       this.loading = false;
-      this.refreshing = false;
+      this.getUIContext()?.animateTo({ duration: 240, curve: Curve.EaseIn }, () => {
+        this.pullDistance = 0;
+      });
+      setTimeout(() => {
+        this.refreshing = false;
+      }, 240);
       if (showHint && ok) {
         RefreshHint.succeed();
       }
@@ -197,10 +210,11 @@ export struct RecommendTab {
       })
     }
     .width('100%')
-    .height(48)
+    .height(48 + this.topInset)
     .padding({
-      left: AppTheme.SPACE_LG,
-      right: AppTheme.SPACE_LG
+      top: this.topInset,
+      left: AppTheme.SPACE_LG + this.leftInset,
+      right: AppTheme.SPACE_LG + this.rightInset
     })
     .alignItems(VerticalAlign.Center)
     .backgroundColor(`rgba(10, 11, 16, ${this.headerAlpha})`)
@@ -210,6 +224,96 @@ export struct RecommendTab {
     })
   }
 
+  private handleTouch(event: TouchEvent): void {
+    if (this.refreshing || this.fetchLock) {
+      return;
+    }
+    if (event.type === TouchType.Down) {
+      this.touchStartY = event.touches[0].y;
+      this.touchStartX = event.touches[0].x;
+      this.isPulling = false;
+    } else if (event.type === TouchType.Move) {
+      let scrollY: number = 0;
+      try {
+        scrollY = this.scroller.currentOffset().yOffset;
+      } catch (_e) {
+        scrollY = 0;
+      }
+
+      const currentY = event.touches[0].y;
+      const currentX = event.touches[0].x;
+
+      if (scrollY > 0) {
+        this.touchStartY = currentY;
+        this.touchStartX = currentX;
+        if (this.isPulling) {
+          this.isPulling = false;
+          this.pullDistance = 0;
+        }
+        return;
+      }
+
+      const deltaY = currentY - this.touchStartY;
+      const deltaX = Math.abs(currentX - this.touchStartX);
+
+      if (scrollY <= 0 && deltaY > 0 && deltaY > deltaX) {
+        this.isPulling = true;
+        const damping = 0.42;
+        this.pullDistance = Math.min(68, deltaY * damping);
+      } else if (this.isPulling && deltaY <= 0) {
+        this.isPulling = false;
+        this.pullDistance = 0;
+      }
+    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      if (this.isPulling) {
+        this.isPulling = false;
+        if (this.pullDistance >= 46 && !this.fetchLock) {
+          this.refreshing = true;
+          this.getUIContext()?.animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+            this.pullDistance = 46;
+          });
+          this.loadHome(true, true);
+        } else {
+          this.getUIContext()?.animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+            this.pullDistance = 0;
+          });
+        }
+      }
+    }
+  }
+
+  @Builder
+  floatingRefreshIndicator() {
+    if (this.pullDistance > 0 || this.refreshing) {
+      Row() {
+        LoadingProgress()
+          .width(22)
+          .height(22)
+          .color(AppTheme.ACCENT)
+      }
+      .width(38)
+      .height(38)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(VerticalAlign.Center)
+      .backgroundColor('rgba(26, 28, 36, 0.75)')
+      .backdropBlur(25)
+      .borderRadius(19)
+      .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.12)' })
+      .shadow({ radius: 12, color: 'rgba(0, 0, 0, 0.38)', offsetY: 2 })
+      .position({
+        x: '50%',
+        y: this.topInset + 48 + this.pullDistance - 38
+      })
+      .markAnchor({ x: '50%', y: 0 })
+      .opacity(Math.max(0, Math.min(1.0, (this.pullDistance - 4) / 16)))
+      .scale({
+        x: Math.min(1.0, 0.5 + 0.5 * (this.pullDistance / 46)),
+        y: Math.min(1.0, 0.5 + 0.5 * (this.pullDistance / 46))
+      })
+      .hitTestBehavior(HitTestMode.Transparent)
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       // 1. 主页面滚动区
@@ -217,205 +321,193 @@ export struct RecommendTab {
         LoadingView({ label: '正在加载推荐' })
           .width('100%')
           .height('100%')
-      } else if (this.errorText) {
-        Refresh({ refreshing: $$this.refreshing }) {
-          Scroll() {
-            Column() {
-              Blank().height(80)
-              EmptyState({
-                title: '加载失败',
-                subtitle: this.errorText,
-                icon: $r('sys.symbol.info_circle'),
-                actionText: '重试',
-                onAction: () => {
-                  this.loadHome(true, true);
-                }
-              })
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Center)
-          }
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.None)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
+          .padding({
+            top: this.topInset,
+            left: this.leftInset,
+            right: this.rightInset
           })
-          .width('100%')
-          .height('100%')
-        }
-        .onRefreshing(() => {
-          if (this.fetchLock) {
-            this.refreshing = false;
-            return;
+      } else if (this.errorText) {
+        Scroll() {
+          Column() {
+            Blank().height(80 + this.topInset)
+            EmptyState({
+              title: '加载失败',
+              subtitle: this.errorText,
+              icon: $r('sys.symbol.info_circle'),
+              actionText: '重试',
+              onAction: () => {
+                this.loadHome(true, true);
+              }
+            })
           }
-          this.loadHome(true, true);
+          .width('100%')
+          .alignItems(HorizontalAlign.Center)
+          .padding({
+            left: this.leftInset,
+            right: this.rightInset
+          })
+        }
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
         })
-        .pullToRefresh(!this.fetchLock)
         .width('100%')
         .height('100%')
       } else if (this.banners.length === 0 && this.visibleSections().length === 0) {
-        Refresh({ refreshing: $$this.refreshing }) {
-          Scroll() {
-            Column() {
-              Blank().height(80)
-              EmptyState({
-                title: '暂无影片数据',
-                subtitle: '当前软件源内暂无影片或尚未采集，可下拉刷新或更换软件源',
-                icon: $r('sys.symbol.film')
-              })
-              Row({ space: 12 }) {
-                Button() {
-                  Row() {
-                    AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
-                    Text('刷新')
-                      .fontSize(13)
-                      .fontColor(AppTheme.TEXT_PRIMARY)
-                      .margin({ left: 4 })
-                  }
+        Scroll() {
+          Column() {
+            Blank().height(80 + this.topInset)
+            EmptyState({
+              title: '暂无影片数据',
+              subtitle: '当前软件源内暂无影片或尚未采集，可下拉刷新或更换软件源',
+              icon: $r('sys.symbol.film')
+            })
+            Row({ space: 12 }) {
+              Button() {
+                Row() {
+                  AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
+                  Text('刷新')
+                    .fontSize(13)
+                    .fontColor(AppTheme.TEXT_PRIMARY)
+                    .margin({ left: 4 })
                 }
-                .height(36)
-                .padding({ left: 16, right: 16 })
-                .backgroundColor(AppTheme.BG_CARD)
-                .borderRadius(AppTheme.RADIUS_PILL)
-                .onClick(() => {
-                  this.loadHome(true, true);
-                })
-
-                Button() {
-                  Row() {
-                    AppIcon({ src: $r('sys.symbol.link'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
-                    Text('更换软件源')
-                      .fontSize(13)
-                      .fontColor(AppTheme.TEXT_PRIMARY)
-                      .margin({ left: 4 })
-                  }
-                }
-                .height(36)
-                .padding({ left: 16, right: 16 })
-                .backgroundColor(AppTheme.ACCENT)
-                .borderRadius(AppTheme.RADIUS_PILL)
-                .onClick(() => {
-                  try {
-                    this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
-                  } catch (_e) {
-                  }
-                })
               }
-              .margin({ top: 16 })
+              .height(36)
+              .padding({ left: 16, right: 16 })
+              .backgroundColor(AppTheme.BG_CARD)
+              .borderRadius(AppTheme.RADIUS_PILL)
+              .onClick(() => {
+                this.loadHome(true, true);
+              })
+
+              Button() {
+                Row() {
+                  AppIcon({ src: $r('sys.symbol.link'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
+                  Text('更换软件源')
+                    .fontSize(13)
+                    .fontColor(AppTheme.TEXT_PRIMARY)
+                    .margin({ left: 4 })
+                }
+              }
+              .height(36)
+              .padding({ left: 16, right: 16 })
+              .backgroundColor(AppTheme.ACCENT)
+              .borderRadius(AppTheme.RADIUS_PILL)
+              .onClick(() => {
+                try {
+                  this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
+                } catch (_e) {
+                }
+              })
             }
-            .width('100%')
-            .alignItems(HorizontalAlign.Center)
+            .margin({ top: 16 })
           }
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.None)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
-          })
           .width('100%')
-          .height('100%')
+          .alignItems(HorizontalAlign.Center)
+          .padding({
+            left: this.leftInset,
+            right: this.rightInset
+          })
         }
-        .onRefreshing(() => {
-          if (this.fetchLock) {
-            this.refreshing = false;
-            return;
-          }
-          this.loadHome(true, true);
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
         })
-        .pullToRefresh(!this.fetchLock)
         .width('100%')
         .height('100%')
       } else {
-        Refresh({ refreshing: $$this.refreshing }) {
-          Scroll(this.scroller) {
-            Column() {
-              HomeBanner({
-                banners: this.banners,
-                reloadToken: this.reloadToken
-              })
+        Scroll(this.scroller) {
+          Column() {
+            HomeBanner({
+              banners: this.banners,
+              reloadToken: this.reloadToken
+            })
 
-              // 片库分类快捷导航胶囊
-              if (this.visibleSections().length > 0) {
-                Column() {
-                  Scroll() {
-                    Row({ space: AppTheme.SPACE_SM }) {
-                      ForEach(this.visibleSections(), (section: HomeSection) => {
-                        this.categoryEntry(section)
-                      }, (section: HomeSection) => `cat_${section.nav.id}_${this.reloadToken}`)
-                    }
-                    .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-                    .justifyContent(FlexAlign.Start)
+            // 片库分类快捷导航胶囊
+            if (this.visibleSections().length > 0) {
+              Column() {
+                Scroll() {
+                  Row({ space: AppTheme.SPACE_SM }) {
+                    ForEach(this.visibleSections(), (section: HomeSection) => {
+                      this.categoryEntry(section)
+                    }, (section: HomeSection) => `cat_${section.nav.id}_${this.reloadToken}`)
                   }
-                  .scrollable(ScrollDirection.Horizontal)
-                  .scrollBar(BarState.Off)
-                  .edgeEffect(EdgeEffect.Spring)
-                  .align(Alignment.Start)
-                  .width('100%')
-                  .nestedScroll({
-                    scrollForward: NestedScrollMode.SELF_FIRST,
-                    scrollBackward: NestedScrollMode.SELF_FIRST
+                  .padding({
+                    left: AppTheme.SPACE_LG + this.leftInset,
+                    right: AppTheme.SPACE_LG + this.rightInset
                   })
+                  .justifyContent(FlexAlign.Start)
                 }
+                .scrollable(ScrollDirection.Horizontal)
+                .scrollBar(BarState.Off)
+                .edgeEffect(EdgeEffect.Spring)
+                .align(Alignment.Start)
                 .width('100%')
-                .alignItems(HorizontalAlign.Start)
-                .margin({ bottom: AppTheme.SPACE_LG })
-              }
-
-              // 各分类影视横向推荐流（通栏无卡片沉浸背景带）
-              ForEach(this.visibleSections(), (section: HomeSection) => {
-                FilmRow({
-                  title: section.nav.name,
-                  films: section.movies.length > 0 ? section.movies : section.hot,
-                  pid: section.nav.id,
-                  onMore: () => {
-                    NavUtil.openFilter(section.nav.id);
-                  }
+                .nestedScroll({
+                  scrollForward: NestedScrollMode.SELF_FIRST,
+                  scrollBackward: NestedScrollMode.SELF_FIRST
                 })
-              }, (section: HomeSection) => `sec_${section.nav.id}_${this.reloadToken}`)
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Start)
+              .margin({ bottom: AppTheme.SPACE_LG })
             }
-            .width('100%')
-            .padding({ bottom: 0 })
+
+            // 各分类影视横向推荐流（通栏无卡片沉浸背景带）
+            ForEach(this.visibleSections(), (section: HomeSection) => {
+              FilmRow({
+                title: section.nav.name,
+                films: section.movies.length > 0 ? section.movies : section.hot,
+                pid: section.nav.id,
+                onMore: () => {
+                  NavUtil.openFilter(section.nav.id);
+                }
+              })
+            }, (section: HomeSection) => `sec_${section.nav.id}_${this.reloadToken}`)
           }
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.None)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
-          })
-          .onDidScroll((_x: number, _y: number, _state: ScrollState) => {
-            const y = this.scroller.currentOffset().yOffset;
-            if (y <= 0) {
-              if (this.headerAlpha !== 0) {
-                this.headerAlpha = 0;
-              }
-            } else {
-              const alpha = Math.min(1.0, y / 160.0);
-              if (Math.abs(this.headerAlpha - alpha) > 0.01 || alpha === 1.0 || alpha === 0.0) {
-                this.headerAlpha = alpha;
-              }
-            }
-          })
+          .width('100%')
+          .padding({ bottom: 0 })
         }
-        .onRefreshing(() => {
-          if (this.fetchLock) {
-            this.refreshing = false;
-            return;
-          }
-          this.loadHome(true, true);
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
         })
-        .pullToRefresh(!this.fetchLock)
+        .onDidScroll((_x: number, _y: number, _state: ScrollState) => {
+          const y = this.scroller.currentOffset().yOffset;
+          if (y <= 0) {
+            if (this.headerAlpha !== 0) {
+              this.headerAlpha = 0;
+            }
+          } else {
+            const alpha = Math.min(1.0, y / 160.0);
+            if (Math.abs(this.headerAlpha - alpha) > 0.01 || alpha === 1.0 || alpha === 0.0) {
+              this.headerAlpha = alpha;
+            }
+          }
+        })
         .width('100%')
         .height('100%')
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
       }
 
-      // 2. 连续 60fps 渐变 Header（位于顶层，背景随滚动深度无缝过渡 0.0 -> 1.0）
+      // 2. 状态栏安全区悬浮刷新指示器（位于内容之上，Header 之下）
+      this.floatingRefreshIndicator()
+
+      // 3. 连续 60fps 渐变 Header（位于顶层，背景随滚动深度无缝过渡 0.0 -> 1.0）
       this.headerRow()
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
+    .onTouch((event: TouchEvent) => {
+      this.handleTouch(event);
+    })
   }
 }
-
-

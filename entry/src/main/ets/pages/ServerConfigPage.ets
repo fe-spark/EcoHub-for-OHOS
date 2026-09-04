@@ -6,6 +6,7 @@ import { WindowBar } from '../common/utils/WindowBar';
 import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { common } from '@kit.AbilityKit';
+import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppIcon } from '../components/AppIcon';
 import { BackIcon } from '../components/BackIcon';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
@@ -22,8 +23,16 @@ struct ServerConfigPage {
   @State private rightInset: number = 0;
   @State private serverHistory: string[] = [];
   @State private showHistoryDialog: boolean = false;
+  @StorageLink('KEYBOARD_HEIGHT') private keyboardHeight: number = 0;
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
+  private scroller: Scroller = new Scroller();
   private inputController: TextInputController = new TextInputController();
   private lastBackPressTime: number = 0;
+
+  private isLandscape(): boolean {
+    return this.windowWidth > this.windowHeight;
+  }
 
   private applyWindowBar(): void {
     WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
@@ -36,6 +45,10 @@ struct ServerConfigPage {
 
   async aboutToAppear() {
     this.applyWindowBar();
+    try {
+      this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
+    } catch (_e) {
+    }
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.reconnect = NavUtil.param(params, 'mode') === 'reconnect';
     this.serverUrl = await ServerConfigManager.getInstance().getServerUrl();
@@ -44,10 +57,18 @@ struct ServerConfigPage {
 
   onPageShow(): void {
     this.applyWindowBar();
+    try {
+      this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
+    } catch (_e) {
+    }
   }
 
   aboutToDisappear(): void {
     SourceGuard.markClosed();
+    try {
+      this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.OFFSET);
+    } catch (_e) {
+    }
   }
 
   onBackPress(): boolean {
@@ -149,165 +170,312 @@ struct ServerConfigPage {
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // Main Scrollable Page Content
-      Scroll() {
-        Column() {
-          Blank().height(48)
-
-          Column() {
-            Image($r('app.media.startIcon'))
-              .width(72)
-              .height(72)
-              .borderRadius(AppTheme.RADIUS_LG)
-              .clip(true)
-
-            Text('EcoHub')
-              .fontSize(28)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .margin({ top: 16 })
-
-            Text(this.reconnect ? '软件源连接失败，请检查后重新接入' : '配置软件源后即可观影')
-              .fontSize(14)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-              .margin({ top: 8 })
-          }
-          .margin({ bottom: 28 })
-
-          Column() {
-            Row() {
-              Text('软件源地址')
-                .fontSize(13)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-
-              if (this.serverHistory.length > 0) {
-                Row() {
-                  AppIcon({
-                    src: $r('sys.symbol.clock_fill'),
-                    iconSize: 12,
-                    color: AppTheme.ACCENT
-                  })
-                  Text(`历史记录 (${this.serverHistory.length})`)
-                    .fontSize(12)
-                    .fontColor(AppTheme.ACCENT)
-                    .margin({ left: 4 })
+      // Main Page Column that pads away safe insets and the soft keyboard
+      Column() {
+        // Top header with back button if not in forced reconnect mode
+        Row() {
+          if (!this.reconnect) {
+            BackIcon({ color: AppTheme.TEXT_PRIMARY })
+              .onClick(() => {
+                try {
+                  this.getUIContext().getRouter().back();
+                } catch (_e) {
                 }
-                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                .backgroundColor(AppTheme.ACCENT_SOFT)
-                .borderRadius(AppTheme.RADIUS_SM)
-                .onClick(() => {
-                  try {
-                    this.inputController.stopEditing();
-                  } catch (_e) {
-                  }
-                  this.showHistoryDialog = true;
-                })
-              }
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.SpaceBetween)
-            .alignItems(VerticalAlign.Center)
-            .margin({ bottom: 8 })
-
-            // Input row
-            Row() {
-              TextInput({ text: this.serverUrl, placeholder: '请输入软件源地址', controller: this.inputController })
-                .layoutWeight(1)
-                .height(48)
-                .fontSize(14)
-                .fontColor(AppTheme.TEXT_PRIMARY)
-                .placeholderColor(AppTheme.TEXT_MUTED)
-                .caretColor(AppTheme.ACCENT)
-                .backgroundColor(Color.Transparent)
-                .padding({ left: 14, right: 8 })
-                .enterKeyType(EnterKeyType.Done)
-                .onChange((val: string) => {
-                  this.serverUrl = val;
-                })
-                .onSubmit(() => {
-                  this.saveAndConnect();
-                })
-
-              if (this.serverUrl.length > 0) {
-                Row() {
-                  AppIcon({
-                    src: $r('sys.symbol.xmark_circle_fill'),
-                    iconSize: 16,
-                    color: AppTheme.TEXT_MUTED
-                  })
-                }
-                .width(36)
-                .height(48)
-                .justifyContent(FlexAlign.Center)
-                .onClick(() => {
-                  this.serverUrl = '';
-                })
-              }
-            }
-            .width('100%')
-            .height(48)
-            .padding({ right: 4 })
-            .backgroundColor(AppTheme.BG_CARD)
-            .borderRadius(AppTheme.RADIUS_MD)
-
-            Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
-              .width('100%')
-              .height(48)
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .backgroundColor(AppTheme.ACCENT)
-              .borderRadius(AppTheme.RADIUS_MD)
-              .margin({ top: 24 })
-              .enabled(!this.isLoading)
-              .onClick(() => this.saveAndConnect())
-              .alignSelf(ItemAlign.Stretch)
-
-            Text('接口形如 https://your-host/api，配置后所有请求均走该源。')
-              .fontSize(12)
-              .fontColor(AppTheme.TEXT_MUTED)
-              .margin({ top: 16 })
-              .width('100%')
-              .textAlign(TextAlign.Center)
+              })
           }
-          .width('100%')
-          .constraintSize({ maxWidth: 480 })
-          .padding({ left: 24, right: 24 })
-
-          Blank().height(24)
         }
         .width('100%')
-        .constraintSize({ minHeight: '100%' })
-        .padding({
-          top: this.topInset,
-          bottom: this.bottomInset,
-          left: this.leftInset,
-          right: this.rightInset
+        .height(this.isLandscape() ? 36 : 48)
+        .padding({ left: 12, right: 16 })
+        .alignItems(VerticalAlign.Center)
+
+        // Scrollable Body
+        Scroll(this.scroller) {
+          if (this.isLandscape()) {
+            // Landscape layout: Left side Logo & Title, Right side Form
+            Row({ space: 28 }) {
+              // Left: Logo & Branding
+              Column() {
+                Image($r('app.media.startIcon'))
+                  .width(56)
+                  .height(56)
+                  .borderRadius(AppTheme.RADIUS_LG)
+                  .clip(true)
+
+                Text('EcoHub')
+                  .fontSize(22)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.TEXT_PRIMARY)
+                  .margin({ top: 8 })
+
+                Text(this.reconnect ? '软件源连接失败\n请重新接入' : '配置软件源后观影')
+                  .fontSize(11)
+                  .fontColor(AppTheme.TEXT_SECONDARY)
+                  .textAlign(TextAlign.Center)
+                  .margin({ top: 4 })
+              }
+              .width(160)
+              .alignItems(HorizontalAlign.Center)
+              .justifyContent(FlexAlign.Center)
+
+              // Right: Form Area
+              Column() {
+                Row() {
+                  Text('软件源地址')
+                    .fontSize(12)
+                    .fontColor(AppTheme.TEXT_SECONDARY)
+
+                  if (this.serverHistory.length > 0) {
+                    Row() {
+                      AppIcon({
+                        src: $r('sys.symbol.clock_fill'),
+                        iconSize: 11,
+                        color: AppTheme.ACCENT
+                      })
+                      Text(`历史记录 (${this.serverHistory.length})`)
+                        .fontSize(11)
+                        .fontColor(AppTheme.ACCENT)
+                        .margin({ left: 4 })
+                    }
+                    .padding({ left: 6, right: 6, top: 3, bottom: 3 })
+                    .backgroundColor(AppTheme.ACCENT_SOFT)
+                    .borderRadius(AppTheme.RADIUS_SM)
+                    .onClick(() => {
+                      try {
+                        this.inputController.stopEditing();
+                      } catch (_e) {
+                      }
+                      this.showHistoryDialog = true;
+                    })
+                  }
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.SpaceBetween)
+                .alignItems(VerticalAlign.Center)
+                .margin({ bottom: 6 })
+
+                // Input row
+                Row() {
+                  TextInput({ text: this.serverUrl, placeholder: '请输入软件源地址', controller: this.inputController })
+                    .layoutWeight(1)
+                    .height(42)
+                    .fontSize(13)
+                    .fontColor(AppTheme.TEXT_PRIMARY)
+                    .placeholderColor(AppTheme.TEXT_MUTED)
+                    .caretColor(AppTheme.ACCENT)
+                    .backgroundColor(Color.Transparent)
+                    .padding({ left: 12, right: 8 })
+                    .enterKeyType(EnterKeyType.Done)
+                    .onChange((val: string) => {
+                      this.serverUrl = val;
+                    })
+                    .onSubmit(() => {
+                      this.saveAndConnect();
+                    })
+
+                  if (this.serverUrl.length > 0) {
+                    Row() {
+                      AppIcon({
+                        src: $r('sys.symbol.xmark_circle_fill'),
+                        iconSize: 15,
+                        color: AppTheme.TEXT_MUTED
+                      })
+                    }
+                    .width(32)
+                    .height(42)
+                    .justifyContent(FlexAlign.Center)
+                    .onClick(() => {
+                      this.serverUrl = '';
+                    })
+                  }
+                }
+                .width('100%')
+                .height(42)
+                .padding({ right: 4 })
+                .backgroundColor(AppTheme.BG_CARD)
+                .borderRadius(AppTheme.RADIUS_MD)
+
+                Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
+                  .width('100%')
+                  .height(42)
+                  .fontSize(15)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.TEXT_PRIMARY)
+                  .backgroundColor(AppTheme.ACCENT)
+                  .borderRadius(AppTheme.RADIUS_MD)
+                  .margin({ top: 10 })
+                  .enabled(!this.isLoading)
+                  .onClick(() => this.saveAndConnect())
+                  .alignSelf(ItemAlign.Stretch)
+
+                Text('接口形如 https://your-host/api，配置后所有请求均走该源。')
+                  .fontSize(11)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                  .margin({ top: 8 })
+                  .width('100%')
+                  .textAlign(TextAlign.Center)
+              }
+              .layoutWeight(1)
+              .constraintSize({ maxWidth: 440 })
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.Center)
+            .alignItems(VerticalAlign.Center)
+            .padding({ top: 4, bottom: 12, left: 16, right: 16 })
+          } else {
+            // Portrait: Classic Top-weighted Column
+            Column() {
+              Column() {
+                Image($r('app.media.startIcon'))
+                  .width(56)
+                  .height(56)
+                  .borderRadius(AppTheme.RADIUS_LG)
+                  .clip(true)
+
+                Text('EcoHub')
+                  .fontSize(24)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.TEXT_PRIMARY)
+                  .margin({ top: 10 })
+
+                Text(this.reconnect ? '软件源连接失败，请检查后重新接入' : '配置软件源后即可观影')
+                  .fontSize(13)
+                  .fontColor(AppTheme.TEXT_SECONDARY)
+                  .margin({ top: 6 })
+              }
+              .margin({ top: 20, bottom: 28 })
+
+              Column() {
+                Row() {
+                  Text('软件源地址')
+                    .fontSize(13)
+                    .fontColor(AppTheme.TEXT_SECONDARY)
+
+                  if (this.serverHistory.length > 0) {
+                    Row() {
+                      AppIcon({
+                        src: $r('sys.symbol.clock_fill'),
+                        iconSize: 12,
+                        color: AppTheme.ACCENT
+                      })
+                      Text(`历史记录 (${this.serverHistory.length})`)
+                        .fontSize(12)
+                        .fontColor(AppTheme.ACCENT)
+                        .margin({ left: 4 })
+                    }
+                    .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                    .backgroundColor(AppTheme.ACCENT_SOFT)
+                    .borderRadius(AppTheme.RADIUS_SM)
+                    .onClick(() => {
+                      try {
+                        this.inputController.stopEditing();
+                      } catch (_e) {
+                      }
+                      this.showHistoryDialog = true;
+                    })
+                  }
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.SpaceBetween)
+                .alignItems(VerticalAlign.Center)
+                .margin({ bottom: 8 })
+
+                // Input row
+                Row() {
+                  TextInput({ text: this.serverUrl, placeholder: '请输入软件源地址', controller: this.inputController })
+                    .layoutWeight(1)
+                    .height(48)
+                    .fontSize(14)
+                    .fontColor(AppTheme.TEXT_PRIMARY)
+                    .placeholderColor(AppTheme.TEXT_MUTED)
+                    .caretColor(AppTheme.ACCENT)
+                    .backgroundColor(Color.Transparent)
+                    .padding({ left: 14, right: 8 })
+                    .enterKeyType(EnterKeyType.Done)
+                    .onChange((val: string) => {
+                      this.serverUrl = val;
+                    })
+                    .onSubmit(() => {
+                      this.saveAndConnect();
+                    })
+
+                  if (this.serverUrl.length > 0) {
+                    Row() {
+                      AppIcon({
+                        src: $r('sys.symbol.xmark_circle_fill'),
+                        iconSize: 16,
+                        color: AppTheme.TEXT_MUTED
+                      })
+                    }
+                    .width(36)
+                    .height(48)
+                    .justifyContent(FlexAlign.Center)
+                    .onClick(() => {
+                      this.serverUrl = '';
+                    })
+                  }
+                }
+                .width('100%')
+                .height(48)
+                .padding({ right: 4 })
+                .backgroundColor(AppTheme.BG_CARD)
+                .borderRadius(AppTheme.RADIUS_MD)
+
+                Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
+                  .width('100%')
+                  .height(48)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.TEXT_PRIMARY)
+                  .backgroundColor(AppTheme.ACCENT)
+                  .borderRadius(AppTheme.RADIUS_MD)
+                  .margin({ top: 24 })
+                  .enabled(!this.isLoading)
+                  .onClick(() => this.saveAndConnect())
+                  .alignSelf(ItemAlign.Stretch)
+
+                Text('接口形如 https://your-host/api，配置后所有请求均走该源。')
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                  .margin({ top: 16 })
+                  .width('100%')
+                  .textAlign(TextAlign.Center)
+              }
+              .width('100%')
+              .constraintSize({ maxWidth: 480 })
+              .padding({ left: 24, right: 24 })
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
+            .padding({ bottom: 24 })
+          }
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .onClick(() => {
+          try {
+            this.inputController.stopEditing();
+          } catch (_e) {
+          }
         })
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
       }
       .width('100%')
       .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-
-      // Top header with back button if not in forced reconnect mode
-      if (!this.reconnect) {
-        Row() {
-          BackIcon({ color: AppTheme.TEXT_PRIMARY })
-            .onClick(() => {
-              try {
-                this.getUIContext().getRouter().back();
-              } catch (_e) {
-              }
-            })
+      .backgroundColor(AppTheme.BG)
+      .padding({
+        top: this.topInset,
+        bottom: this.keyboardHeight > 0 ? 0 : this.bottomInset,
+        left: this.leftInset,
+        right: this.rightInset
+      })
+      .onClick(() => {
+        try {
+          this.inputController.stopEditing();
+        } catch (_e) {
         }
-        .position({ x: this.leftInset, y: this.topInset })
-        .height(48)
-        .padding({ left: 12 })
-        .alignItems(VerticalAlign.Center)
-      }
+      })
 
       // Modal Dialog Layer (Overlay Backdrop + Centered Dialog Box)
       if (this.showHistoryDialog) {

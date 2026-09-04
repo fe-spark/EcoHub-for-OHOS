@@ -14,6 +14,8 @@ export struct FilmRow {
   onMore?: () => void;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
+  @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
+  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
 
   private openMore(): void {
     if (this.onMore) {
@@ -60,14 +62,14 @@ export struct FilmRow {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
-      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+      .padding({ left: AppTheme.SPACE_LG + this.leftInset, right: AppTheme.SPACE_LG + this.rightInset })
       .margin({ bottom: AppTheme.SPACE_MD })
 
       if (this.films.length === 0) {
         Text('暂无影片')
           .fontSize(12)
           .fontColor(AppTheme.TEXT_MUTED)
-          .padding({ left: AppTheme.SPACE_LG })
+          .padding({ left: AppTheme.SPACE_LG + this.leftInset })
       } else {
         Scroll() {
           Row({ space: AppTheme.SPACE_SM }) {
@@ -75,7 +77,7 @@ export struct FilmRow {
               FilmCard({ film: film, cardWidth: Breakpoint.cardWidth(this.widthBp, this.windowWidth) })
             }, (film: MovieBasicInfo) => `${film.id}`)
           }
-          .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+          .padding({ left: AppTheme.SPACE_LG + this.leftInset, right: AppTheme.SPACE_LG + this.rightInset })
         }
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)

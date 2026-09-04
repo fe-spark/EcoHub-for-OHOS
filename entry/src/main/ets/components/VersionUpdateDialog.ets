@@ -23,6 +23,13 @@ export struct VersionUpdateDialog {
   @State private cardOpacity: number = 0;
   private isClosing: boolean = false;
 
+  @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
+
+  private isLandscape(): boolean {
+    return this.windowHeight > 0 && this.windowHeight < 500;
+  }
+
   aboutToAppear(): void {
     setTimeout(() => {
       this.maskOpacity = 1;
@@ -108,7 +115,7 @@ export struct VersionUpdateDialog {
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
-        .margin({ bottom: AppTheme.SPACE_MD })
+        .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_MD })
 
         // 版本号信息对比胶囊
         Row() {
@@ -130,9 +137,9 @@ export struct VersionUpdateDialog {
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
-        .margin({ bottom: AppTheme.SPACE_SM })
+        .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_SM })
 
-        // 更新日志（可滚动容器）
+        // 更新日志（可滚动容器，弹性伸缩）
         Scroll() {
           Column() {
             if (this.updateInfo.releaseName && this.updateInfo.releaseName !== `v${this.updateInfo.latestVersion}`) {
@@ -151,15 +158,16 @@ export struct VersionUpdateDialog {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
         }
+        .layoutWeight(1)
         .scrollable(ScrollDirection.Vertical)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
-        .constraintSize({ maxHeight: 240 })
+        .constraintSize({ minHeight: 60, maxHeight: 240 })
         .width('100%')
         .padding(AppTheme.SPACE_MD)
         .backgroundColor(AppTheme.BG_CARD)
         .borderRadius(AppTheme.RADIUS_MD)
-        .margin({ bottom: AppTheme.SPACE_MD })
+        .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_MD })
 
         // 侧载安装温馨提示
         Row() {
@@ -176,41 +184,69 @@ export struct VersionUpdateDialog {
             .layoutWeight(1)
         }
         .width('100%')
-        .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD, top: 8, bottom: 8 })
+        .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD, top: 6, bottom: 6 })
         .backgroundColor(AppTheme.ACCENT_SOFT)
         .borderRadius(AppTheme.RADIUS_MD)
-        .margin({ bottom: AppTheme.SPACE_MD })
+        .margin({ bottom: this.isLandscape() ? 8 : AppTheme.SPACE_MD })
         .alignItems(VerticalAlign.Center)
 
-        // 底部操作区：主按钮「前往更新」+ 次按钮「稍后再说」
-        Column({ space: 8 }) {
-          Button('前往更新')
-            .width('100%')
-            .height(42)
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .backgroundColor(AppTheme.ACCENT)
-            .borderRadius(AppTheme.RADIUS_PILL)
-            .onClick(() => {
-              this.handleUpdate();
-            })
+        // 底部操作区：横屏并排排列，竖屏上下排列，始终可见
+        if (this.isLandscape()) {
+          Row({ space: 10 }) {
+            Button('稍后再说')
+              .layoutWeight(1)
+              .height(36)
+              .fontSize(13)
+              .fontColor(AppTheme.TEXT_MUTED)
+              .backgroundColor('rgba(255, 255, 255, 0.08)')
+              .borderRadius(AppTheme.RADIUS_PILL)
+              .onClick(() => {
+                this.handleClose();
+              })
 
-          Button('稍后再说')
-            .width('100%')
-            .height(36)
-            .fontSize(13)
-            .fontColor(AppTheme.TEXT_MUTED)
-            .backgroundColor(Color.Transparent)
-            .onClick(() => {
-              this.handleClose();
-            })
+            Button('前往更新')
+              .layoutWeight(1)
+              .height(36)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .backgroundColor(AppTheme.ACCENT)
+              .borderRadius(AppTheme.RADIUS_PILL)
+              .onClick(() => {
+                this.handleUpdate();
+              })
+          }
+          .width('100%')
+        } else {
+          Column({ space: 8 }) {
+            Button('前往更新')
+              .width('100%')
+              .height(42)
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .backgroundColor(AppTheme.ACCENT)
+              .borderRadius(AppTheme.RADIUS_PILL)
+              .onClick(() => {
+                this.handleUpdate();
+              })
+
+            Button('稍后再说')
+              .width('100%')
+              .height(36)
+              .fontSize(13)
+              .fontColor(AppTheme.TEXT_MUTED)
+              .backgroundColor(Color.Transparent)
+              .onClick(() => {
+                this.handleClose();
+              })
+          }
+          .width('100%')
         }
-        .width('100%')
       }
       .width('86%')
-      .constraintSize({ maxWidth: 360 })
-      .padding(AppTheme.SPACE_LG)
+      .constraintSize({ maxWidth: 420, maxHeight: '88%' })
+      .padding(this.isLandscape() ? 12 : AppTheme.SPACE_LG)
       .backgroundColor(AppTheme.BG_ELEVATED)
       .borderRadius(AppTheme.RADIUS_LG)
       .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
@@ -224,6 +260,7 @@ export struct VersionUpdateDialog {
     }
     .width('100%')
     .height('100%')
+    .padding({ bottom: Math.max(12, this.bottomInset) })
     .zIndex(999)
   }
 }

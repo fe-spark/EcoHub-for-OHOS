@@ -10,6 +10,12 @@ export struct FilmDetailDialog {
   director: string = '';
   actor: string = '';
   plot: string = '';
+  @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
+
+  private isLandscape(): boolean {
+    return this.windowHeight > 0 && this.windowHeight < 500;
+  }
 
   build() {
     Column() {
@@ -207,22 +213,23 @@ export struct FilmDetailDialog {
         .alignItems(HorizontalAlign.Start)
         .padding({ bottom: 4 })
       }
+      .layoutWeight(1)
       .scrollable(ScrollDirection.Vertical)
       .scrollBar(BarState.Auto)
       .edgeEffect(EdgeEffect.Spring)
       .width('100%')
-      .constraintSize({ maxHeight: '56%' })
+      .constraintSize({ minHeight: 60, maxHeight: this.isLandscape() ? 150 : '56%' })
 
       // 底部确认关闭主按钮
       Button('我知道了')
         .width('100%')
-        .height(40)
+        .height(this.isLandscape() ? 36 : 40)
         .fontSize(14)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppTheme.TEXT_PRIMARY)
         .backgroundColor(AppTheme.ACCENT)
         .borderRadius(AppTheme.RADIUS_PILL)
-        .margin({ top: 12 })
+        .margin({ top: this.isLandscape() ? 8 : 12 })
         .onClick(() => {
           if (this.controller) {
             this.controller.close();
@@ -230,7 +237,8 @@ export struct FilmDetailDialog {
         })
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 4, bottom: 20 })
+    .constraintSize({ maxWidth: 600, maxHeight: '88%' })
+    .padding({ left: 16, right: 16, top: 4, bottom: Math.max(16, this.bottomInset) })
     .backgroundColor('#181A22')
     .borderRadius({ topLeft: 20, topRight: 20 })
     .alignItems(HorizontalAlign.Start)

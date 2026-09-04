@@ -59,7 +59,7 @@ export default class EntryAbility extends UIAbility {
           win.setWindowSystemBarEnable(['status', 'navigation']);
           win.setWindowLayoutFullScreen(true);
           win.setWindowSystemBarProperties({
-            statusBarColor: '#0A0B10',
+            statusBarColor: '#00000000',
             statusBarContentColor: '#FFFFFF',
             navigationBarColor: '#12141C',
             navigationBarContentColor: '#FFFFFF'

@@ -277,16 +277,17 @@ struct Index {
             }
             if (this.tabReady[1]) {
               DailyUpdatesTab()
+                .padding({ top: this.topInset, left: this.leftInset, right: this.rightInset })
                 .visibility(this.currentTabIndex === 1 ? Visibility.Visible : Visibility.None)
             }
             if (this.tabReady[2]) {
               ProfileTab()
+                .padding({ top: this.topInset, left: this.leftInset, right: this.rightInset })
                 .visibility(this.currentTabIndex === 2 ? Visibility.Visible : Visibility.None)
             }
           }
           .width('100%')
           .layoutWeight(1)
-          .padding({ left: this.leftInset, right: this.rightInset })
 
           Column() {
             Row() {
@@ -308,8 +309,8 @@ struct Index {
       }
       .width('100%')
       .height('100%')
-      .padding({ top: this.topInset })
       .backgroundColor(AppTheme.BG)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
 
       if (this.showNotice && this.ready && this.siteOpen) {
         NoticeDialog({
@@ -325,5 +326,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }

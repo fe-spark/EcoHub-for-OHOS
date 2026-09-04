@@ -29,7 +29,7 @@ export class WindowBar {
       win.setWindowSystemBarEnable(['status', 'navigation']);
       win.setWindowLayoutFullScreen(true);
       win.setWindowSystemBarProperties({
-        statusBarColor: AppTheme.BG,
+        statusBarColor: '#00000000',
         statusBarContentColor: '#FFFFFF',
         navigationBarColor: AppTheme.BG_ELEVATED,
         navigationBarContentColor: '#FFFFFF'
@@ -77,20 +77,24 @@ export class WindowBar {
       const system = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const cutout = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_CUTOUT);
       const nav = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
+      const keyboard = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_KEYBOARD);
       const top = Math.max(system.topRect.height, cutout.topRect.height);
       const bottom = Math.max(nav.bottomRect.height, system.bottomRect.height, cutout.bottomRect.height);
       const left = Math.max(system.leftRect.width, cutout.leftRect.width, nav.leftRect.width);
       const right = Math.max(system.rightRect.width, cutout.rightRect.width, nav.rightRect.width);
+      const keyboardHeight = keyboard.bottomRect.height;
 
       const topVp = uiContext.px2vp(top);
       const bottomVp = uiContext.px2vp(bottom);
       const leftVp = uiContext.px2vp(left);
       const rightVp = uiContext.px2vp(right);
+      const keyboardVp = uiContext.px2vp(keyboardHeight);
 
       AppStorage.setOrCreate<number>('SAFE_INSET_TOP', topVp);
       AppStorage.setOrCreate<number>('SAFE_INSET_BOTTOM', bottomVp);
       AppStorage.setOrCreate<number>('SAFE_INSET_LEFT', leftVp);
       AppStorage.setOrCreate<number>('SAFE_INSET_RIGHT', rightVp);
+      AppStorage.setOrCreate<number>('KEYBOARD_HEIGHT', keyboardVp);
 
       if (WindowBar.onInsets) {
         WindowBar.onInsets(topVp, bottomVp, leftVp, rightVp);
@@ -121,5 +125,9 @@ export class WindowBar {
 
   static bottomInset(): number {
     return AppStorage.get<number>('SAFE_INSET_BOTTOM') || 16;
+  }
+
+  static keyboardHeight(): number {
+    return AppStorage.get<number>('KEYBOARD_HEIGHT') || 0;
   }
 }

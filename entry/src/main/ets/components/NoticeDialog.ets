@@ -13,6 +13,13 @@ export struct NoticeDialog {
   @State private cardOpacity: number = 0;
   private isClosing: boolean = false;
 
+  @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
+
+  private isLandscape(): boolean {
+    return this.windowHeight > 0 && this.windowHeight < 500;
+  }
+
   aboutToAppear(): void {
     setTimeout(() => {
       this.maskOpacity = 1;
@@ -90,9 +97,9 @@ export struct NoticeDialog {
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
-        .margin({ bottom: AppTheme.SPACE_MD })
+        .margin({ bottom: this.isLandscape() ? 8 : AppTheme.SPACE_MD })
 
-        // 公告正文（可滚动容器）
+        // 公告正文（可滚动容器，弹性收缩保护底部按钮）
         Scroll() {
           Column() {
             Text(this.content)
@@ -104,20 +111,21 @@ export struct NoticeDialog {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
         }
+        .layoutWeight(1)
         .scrollable(ScrollDirection.Vertical)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
-        .constraintSize({ maxHeight: 260 })
+        .constraintSize({ minHeight: 60, maxHeight: 260 })
         .width('100%')
         .padding(AppTheme.SPACE_MD)
         .backgroundColor(AppTheme.BG_CARD)
         .borderRadius(AppTheme.RADIUS_MD)
-        .margin({ bottom: AppTheme.SPACE_LG })
+        .margin({ bottom: this.isLandscape() ? 10 : AppTheme.SPACE_LG })
 
-        // 底部确认主按钮
+        // 底部确认主按钮（高度固定，绝不溢出）
         Button('我知道了')
           .width('100%')
-          .height(42)
+          .height(this.isLandscape() ? 36 : 42)
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
@@ -128,8 +136,8 @@ export struct NoticeDialog {
           })
       }
       .width('86%')
-      .constraintSize({ maxWidth: 360 })
-      .padding(AppTheme.SPACE_LG)
+      .constraintSize({ maxWidth: 380, maxHeight: '85%' })
+      .padding(this.isLandscape() ? 14 : AppTheme.SPACE_LG)
       .backgroundColor(AppTheme.BG_ELEVATED)
       .borderRadius(AppTheme.RADIUS_LG)
       .border({ width: 1, color: 'rgba(255, 255, 255, 0.08)' })
@@ -143,6 +151,7 @@ export struct NoticeDialog {
     }
     .width('100%')
     .height('100%')
+    .padding({ bottom: Math.max(12, this.bottomInset) })
     .zIndex(999)
   }
 }
