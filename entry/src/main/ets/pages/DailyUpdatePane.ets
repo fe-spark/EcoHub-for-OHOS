@@ -6,9 +6,9 @@ import { ScrollFab } from '../components/ScrollFab';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { RefreshHint } from '../common/utils/RefreshHint';
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 const PAGE_SIZE = 21;
-const GRID_COLS = 3;
 
 @Component
 export struct DailyUpdatePane {
@@ -28,8 +28,14 @@ export struct DailyUpdatePane {
   @State private fetchLock: boolean = false;
   @State private listHeight: number = 0;
   @State private showTopFab: boolean = false;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
   private hasLoaded: boolean = false;
   private listScroller: Scroller = new Scroller();
+
+  private gridCols(): number {
+    return Breakpoint.gridCols(this.widthBp, this.windowWidth);
+  }
 
   aboutToAppear(): void {
     this.boot();
@@ -147,12 +153,7 @@ export struct DailyUpdatePane {
   }
 
   private rowIds(): number[] {
-    const n = Math.ceil(this.films.length / GRID_COLS);
-    const ids: number[] = [];
-    for (let i = 0; i < n; i++) {
-      ids.push(i);
-    }
-    return ids;
+    return Breakpoint.rowIds(this.films.length, this.gridCols());
   }
 
   @Builder
@@ -171,9 +172,9 @@ export struct DailyUpdatePane {
   @Builder
   filmRow(row: number) {
     Row({ space: AppTheme.SPACE_SM }) {
-      this.filmCell(row * GRID_COLS)
-      this.filmCell(row * GRID_COLS + 1)
-      this.filmCell(row * GRID_COLS + 2)
+      ForEach(Breakpoint.colIds(this.gridCols()), (col: number) => {
+        this.filmCell(row * this.gridCols() + col)
+      }, (col: number) => `film_col_${this.gridCols()}_${row}_${col}`)
     }
     .width('100%')
     .alignItems(VerticalAlign.Top)
@@ -225,7 +226,7 @@ export struct DailyUpdatePane {
                 ListItem() {
                   this.filmRow(row)
                 }
-              }, (row: number) => `film_row_${row}_${this.films[row * GRID_COLS].id}`)
+              }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
 
               ListItem() {
                 Text(this.loadingMore ? '加载中...' : (this.hasMore() ? '' : '没有更多了'))

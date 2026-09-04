@@ -1,5 +1,6 @@
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
+import { Breakpoint } from '../common/utils/Breakpoint';
 import { HistoryManager } from '../common/utils/HistoryManager';
 import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
@@ -46,6 +47,13 @@ export default class EntryAbility extends UIAbility {
               familyName: CUSTOM_FONT_FAMILY,
               familySrc: $rawfile(CUSTOM_FONT_RAWFILE)
             });
+          } catch (_e) {
+          }
+          try {
+            const rect = win.getWindowProperties().windowRect;
+            const ui = win.getUIContext();
+            Breakpoint.publish(ui.px2vp(rect.width), ui.px2vp(rect.height));
+            win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
           } catch (_e) {
           }
           win.setWindowSystemBarEnable(['status', 'navigation']);

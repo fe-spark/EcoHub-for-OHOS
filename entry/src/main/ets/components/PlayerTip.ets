@@ -402,7 +402,7 @@ export struct PlayerScaleDialog {
           .fontColor(AppTheme.ACCENT)
       }
       .width('100%')
-      Text('全屏播放时画面适应与拉伸方式')
+      Text('播放画面比例与填充方式')
         .fontSize(PlayerScaleDialog.SUBTITLE_SIZE)
         .fontColor(AppTheme.TEXT_SECONDARY)
         .margin({ top: AppTheme.SPACE_XS, bottom: AppTheme.SPACE_MD })

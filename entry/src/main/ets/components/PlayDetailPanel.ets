@@ -1,5 +1,6 @@
 import { MovieDescriptor, MovieUrlInfo, PlaySource } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
+import { Breakpoint } from '../common/utils/Breakpoint';
 import { AppIcon } from './AppIcon';
 import { FilmDetailHeader } from './FilmDetailHeader';
 
@@ -25,6 +26,7 @@ export struct PlayDetailPanel {
   @State private groupIndexes: number[] = [];
   @State private headerHeight: number = 148;
   @State private ready: boolean = false;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private listScroller: Scroller = new Scroller();
   private groupScroller: Scroller = new Scroller();
   private sourceScroller: Scroller = new Scroller();
@@ -259,6 +261,12 @@ export struct PlayDetailPanel {
   }
 
   private epCols(): number {
+    if (this.widthBp === 'lg' || this.widthBp === 'xl') {
+      return this.usesWideTiles() ? 3 : 5;
+    }
+    if (this.widthBp === 'md') {
+      return this.usesWideTiles() ? 3 : 4;
+    }
     return this.usesWideTiles() ? EP_COLS_WIDE : EP_COLS_COMPACT;
   }
 

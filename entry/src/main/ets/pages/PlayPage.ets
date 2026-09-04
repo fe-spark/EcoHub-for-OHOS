@@ -13,10 +13,10 @@ import { PlayDetailPanel } from '../components/PlayDetailPanel';
 import { FilmGrid } from '../components/FilmGrid';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
-import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry
 @Component
@@ -49,6 +49,7 @@ struct PlayPage {
   @State private viewH: number = 9;
   @State private playerFull: boolean = false;
   @State private playerActive: boolean = true;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private sourceName: string = '';
   private reconnectCb: () => void = () => {};
   private loadToken: number = 0;
@@ -124,7 +125,6 @@ struct PlayPage {
     if (this.playerFull) { this.setPlayerFull(false); return true; }
     return false;
   }
-
   aboutToDisappear(): void {
     if (this.playerFull) this.setPlayerFull(false);
     if (this.lastCurrentTime > 0) this.persistHistory(this.lastCurrentTime, this.lastDuration);
@@ -225,8 +225,8 @@ struct PlayPage {
   }
 
   private hasNext(): boolean {
-    const source = this.findSource(this.playingSourceId);
-    return !!source && this.episodeIndex < source.linkList.length - 1;
+    const s = this.findSource(this.playingSourceId);
+    return !!s && this.episodeIndex < s.linkList.length - 1;
   }
 
   private hasPrev(): boolean {
@@ -306,24 +306,156 @@ struct PlayPage {
     this.loadRelate();
   }
 
+  private splitPlay(): boolean {
+    return Breakpoint.isWide(this.widthBp) && !this.playerFull;
+  }
+
+  private hudLeftInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0; }
+  private hudRightInset(): number { return this.playerFull ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : AppTheme.SAFE_EDGE; }
+  private hudTopInset(): number { return (this.playerFull || this.splitPlay()) ? this.topInset : 0; }
+  private hudBottomInset(): number { return (this.playerFull || this.splitPlay()) ? this.bottomInset : 0; }
+
   @Builder
   playTabItem(title: string, index: number) {
     Column() {
       Text(title)
-        .fontSize(16)
-        .fontWeight(FontWeight.Bold)
+        .fontSize(16).fontWeight(FontWeight.Bold)
         .fontColor(this.activeTab === index ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_MUTED)
       Column()
-        .width(18)
-        .height(3)
+        .width(18).height(3).borderRadius(2).margin({ top: 6 })
         .backgroundColor(this.activeTab === index ? AppTheme.ACCENT : Color.Transparent)
-        .borderRadius(2)
-        .margin({ top: 6 })
     }
     .padding({ right: 20 })
-    .onClick(() => {
-      this.activeTab = index;
+    .onClick(() => { this.activeTab = index; })
+  }
+
+  @Builder
+  playVideo() {
+    VideoPlayer({
+      videoUrl: this.playUrl,
+      reloadToken: this.playToken,
+      title: this.playTitle,
+      poster: this.picture,
+      initialTime: this.initialTime,
+      showBack: true,
+      isFull: this.playerFull,
+      edgeHud: this.splitPlay(),
+      pageActive: this.playerActive,
+      hasPrev: this.hasPrev(),
+      hasNext: this.hasNext(),
+      topInset: this.hudTopInset(),
+      leftInset: this.hudLeftInset(),
+      rightInset: this.hudRightInset(),
+      bottomInset: this.hudBottomInset(),
+      onBack: () => {
+        if (this.playerFull) this.setPlayerFull(false);
+        else { try { this.getUIContext().getRouter().back(); } catch (_e) {} }
+      },
+      onEnded: () => { if (this.hasNext()) this.playNext(); },
+      onPrev: () => this.playPrev(),
+      onNext: () => this.playNext(),
+      onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
+      onProgress: (current: number, duration: number) => {
+        this.lastCurrentTime = current;
+        this.lastDuration = duration;
+        this.persistHistory(current, duration);
+      }
     })
+      .width('100%')
+      .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
+      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
+      .constraintSize({ maxHeight: '100%' })
+  }
+
+  @Builder
+  playDetail() {
+    PlayDetailPanel({
+      filmId: this.filmId,
+      picture: this.picture,
+      name: this.name,
+      subTitle: this.subTitle,
+      actor: this.actor,
+      plot: this.plot,
+      descriptor: this.descriptor,
+      sources: this.sources,
+      playingSourceId: this.playingSourceId,
+      viewingSourceId: this.viewingSourceId,
+      episodeIndex: this.episodeIndex,
+      onViewSource: (id: string) => { this.viewingSourceId = id; },
+      onSelectEpisode: (sourceId: string, index: number) => { this.selectEpisode(sourceId, index); }
+    })
+  }
+
+  @Builder
+  relatedPane() {
+    if (this.relateLoading) {
+      LoadingView({ label: '加载相关推荐' })
+    } else if (this.related.length === 0) {
+      EmptyState({ title: '暂无相关推荐', subtitle: '换一部片子再看看', icon: $r('sys.symbol.film') })
+    } else {
+      FilmGrid({
+        films: this.related,
+        columns: this.splitPlay() ? 3 : Breakpoint.gridCols(this.widthBp),
+        onClickFilm: (film: MovieBasicInfo) => this.openRelated(film)
+      })
+        .padding({ left: 12, right: 12, top: 4, bottom: 12 })
+    }
+  }
+
+  @Builder
+  sideTabs() {
+    Row() {
+      this.playTabItem('详情', 0)
+      this.playTabItem('相关推荐', 1)
+    }
+    .width('100%')
+    .height(44)
+    .justifyContent(FlexAlign.Start)
+    .alignItems(VerticalAlign.Center)
+    .padding({ left: 12, right: 12 })
+
+    Stack() {
+      Column() { this.playDetail() }.width('100%').height('100%')
+        .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
+      if (this.activeTab === 1) {
+        Column() { this.relatedPane() }.width('100%').height('100%')
+      }
+    }
+    .layoutWeight(1)
+    .width('100%')
+  }
+
+  @Builder
+  playBody() {
+    Row() {
+      Column() {
+        this.playVideo()
+      }
+      .layoutWeight(this.splitPlay() ? 7 : 1)
+      .width(this.splitPlay() ? undefined : '100%')
+      .height(this.splitPlay() || this.playerFull ? '100%' : 'auto')
+      .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+
+      if (this.splitPlay()) {
+        Column() {
+          Column().width(1).height('100%').backgroundColor('rgba(255, 255, 255, 0.14)')
+        }
+        .height('100%').padding({ top: this.topInset, bottom: this.bottomInset })
+
+        Column() { this.sideTabs() }
+          .layoutWeight(5)
+          .height('100%')
+          .padding({ top: this.topInset, bottom: this.bottomInset })
+          .backgroundColor(AppTheme.BG_ELEVATED)
+      }
+    }
+    .width('100%')
+    .layoutWeight(this.splitPlay() || this.playerFull ? 1 : 0)
+
+    if (!this.playerFull && !this.splitPlay()) {
+      Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
+      this.sideTabs()
+    }
   }
 
   build() {
@@ -331,119 +463,17 @@ struct PlayPage {
       if (this.loading && !this.name) {
         LoadingView({ label: '正在打开播放页' })
       } else if (this.errorText && !this.name) {
-        EmptyState({
-          title: '当前内容无法播放',
-          subtitle: this.errorText,
-          icon: $r('sys.symbol.play_circle')
-        })
+        EmptyState({ title: '当前内容无法播放', subtitle: this.errorText, icon: $r('sys.symbol.play_circle') })
       } else {
-        VideoPlayer({
-          videoUrl: this.playUrl,
-          reloadToken: this.playToken,
-          title: this.playTitle,
-          poster: this.picture,
-          initialTime: this.initialTime,
-          showBack: true,
-          isFull: this.playerFull,
-          pageActive: this.playerActive,
-          hasPrev: this.hasPrev(),
-          hasNext: this.hasNext(),
-          topInset: this.playerFull ? this.topInset : 0,
-          leftInset: this.playerFull ? this.leftInset : 0,
-          rightInset: this.playerFull ? this.rightInset : 0,
-          bottomInset: this.playerFull ? this.bottomInset : 0,
-          onBack: () => {
-            try { this.getUIContext().getRouter().back(); } catch (_e) {}
-          },
-          onEnded: () => {
-            if (this.hasNext()) this.playNext();
-          },
-          onPrev: () => this.playPrev(),
-          onNext: () => this.playNext(),
-          onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
-          onProgress: (current: number, duration: number) => {
-            this.lastCurrentTime = current;
-            this.lastDuration = duration;
-            this.persistHistory(current, duration);
-          }
-        })
-          .width('100%')
-          .aspectRatio(this.playerFull ? this.viewW / Math.max(this.viewH, 1) : 16 / 9)
-          .layoutWeight(this.playerFull ? 1 : 0)
-          .constraintSize(this.playerFull ?
-            { minWidth: '100%', maxWidth: '100%', minHeight: '100%', maxHeight: '100%' } :
-            { minHeight: 0 })
-
-        if (!this.playerFull) {
-          Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
-
-          Row() {
-            this.playTabItem('详情', 0)
-            this.playTabItem('相关推荐', 1)
-          }
-          .width('100%')
-          .height(44)
-          .justifyContent(FlexAlign.Start)
-          .alignItems(VerticalAlign.Center)
-          .padding({ left: 12, right: 12 })
-
-          Stack() {
-            Column() {
-              PlayDetailPanel({
-                filmId: this.filmId,
-                picture: this.picture,
-                name: this.name,
-                subTitle: this.subTitle,
-                actor: this.actor,
-                plot: this.plot,
-                descriptor: this.descriptor,
-                sources: this.sources,
-                playingSourceId: this.playingSourceId,
-                viewingSourceId: this.viewingSourceId,
-                episodeIndex: this.episodeIndex,
-                onViewSource: (id: string) => {
-                  this.viewingSourceId = id;
-                },
-                onSelectEpisode: (sourceId: string, index: number) => {
-                  this.selectEpisode(sourceId, index);
-                }
-              })
-            }
-            .width('100%')
-            .height('100%')
-            .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
-
-          if (this.activeTab === 1) {
-            Column() {
-              if (this.relateLoading) {
-                LoadingView({ label: '加载相关推荐' })
-              } else if (this.related.length === 0) {
-                EmptyState({
-                  title: '暂无相关推荐',
-                  subtitle: '换一部片子再看看',
-                  icon: $r('sys.symbol.film')
-                })
-              } else {
-                FilmGrid({
-                  films: this.related,
-                  columns: 3,
-                  onClickFilm: (film: MovieBasicInfo) => this.openRelated(film)
-                })
-                .padding({ left: 12, right: 12, top: 4, bottom: 12 })
-              }
-            }
-            .width('100%')
-            .height('100%')
-          }
-        }
-          .layoutWeight(1)
-          .width('100%')
-        }
+        this.playBody()
       }
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.playerFull ? 0 : this.topInset, bottom: this.playerFull ? 0 : this.bottomInset })
+    .padding({
+      top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
+      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset
+    })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
   }
 }

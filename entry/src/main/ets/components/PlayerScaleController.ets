@@ -32,6 +32,12 @@ export class PlayerScaleController {
     this.isShowingScale = showing;
   }
 
+  cycle(): PlayerScaleMode {
+    this.scaleMode = PlayerScale.next(this.scaleMode);
+    this.isShowingScale = false;
+    return this.scaleMode;
+  }
+
   pick(mode: PlayerScaleMode): void {
     this.scaleMode = mode;
     this.isShowingScale = false;

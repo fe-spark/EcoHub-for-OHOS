@@ -13,6 +13,8 @@ import { RefreshHint } from '../common/utils/RefreshHint';
 import { SearchHistoryManager } from '../common/utils/SearchHistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { SearchResultItem } from '../components/SearchResultItem';
+import { SearchSuggestPane } from '../components/SearchSuggestPane';
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry
 @Component
@@ -30,6 +32,9 @@ struct SearchPage {
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  @State private leftInset: number = 0;
+  @State private rightInset: number = 0;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private reconnectCb: () => void = () => {};
   private inputController: TextInputController = new TextInputController();
   private static readonly DEFAULT_HOT_KEYWORDS: string[] = [
@@ -37,15 +42,9 @@ struct SearchPage {
   ];
 
   private hideKeyboard(): void {
-    try {
-      this.inputController.stopEditing();
-    } catch (_e) {
-    }
+    try { this.inputController.stopEditing(); } catch (_e) {}
     setTimeout(() => {
-      try {
-        this.inputController.stopEditing();
-      } catch (_e) {
-      }
+      try { this.inputController.stopEditing(); } catch (_e) {}
     }, 50);
   }
 
@@ -57,9 +56,11 @@ struct SearchPage {
   }
 
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     });
   }
 
@@ -134,10 +135,7 @@ struct SearchPage {
         action: () => {
           SearchHistoryManager.clear().then(() => {
             this.loadHistory();
-            try {
-              this.getUIContext().getPromptAction().showToast({ message: '已清空搜索历史' });
-            } catch (_e) {
-            }
+        try { this.getUIContext().getPromptAction().showToast({ message: '已清空搜索历史' }); } catch (_e) {}
           });
         }
       },
@@ -150,10 +148,7 @@ struct SearchPage {
     if (!kw) {
       this.refreshing = false;
       if (reset && !fromPull) {
-        try {
-          this.getUIContext().getPromptAction().showToast({ message: '请输入搜索关键词' });
-        } catch (_e) {
-        }
+        try { this.getUIContext().getPromptAction().showToast({ message: '请输入搜索关键词' }); } catch (_e) {}
       }
       return;
     }
@@ -211,6 +206,47 @@ struct SearchPage {
       }
       this.hideKeyboard();
     }
+  }
+
+  private listCols(): number {
+    return Breakpoint.listLanes(this.widthBp);
+  }
+
+  private rowIds(): number[] {
+    const rows = Math.ceil(this.list.length / this.listCols());
+    return Array.from({ length: rows }, (_: Object, i: number) => i);
+  }
+
+  private rowFilms(row: number): MovieBasicInfo[] {
+    const cols = this.listCols();
+    return this.list.slice(row * cols, row * cols + cols);
+  }
+
+  private rowFillers(row: number): number[] {
+    const missing = Math.max(0, this.listCols() - this.rowFilms(row).length);
+    return Array.from({ length: missing }, (_: Object, i: number) => i);
+  }
+
+  @Builder
+  filmRow(row: number) {
+    Row({ space: 16 }) {
+      ForEach(this.rowFilms(row), (film: MovieBasicInfo) => {
+        SearchResultItem({
+          film: film,
+          onSelect: (selected: MovieBasicInfo) => {
+            this.hideKeyboard();
+            NavUtil.openPlay(selected.id);
+          }
+        })
+        .layoutWeight(1)
+      }, (film: MovieBasicInfo) => `${film.id}`)
+
+      ForEach(this.rowFillers(row), (idx: number) => {
+        Blank()
+          .layoutWeight(1)
+      }, (idx: number) => `filler_${row}_${idx}`)
+    }
+    .width('100%')
   }
 
   build() {
@@ -306,6 +342,7 @@ struct SearchPage {
         })
       }
       .width('100%')
+      .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
       .padding({ left: 8, right: 16, top: 8, bottom: 12 })
       .alignItems(VerticalAlign.Center)
 
@@ -348,209 +385,72 @@ struct SearchPage {
         .pullToRefresh(!this.fetchLock)
         .layoutWeight(1)
       } else if (!this.submitted) {
-        Scroll() {
-          Column() {
-            if (this.searchHistory.length > 0) {
-              Column() {
-                Row() {
-                  Text('搜索历史')
-                    .fontSize(14)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-
-                  Row() {
-                    AppIcon({
-                      src: $r('sys.symbol.trash'),
-                      iconSize: 14,
-                      color: AppTheme.TEXT_MUTED
-                    })
-                    Text('清空')
-                      .fontSize(12)
-                      .fontColor(AppTheme.TEXT_MUTED)
-                      .margin({ left: 4 })
-                  }
-                  .onClick(() => this.confirmClearHistory())
-                }
-                .width('100%')
-                .justifyContent(FlexAlign.SpaceBetween)
-                .padding({ left: 16, right: 16, top: 8, bottom: 12 })
-
-                Flex({ wrap: FlexWrap.Wrap }) {
-                  ForEach(this.searchHistory, (item: string) => {
-                    Row() {
-                      Row() {
-                        Text(item)
-                          .fontSize(13)
-                          .fontColor(AppTheme.TEXT_SECONDARY)
-                          .maxLines(1)
-                          .textOverflow({ overflow: TextOverflow.Ellipsis })
-                          .constraintSize({ maxWidth: 200 })
-                      }
-                      .padding({ left: 12, right: 4, top: 6, bottom: 6 })
-                      .onClick(() => {
-                        this.hideKeyboard();
-                        this.keyword = item;
-                        this.doSearch(true);
-                      })
-
-                      Row() {
-                        AppIcon({
-                          src: $r('sys.symbol.xmark'),
-                          iconSize: 10,
-                          color: AppTheme.TEXT_MUTED
-                        })
-                      }
-                      .width(22)
-                      .height(28)
-                      .justifyContent(FlexAlign.Center)
-                      .padding({ right: 6 })
-                      .onClick(() => {
-                        SearchHistoryManager.remove(item).then(() => {
-                          this.loadHistory();
-                        });
-                      })
-                    }
-                    .margin({ right: 8, bottom: 8 })
-                    .backgroundColor(AppTheme.BG_CARD)
-                    .borderRadius(AppTheme.RADIUS_PILL)
-                  }, (item: string) => item)
-                }
-                .padding({ left: 16, right: 16 })
-              }
-              .width('100%')
-              .alignItems(HorizontalAlign.Start)
-              .margin({ bottom: 16 })
-            }
-
-            if (this.hotKeywords.length > 0) {
-              Column() {
-                Row() {
-                  AppIcon({
-                    src: $r('sys.symbol.flame_fill'),
-                    iconSize: 15,
-                    color: AppTheme.ACCENT
-                  })
-                  Text('热门搜索')
-                    .fontSize(14)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-                    .margin({ left: 6 })
-                }
-                .width('100%')
-                .padding({ left: 16, right: 16, top: 8, bottom: 12 })
-
-                Flex({ wrap: FlexWrap.Wrap }) {
-                  ForEach(this.hotKeywords, (item: string, index: number) => {
-                    Row() {
-                      Text(`${index + 1}`)
-                        .fontSize(11)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor(index < 3 ? AppTheme.ACCENT : AppTheme.TEXT_MUTED)
-                        .margin({ right: 6 })
-                      Text(item)
-                        .fontSize(13)
-                        .fontColor(AppTheme.TEXT_PRIMARY)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        .constraintSize({ maxWidth: 200 })
-                    }
-                    .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-                    .margin({ right: 8, bottom: 8 })
-                    .backgroundColor(index < 3 ? AppTheme.BG_CHIP : AppTheme.BG_CARD)
-                    .border({
-                      width: 1,
-                      color: index < 3 ? AppTheme.ACCENT_SOFT : AppTheme.BORDER
-                    })
-                    .borderRadius(AppTheme.RADIUS_PILL)
-                    .onClick(() => {
-                      this.hideKeyboard();
-                      this.keyword = item;
-                      this.doSearch(true);
-                    })
-                  }, (item: string) => item)
-                }
-                .padding({ left: 16, right: 16 })
-              }
-              .width('100%')
-              .alignItems(HorizontalAlign.Start)
-            }
-
-            if (this.searchHistory.length === 0 && this.hotKeywords.length === 0) {
+        SearchSuggestPane({
+          searchHistory: this.searchHistory,
+          hotKeywords: this.hotKeywords,
+          onSelectKeyword: (kw: string) => {
+            this.hideKeyboard();
+            this.keyword = kw;
+            this.doSearch(true);
+          },
+          onClearHistory: () => {
+            this.confirmClearHistory();
+          },
+          onRemoveHistory: (item: string) => {
+            SearchHistoryManager.remove(item).then(() => {
+              this.loadHistory();
+            });
+          }
+        })
+      } else if (this.list.length === 0) {
+        Refresh({ refreshing: $$this.refreshing }) {
+          Scroll() {
+            Column() {
+              Blank().height(80)
               EmptyState({
-                title: '搜索影片',
-                subtitle: '输入片名、演员或关键词',
-                icon: $r('sys.symbol.magnifyingglass')
+                title: '未找到相关影片',
+                subtitle: `未搜索到与“${this.submitted}”相关的结果，请换个关键词试试`,
+                icon: $r('sys.symbol.film')
               })
             }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
           }
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
           .width('100%')
-          .alignItems(HorizontalAlign.Start)
-          .justifyContent(FlexAlign.Start)
-          .padding({ bottom: this.bottomInset + 20 })
+          .height('100%')
         }
-        .scrollBar(BarState.Off)
-        .width('100%')
-        .layoutWeight(1)
-        .align(Alignment.Top)
-        .onClick(() => {
-          this.hideKeyboard();
+        .onRefreshing(() => {
+          if (this.fetchLock) {
+            this.refreshing = false;
+            return;
+          }
+          this.doSearch(true, true);
         })
+        .pullToRefresh(!this.fetchLock)
+        .layoutWeight(1)
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
-          if (this.list.length === 0) {
-            Scroll() {
-              EmptyState({
-                title: '没有结果',
-                subtitle: `未找到与「${this.submitted}」相关的影片`,
-                icon: $r('sys.symbol.magnifyingglass')
-              })
-            }
-            .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.None)
-            .nestedScroll({
-              scrollForward: NestedScrollMode.SELF_FIRST,
-              scrollBackward: NestedScrollMode.SELF_FIRST
-            })
-            .width('100%')
-            .height('100%')
-          } else {
-            List({ space: 16 }) {
+          Column() {
+            List({ space: 12 }) {
+              ForEach(this.rowIds(), (row: number) => {
+                ListItem() {
+                  this.filmRow(row)
+                }
+              }, (row: number) => `row_${this.listCols()}_${row}_${this.list[row * this.listCols()]?.id}`)
+
               ListItem() {
-                Text(`共 ${this.page.total} 部与「${this.submitted}」相关`)
+                Text(this.loadingMore ? '加载中...' : (this.page.current >= this.page.pageCount ? '没有更多了' : ''))
                   .fontSize(12)
                   .fontColor(AppTheme.TEXT_MUTED)
                   .width('100%')
-                  .padding({ bottom: 8 })
-              }
-              ForEach(this.list, (film: MovieBasicInfo) => {
-                ListItem() {
-                  SearchResultItem({
-                    film: film,
-                    onSelect: (selected: MovieBasicInfo) => {
-                      this.hideKeyboard();
-                      NavUtil.openPlay(selected.id);
-                    }
-                  })
-                }
-              }, (film: MovieBasicInfo) => `${film.id}`)
-
-              ListItem() {
-                if (this.page.current < this.page.pageCount) {
-                  Text(this.loadingMore ? '加载中...' : '加载更多')
-                    .fontSize(13)
-                    .fontColor(AppTheme.TEXT_SECONDARY)
-                    .width('100%')
-                    .textAlign(TextAlign.Center)
-                    .padding({ top: 8, bottom: this.bottomInset + 32 })
-                    .onClick(() => this.doSearch(false))
-                } else {
-                  Text('没有更多了')
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_MUTED)
-                    .width('100%')
-                    .textAlign(TextAlign.Center)
-                    .padding({ top: 8, bottom: this.bottomInset + 32 })
-                }
+                  .height(60)
+                  .textAlign(TextAlign.Center)
               }
             }
             .width('100%')
@@ -570,6 +470,9 @@ struct SearchPage {
               this.doSearch(false);
             })
           }
+          .width('100%')
+          .height('100%')
+          .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
         }
         .onRefreshing(() => {
           if (this.fetchLock) {
@@ -584,7 +487,12 @@ struct SearchPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.topInset })
+    .padding({
+      top: this.topInset,
+      bottom: this.bottomInset,
+      left: this.leftInset,
+      right: this.rightInset
+    })
     .backgroundColor(AppTheme.BG)
   }
 }

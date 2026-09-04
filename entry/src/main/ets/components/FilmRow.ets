@@ -1,5 +1,6 @@
 import { MovieBasicInfo } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
+import { Breakpoint } from '../common/utils/Breakpoint';
 import { NavUtil } from '../common/utils/NavUtil';
 import { FilmCard } from './FilmCard';
 import { AppIcon } from './AppIcon';
@@ -11,6 +12,8 @@ export struct FilmRow {
   @Prop moreText: string = '查看全部';
   @Prop pid: number = 0;
   onMore?: () => void;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
 
   private openMore(): void {
     if (this.onMore) {
@@ -67,9 +70,9 @@ export struct FilmRow {
           .padding({ left: AppTheme.SPACE_LG })
       } else {
         Scroll() {
-          Row({ space: 10 }) {
+          Row({ space: AppTheme.SPACE_SM }) {
             ForEach(this.films, (film: MovieBasicInfo) => {
-              FilmCard({ film: film, cardWidth: 104 })
+              FilmCard({ film: film, cardWidth: Breakpoint.cardWidth(this.widthBp, this.windowWidth) })
             }, (film: MovieBasicInfo) => `${film.id}`)
           }
           .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })

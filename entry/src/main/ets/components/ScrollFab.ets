@@ -7,6 +7,7 @@ export struct ScrollFab {
   @Prop busy: boolean = false;
   @Prop src: Resource = $r('sys.symbol.arrow_up');
   @Prop bottom: number = AppTheme.SPACE_LG;
+  @Prop right: number = AppTheme.SPACE_LG;
   onClickFab: () => void = () => {};
 
   build() {
@@ -30,7 +31,7 @@ export struct ScrollFab {
     .backgroundColor(AppTheme.ACCENT)
     .borderRadius(22)
     .shadow({ radius: 12, color: 'rgba(0, 0, 0, 0.35)', offsetY: 4 })
-    .margin({ right: AppTheme.SPACE_LG, bottom: this.bottom })
+    .margin({ right: this.right, bottom: this.bottom })
     .opacity(this.visible ? 1 : 0)
     .scale({ x: this.visible ? 1 : 0.72, y: this.visible ? 1 : 0.72 })
     .translate({ y: this.visible ? 0 : 12 })

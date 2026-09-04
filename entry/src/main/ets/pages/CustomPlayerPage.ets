@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { AppIcon } from '../components/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
 import { PlayerWindow } from '../common/utils/PlayerWindow';
+import { Breakpoint } from '../common/utils/Breakpoint';
 import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { common } from '@kit.AbilityKit';
 
@@ -21,12 +22,15 @@ struct CustomPlayerPage {
   @State private viewH: number = 9;
   @State private playerFull: boolean = false;
   @State private playerActive: boolean = true;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private inputController: TextInputController = new TextInputController();
 
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     }, (left: number, right: number, width: number, height: number) => {
       this.leftInset = left;
       this.rightInset = right;
@@ -102,7 +106,7 @@ struct CustomPlayerPage {
 
   build() {
     Column() {
-      if (!this.playerFull) {
+      Column() {
         PageHeader({ title: '自定义播放' })
 
         Row() {
@@ -179,6 +183,8 @@ struct CustomPlayerPage {
         .width('100%')
         .padding(16)
       }
+      .width('100%')
+      .visibility(this.playerFull ? Visibility.None : Visibility.Visible)
 
       VideoPlayer({
         videoUrl: this.playUrl,
@@ -194,25 +200,24 @@ struct CustomPlayerPage {
         onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait)
       })
         .width('100%')
-        .aspectRatio(this.playerFull ? this.viewW / Math.max(this.viewH, 1) : 16 / 9)
-        .layoutWeight(this.playerFull ? 1 : 0)
-        .constraintSize(this.playerFull ?
-          { minWidth: '100%', maxWidth: '100%', minHeight: '100%', maxHeight: '100%' } :
-          { minHeight: 0 })
+        .height(this.playerFull ? '100%' : undefined)
+        .aspectRatio(this.playerFull ? undefined : 16 / 9)
+        .layoutWeight(this.playerFull || Breakpoint.isWide(this.widthBp) ? 1 : 0)
 
-      if (!this.playerFull) {
-        Text('仅支持直链 mp4 / m3u8，不会写入观看历史。')
-          .fontSize(12)
-          .fontColor(AppTheme.TEXT_MUTED)
-          .margin({ top: 16 })
-          .padding({ left: 16, right: 16 })
-      }
+      Text('仅支持直链 mp4 / m3u8，不会写入观看历史。')
+        .fontSize(12)
+        .fontColor(AppTheme.TEXT_MUTED)
+        .margin({ top: 16 })
+        .padding({ left: 16, right: 16 })
+        .visibility(this.playerFull ? Visibility.None : Visibility.Visible)
     }
     .width('100%')
     .height('100%')
     .padding({
       top: this.playerFull ? 0 : this.topInset,
-      bottom: this.playerFull ? 0 : this.bottomInset
+      bottom: this.playerFull ? 0 : this.bottomInset,
+      left: this.playerFull ? 0 : this.leftInset,
+      right: this.playerFull ? 0 : this.rightInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
   }

@@ -26,4 +26,6 @@ export class AppTheme {
 
   static readonly TAB_HEIGHT = 56;
   static readonly POSTER_RATIO = 1.5;
+  static readonly CONTENT_MAX_WIDTH = 1280;
+  static readonly SAFE_EDGE = 16;
 }

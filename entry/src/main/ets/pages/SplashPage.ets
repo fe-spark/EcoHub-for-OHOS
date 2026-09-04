@@ -17,6 +17,8 @@ struct SplashPage {
   @State private statusText: string = '正在接入服务...';
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
+  @State private leftInset: number = 0;
+  @State private rightInset: number = 0;
   @State private showUpdateDialog: boolean = false;
   @State private updateInfo: AppUpdateInfo = {
     currentVersion: '',
@@ -31,9 +33,11 @@ struct SplashPage {
 
   async aboutToAppear() {
     AppStorage.setOrCreate('UI_CONTEXT', this.getUIContext());
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number, left: number, right: number) => {
       this.topInset = top;
       this.bottomInset = bottom;
+      this.leftInset = left;
+      this.rightInset = right;
     });
     this.startBootstrapPipeline();
   }
@@ -169,7 +173,12 @@ struct SplashPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.topInset, bottom: this.bottomInset })
+    .padding({
+      top: this.topInset,
+      bottom: this.bottomInset,
+      left: this.leftInset,
+      right: this.rightInset
+    })
     .backgroundColor(AppTheme.BG)
   }
 }

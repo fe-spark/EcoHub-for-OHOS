@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.ecohub.spark",
     "vendor": "ecohub",
-    "versionCode": 1001007,
-    "versionName": "1.1.7",
+    "versionCode": 1002000,
+    "versionName": "1.2.0",
     "icon": "$media:layered_image",
     "label": "$string:app_name"
   }

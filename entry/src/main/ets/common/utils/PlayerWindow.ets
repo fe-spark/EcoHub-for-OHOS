@@ -26,8 +26,8 @@ export class PlayerWindow {
           await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_LANDSCAPE);
         }
       } else {
-        console.info(`[PlayerWindow] 退出全屏 -> 恢复 PORTRAIT`);
-        await win.setPreferredOrientation(window.Orientation.PORTRAIT);
+        console.info(`[PlayerWindow] 退出全屏 -> 恢复 AUTO_ROTATION_RESTRICTED`);
+        await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
         WindowBar.apply(context);
       }
     } catch (err) {

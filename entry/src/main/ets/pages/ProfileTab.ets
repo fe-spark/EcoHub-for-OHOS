@@ -230,18 +230,19 @@ export struct ProfileTab {
 
   build() {
     Stack({ alignContent: Alignment.Center }) {
-      Column() {
-        Row() {
-          AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 20, color: AppTheme.ACCENT })
-          Text('我的')
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-            .margin({ left: AppTheme.SPACE_SM })
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-        .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
+      Scroll() {
+        Column() {
+          Row() {
+            AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 20, color: AppTheme.ACCENT })
+            Text('我的')
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_PRIMARY)
+              .margin({ left: AppTheme.SPACE_SM })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_LG })
 
         Column() {
           Row() {
@@ -253,8 +254,8 @@ export struct ProfileTab {
                   .color(AppTheme.ACCENT)
               } else if (this.config.logo && this.config.logo.trim() && !this.logoLoadFailed) {
                 Image(ServerConfigManager.getInstance().resolveMediaUrl(this.config.logo.trim()))
-                  .width(52)
-                  .height(52)
+                  .width(56)
+                  .height(56)
                   .objectFit(ImageFit.Cover)
                   .borderRadius(AppTheme.RADIUS_LG)
                   .clip(true)
@@ -275,51 +276,63 @@ export struct ProfileTab {
                 }
               } else {
                 Image($r('app.media.startIcon'))
-                  .width(52)
-                  .height(52)
+                  .width(56)
+                  .height(56)
                   .objectFit(ImageFit.Cover)
                   .borderRadius(AppTheme.RADIUS_LG)
                   .clip(true)
                   .backgroundColor(AppTheme.BG_CARD)
               }
             }
-            .width(52)
-            .height(52)
+            .width(56)
+            .height(56)
             .borderRadius(AppTheme.RADIUS_LG)
             .clip(true)
             .backgroundColor(AppTheme.BG_CARD)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.1)' })
 
             Column() {
-              Text(this.config.siteName)
-                .width('100%')
-                .fontSize(17)
+              Text(this.config.siteName || 'EcoHub')
+                .fontSize(18)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(AppTheme.TEXT_PRIMARY)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text('当前软件源')
-                .width('100%')
-                .fontSize(11)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .margin({ top: 2 })
-              Text(this.sourceHost())
-                .width('100%')
-                .fontSize(13)
-                .fontColor(AppTheme.TEXT_PRIMARY)
-                .margin({ top: 2 })
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+              Row() {
+                Text('软件源')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(AppTheme.ACCENT)
+                Text(this.sourceHost())
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_SECONDARY)
+                  .margin({ left: 6 })
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              .padding({ left: 8, right: 10, top: 4, bottom: 4 })
+              .backgroundColor('rgba(255, 255, 255, 0.05)')
+              .borderRadius(AppTheme.RADIUS_SM)
+              .margin({ top: 6 })
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
             .constraintSize({ minWidth: 0 })
             .margin({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_SM })
 
-            AppIcon({
-              src: $r('sys.symbol.chevron_right'),
-              iconSize: 15,
-              color: AppTheme.TEXT_SECONDARY
-            })
+            Row() {
+              AppIcon({
+                src: $r('sys.symbol.chevron_right'),
+                iconSize: 14,
+                color: AppTheme.TEXT_MUTED
+              })
+            }
+            .width(28)
+            .height(28)
+            .borderRadius(14)
+            .backgroundColor('rgba(255, 255, 255, 0.04)')
+            .justifyContent(FlexAlign.Center)
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
@@ -433,10 +446,16 @@ export struct ProfileTab {
         .clip(true)
       }
       .width('100%')
-      .height('100%')
-      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+      .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
+      .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_LG })
       .alignItems(HorizontalAlign.Start)
-      .backgroundColor(AppTheme.BG)
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
+    .align(Alignment.Top)
+    .backgroundColor(AppTheme.BG)
 
       if (this.showUpdateDialog) {
         VersionUpdateDialog({

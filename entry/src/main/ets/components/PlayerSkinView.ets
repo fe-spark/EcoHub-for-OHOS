@@ -52,6 +52,7 @@ export struct PlayerSkinView {
   @Prop leftInset: number = 0;
   @Prop rightInset: number = 0;
   @Prop bottomInset: number = 0;
+  @Prop edgeHud: boolean = false;
   @Prop ready: boolean = false;
 
   events?: PlayerSkinEvents;
@@ -83,6 +84,7 @@ export struct PlayerSkinView {
       leftInset: this.leftInset,
       rightInset: this.rightInset,
       bottomInset: this.bottomInset,
+      edgeHud: this.edgeHud,
       ready: this.ready,
       onBack: () => { if (this.events) this.events.onBack(); },
       onPlay: () => { if (this.events) this.events.onPlay(); },

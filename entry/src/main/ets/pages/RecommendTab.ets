@@ -7,8 +7,10 @@ import { FilmRow } from '../components/FilmRow';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
 import { AppIcon } from '../components/AppIcon';
+import { HomeBanner } from '../components/HomeBanner';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 const CATEGORY_FONT_FAMILY: string = 'CalligraphyFont';
 const CATEGORY_ICON_SIZE: number = 17;
@@ -34,10 +36,9 @@ export struct RecommendTab {
   @State private refreshing: boolean = false;
   @State private errorText: string = '';
   private scroller: Scroller = new Scroller();
-  private swiperController: SwiperController = new SwiperController();
-  @State private currentBannerIndex: number = 0;
   @State private reloadToken: number = 0;
   @State private headerAlpha: number = 0;
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
 
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
@@ -73,13 +74,6 @@ export struct RecommendTab {
       this.sections = home.content;
       this.reloadToken = Date.now();
       ok = true;
-      if (fromPull && this.banners.length > 0) {
-        this.currentBannerIndex = 0;
-        try {
-          this.swiperController.changeIndex(0, false);
-        } catch (_err) {
-        }
-      }
     } catch (err) {
       this.errorText = err instanceof Error ? err.message : '首页加载失败';
     } finally {
@@ -90,14 +84,6 @@ export struct RecommendTab {
         RefreshHint.succeed();
       }
     }
-  }
-
-  private displayBanners(): BannerItem[] {
-    if (this.banners.length === 2) {
-      // 扩充为 4 张循环副本，解决仅有 2 张时 Swiper 左右两翼无法同时渲染出上一张/下一张露出卡片的问题
-      return [this.banners[0], this.banners[1], this.banners[0], this.banners[1]];
-    }
-    return this.banners;
   }
 
   private visibleSections(): HomeSection[] {
@@ -157,121 +143,6 @@ export struct RecommendTab {
     .onClick(() => {
       NavUtil.openFilter(section.nav.id);
     })
-  }
-
-  @Builder
-  heroBannerItem(item: BannerItem) {
-    Stack({ alignContent: Alignment.Bottom }) {
-      // 1. 海报大图（多张时为圆角卡片，单张时满铺全屏直角无留白）
-      Image(FormatUtil.bannerBackdrop(item))
-        .width('100%')
-        .height('100%')
-        .objectFit(ImageFit.Cover)
-        .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
-
-      // 2. 顶部微暗角遮罩（保障 Header 纯净可读）
-      Column()
-        .width('100%')
-        .height(110)
-        .position({ x: 0, y: 0 })
-        .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
-        .linearGradient({
-          angle: 180,
-          colors: [
-            ['rgba(10, 11, 16, 0.70)', 0],
-            ['rgba(10, 11, 16, 0.20)', 0.55],
-            ['rgba(10, 11, 16, 0.0)', 1.0]
-          ]
-        })
-
-      // 3. 底部 5 阶指数羽化遮罩（海报与页面黑位融合）
-      Column()
-        .width('100%')
-        .height('100%')
-        .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
-        .linearGradient({
-          angle: 180,
-          colors: [
-            ['rgba(10, 11, 16, 0.0)', 0.0],
-            ['rgba(10, 11, 16, 0.20)', 0.40],
-            ['rgba(10, 11, 16, 0.70)', 0.70],
-            ['rgba(10, 11, 16, 0.95)', 0.90],
-            ['#0A0B10', 1.0]
-          ]
-        })
-
-      // 4. Apple TV+ 居中对称排版层
-      Column() {
-        // 极简大片标 (24vp 特粗纯白 + 居中对齐 + 电影级文字阴影)
-        Text(item.name)
-          .fontSize(23)
-          .fontWeight(FontWeight.Bolder)
-          .fontColor('#FFFFFF')
-          .textAlign(TextAlign.Center)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .textShadow({
-            radius: 10,
-            color: 'rgba(0, 0, 0, 0.90)',
-            offsetY: 2
-          })
-
-        // 极细元数据副标 (居中对齐)
-        Row({ space: 6 }) {
-          if (item.remark) {
-            Text(item.remark)
-              .fontSize(11)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#FA8C16')
-          }
-          Text(FormatUtil.joinMeta([item.year, item.cName, item.area]))
-            .fontSize(12)
-            .fontColor('rgba(255, 255, 255, 0.75)')
-        }
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 6, bottom: 14 })
-
-        // 主操作：主题琥珀金流光播放胶囊（居中）
-        Row({ space: 6 }) {
-          AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 13, color: '#FFFFFF' })
-          Text('立即播放')
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-        }
-        .height(36)
-        .padding({ left: 22, right: 24 })
-        .linearGradient({
-          angle: 90,
-          colors: [['#FA8C16', 0], ['#FFA940', 1]]
-        })
-        .borderRadius(AppTheme.RADIUS_PILL)
-        .shadow({
-          radius: 12,
-          color: 'rgba(250, 140, 22, 0.38)',
-          offsetY: 4
-        })
-        .onClick(() => {
-          NavUtil.openPlay(item.mid > 0 ? item.mid : item.id);
-        })
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Center)
-      .padding({
-        left: AppTheme.SPACE_MD,
-        right: AppTheme.SPACE_MD,
-        bottom: AppTheme.SPACE_LG
-      })
-    }
-    .width('100%')
-    .height('100%')
-    .borderRadius(this.banners.length > 1 ? AppTheme.RADIUS_LG : 0)
-    .clip(true)
-    .shadow(this.banners.length > 1 ? {
-      radius: 12,
-      color: 'rgba(0, 0, 0, 0.50)',
-      offsetY: 4
-    } : undefined)
   }
 
   @Builder
@@ -459,47 +330,10 @@ export struct RecommendTab {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll(this.scroller) {
             Column() {
-              if (this.banners.length > 0) {
-                Column() {
-                  Swiper(this.swiperController) {
-                    ForEach(this.displayBanners(), (item: BannerItem, index: number) => {
-                      this.heroBannerItem(item)
-                    }, (item: BannerItem, index: number) => `banner_${item.id}_${index}_${this.reloadToken}`)
-                  }
-                  .autoPlay(this.banners.length > 1)
-                  .interval(4800)
-                  .loop(this.banners.length > 1)
-                  .indicator(false)
-                  .prevMargin(this.banners.length > 1 ? 20 : 0)
-                  .nextMargin(this.banners.length > 1 ? 20 : 0)
-                  .itemSpace(this.banners.length > 1 ? 10 : 0)
-                  .onChange((index: number) => {
-                    this.currentBannerIndex = index % this.banners.length;
-                  })
-                  .width('100%')
-                  .height(this.banners.length > 1 ? 430 : 450)
-
-                  // 居中指示条（置于首尾露出轮播图下方，按真实数据数量显示点数）
-                  if (this.banners.length > 1) {
-                    Row({ space: 4 }) {
-                      ForEach(this.banners, (_b: BannerItem, bIdx: number) => {
-                        Row()
-                          .width(bIdx === (this.currentBannerIndex % this.banners.length) ? 18 : 5)
-                          .height(3.5)
-                          .borderRadius(2)
-                          .backgroundColor(bIdx === (this.currentBannerIndex % this.banners.length) ? '#FA8C16' : 'rgba(255, 255, 255, 0.25)')
-                          .animation({ duration: 250, curve: Curve.EaseInOut })
-                      }, (_b: BannerItem, bIdx: number) => `ind_${bIdx}`)
-                    }
-                    .margin({ top: 12 })
-                    .justifyContent(FlexAlign.Center)
-                  }
-                }
-                .width('100%')
-                .margin({ bottom: this.banners.length > 1 ? AppTheme.SPACE_XL : AppTheme.SPACE_LG })
-              } else {
-                Blank().height(48)
-              }
+              HomeBanner({
+                banners: this.banners,
+                reloadToken: this.reloadToken
+              })
 
               // 片库分类快捷导航胶囊
               if (this.visibleSections().length > 0) {
