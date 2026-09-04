@@ -49,6 +49,8 @@ struct PlayPage {
   @State private viewH: number = 9;
   @State private playerFull: boolean = false;
   @State private playerActive: boolean = true;
+  @State private pageW: number = 0;
+  @State private pageH: number = 0;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private sourceName: string = '';
   private reconnectCb: () => void = () => {};
@@ -60,15 +62,18 @@ struct PlayPage {
   private lastDuration: number = 0;
 
   private applyWindowBar(): void {
-    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext, (top: number, bottom: number) => {
-      this.topInset = top;
-      this.bottomInset = bottom;
-    }, (left: number, right: number, width: number, height: number) => {
-      this.leftInset = left;
-      this.rightInset = right;
-      this.viewW = width;
-      this.viewH = height;
-    });
+    WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext,
+      (top: number, bottom: number, left: number, right: number) => {
+        this.topInset = top;
+        this.bottomInset = bottom;
+        this.leftInset = left;
+        this.rightInset = right;
+      }, (left: number, right: number, width: number, height: number) => {
+        this.leftInset = left;
+        this.rightInset = right;
+        this.viewW = width;
+        this.viewH = height;
+      });
   }
 
   async aboutToAppear(): Promise<void> {
@@ -306,8 +311,17 @@ struct PlayPage {
     this.loadRelate();
   }
 
+  private isWideScreen(): boolean {
+    if (this.pageW > 0 && this.pageH > 0) {
+      return this.pageW >= 600 && this.pageW > this.pageH;
+    }
+    const winW = Breakpoint.windowWidth();
+    const winH = Breakpoint.windowHeight();
+    return Breakpoint.isWide(this.widthBp) && winW > winH;
+  }
+
   private splitPlay(): boolean {
-    return Breakpoint.isWide(this.widthBp) && !this.playerFull;
+    return !this.playerFull && this.isWideScreen();
   }
 
   private hudLeftInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0; }
@@ -470,6 +484,14 @@ struct PlayPage {
     }
     .width('100%')
     .height('100%')
+    .onAreaChange((_old: Area, newArea: Area) => {
+      const w = Number(newArea.width);
+      const h = Number(newArea.height);
+      if (w > 0 && h > 0) {
+        this.pageW = w;
+        this.pageH = h;
+      }
+    })
     .padding({
       top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
       bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset

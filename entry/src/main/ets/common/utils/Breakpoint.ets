@@ -102,13 +102,16 @@ export class Breakpoint {
   static bannerPeek(bp: string, windowWidth?: number): number {
     const w = (windowWidth !== undefined && windowWidth > 0) ? windowWidth : Breakpoint.windowWidth();
     if (w >= 1440) {
-      return 96;
+      return 140;
     }
     if (w >= 1100) {
-      return 64;
+      return 104;
     }
-    if (Breakpoint.isWide(bp)) {
-      return 40;
+    if (w >= 780 || bp === 'lg' || bp === 'xl') {
+      return 84;
+    }
+    if (Breakpoint.isWide(bp) || w >= 600) {
+      return 68;
     }
     return 20;
   }

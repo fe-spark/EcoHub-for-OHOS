@@ -17,7 +17,7 @@ const CATEGORY_ICON_SIZE: number = 17;
 const CATEGORY_ICON_RADIUS: number = 8.5;
 const CATEGORY_TAG_HEIGHT: number = 32;
 const CATEGORY_GLYPH_SIZE: number = 10;
-const CATEGORY_LABEL_SIZE: number = 12.5;
+const CATEGORY_LABEL_SIZE: number = 13;
 const CATEGORY_ICON_BG: string = 'rgba(250, 140, 22, 0.12)';
 const CATEGORY_ICON_BORDER: string = 'rgba(250, 140, 22, 0.28)';
 const CATEGORY_ICON_BORDER_WIDTH: number = 0.6;
@@ -120,42 +120,59 @@ export struct RecommendTab {
 
   @Builder
   categoryEntry(section: HomeSection) {
-    Row({ space: AppTheme.SPACE_SM - 2 }) {
+    Row({ space: this.isWide() ? 6 : (AppTheme.SPACE_SM - 2) }) {
       if (this.categoryGlyph(section.nav.name)) {
         Row() {
           Text(this.categoryGlyph(section.nav.name))
             .fontFamily(CATEGORY_FONT_FAMILY)
-            .fontSize(CATEGORY_GLYPH_SIZE)
+            .fontSize(this.isWide() ? 11 : CATEGORY_GLYPH_SIZE)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.ACCENT)
         }
-        .width(CATEGORY_ICON_SIZE)
-        .height(CATEGORY_ICON_SIZE)
+        .width(this.isWide() ? 19 : CATEGORY_ICON_SIZE)
+        .height(this.isWide() ? 19 : CATEGORY_ICON_SIZE)
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
-        .borderRadius(CATEGORY_ICON_RADIUS)
-        .backgroundColor(CATEGORY_ICON_BG)
-        .border({ width: CATEGORY_ICON_BORDER_WIDTH, color: CATEGORY_ICON_BORDER })
+        .borderRadius(this.isWide() ? 9.5 : CATEGORY_ICON_RADIUS)
+        .backgroundColor(this.isWide() ? 'rgba(250, 140, 22, 0.14)' : CATEGORY_ICON_BG)
+        .border({
+          width: this.isWide() ? 0.7 : CATEGORY_ICON_BORDER_WIDTH,
+          color: this.isWide() ? 'rgba(250, 140, 22, 0.32)' : CATEGORY_ICON_BORDER
+        })
         .clip(true)
       }
       Text(section.nav.name)
-        .fontSize(CATEGORY_LABEL_SIZE)
+        .fontSize(this.isWide() ? 13.5 : CATEGORY_LABEL_SIZE)
         .fontWeight(FontWeight.Medium)
         .fontColor(AppTheme.TEXT_PRIMARY)
         .maxLines(1)
     }
-    .height(CATEGORY_TAG_HEIGHT)
-    .padding({ left: AppTheme.SPACE_SM - 2, right: AppTheme.SPACE_MD - 1 })
+    .height(this.isWide() ? 35 : CATEGORY_TAG_HEIGHT)
+    .padding({
+      left: this.isWide() ? 8 : (AppTheme.SPACE_SM - 2),
+      right: this.isWide() ? 13 : (AppTheme.SPACE_MD - 1)
+    })
     .justifyContent(FlexAlign.Center)
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(CATEGORY_CHIP_BG)
+    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.06)' : CATEGORY_CHIP_BG)
     .backdropBlur(CATEGORY_CHIP_BLUR)
     .borderRadius(AppTheme.RADIUS_PILL)
     .clip(true)
-    .border({ width: CATEGORY_CHIP_BORDER_WIDTH, color: CATEGORY_CHIP_BORDER })
+    .border({
+      width: this.isWide() ? 0.8 : CATEGORY_CHIP_BORDER_WIDTH,
+      color: this.isWide() ? 'rgba(255, 255, 255, 0.12)' : CATEGORY_CHIP_BORDER
+    })
     .onClick(() => {
       NavUtil.openFilter(section.nav.id);
     })
+  }
+
+  private isWide(): boolean {
+    return Breakpoint.isWide(this.widthBp);
+  }
+
+  private effectiveHeaderAlpha(): number {
+    return Breakpoint.isWide(this.widthBp) ? Math.min(0.92, 0.76 + 0.16 * this.headerAlpha) : this.headerAlpha;
   }
 
   @Builder
@@ -195,11 +212,11 @@ export struct RecommendTab {
       }
       .height(34)
       .padding({ left: 12, right: 14 })
-      .backgroundColor(`rgba(${Math.round(22 * this.headerAlpha)}, ${Math.round(23 * this.headerAlpha)}, ${Math.round(31 * this.headerAlpha)}, ${0.36 + 0.64 * this.headerAlpha})`)
+      .backgroundColor(`rgba(${Math.round(22 * this.effectiveHeaderAlpha())}, ${Math.round(23 * this.effectiveHeaderAlpha())}, ${Math.round(31 * this.effectiveHeaderAlpha())}, ${0.36 + 0.64 * this.effectiveHeaderAlpha()})`)
       .borderRadius(AppTheme.RADIUS_PILL)
       .border({
         width: 1,
-        color: `rgba(255, 255, 255, ${0.16 * (1 - this.headerAlpha) + 0.08 * this.headerAlpha})`
+        color: `rgba(255, 255, 255, ${0.16 * (1 - this.effectiveHeaderAlpha()) + 0.08 * this.effectiveHeaderAlpha()})`
       })
       .onClick(() => {
         if (this.onOpenSearch) {
@@ -217,11 +234,13 @@ export struct RecommendTab {
       right: AppTheme.SPACE_LG + this.rightInset
     })
     .alignItems(VerticalAlign.Center)
-    .backgroundColor(`rgba(10, 11, 16, ${this.headerAlpha})`)
+    .backgroundColor(`rgba(10, 11, 16, ${this.effectiveHeaderAlpha()})`)
+    .backdropBlur(this.isWide() || this.headerAlpha > 0 ? 25 : 0)
     .border({
-      width: { bottom: this.headerAlpha > 0.5 ? 0.5 : 0 },
-      color: `rgba(255, 255, 255, ${Math.max(0, (this.headerAlpha - 0.5) * 0.16)})`
+      width: { bottom: (this.isWide() || this.headerAlpha > 0.5) ? 0.5 : 0 },
+      color: `rgba(255, 255, 255, ${this.isWide() ? 0.08 : Math.max(0, (this.headerAlpha - 0.5) * 0.16)})`
     })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
   }
 
   private handleTouch(event: TouchEvent): void {
@@ -322,7 +341,7 @@ export struct RecommendTab {
           .width('100%')
           .height('100%')
           .padding({
-            top: this.topInset,
+            top: 48 + this.topInset,
             left: this.leftInset,
             right: this.rightInset
           })
@@ -422,6 +441,8 @@ export struct RecommendTab {
       } else {
         Scroll(this.scroller) {
           Column() {
+            Blank().height(Breakpoint.isWide(this.widthBp) ? (48 + this.topInset + 8) : 0)
+
             HomeBanner({
               banners: this.banners,
               reloadToken: this.reloadToken
@@ -431,7 +452,7 @@ export struct RecommendTab {
             if (this.visibleSections().length > 0) {
               Column() {
                 Scroll() {
-                  Row({ space: AppTheme.SPACE_SM }) {
+                  Row({ space: this.isWide() ? 8 : AppTheme.SPACE_SM }) {
                     ForEach(this.visibleSections(), (section: HomeSection) => {
                       this.categoryEntry(section)
                     }, (section: HomeSection) => `cat_${section.nav.id}_${this.reloadToken}`)
@@ -454,7 +475,7 @@ export struct RecommendTab {
               }
               .width('100%')
               .alignItems(HorizontalAlign.Start)
-              .margin({ bottom: AppTheme.SPACE_LG })
+              .margin({ bottom: this.isWide() ? 14 : AppTheme.SPACE_LG })
             }
 
             // 各分类影视横向推荐流（通栏无卡片沉浸背景带）

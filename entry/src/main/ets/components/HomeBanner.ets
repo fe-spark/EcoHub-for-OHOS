@@ -107,12 +107,12 @@ export struct HomeBanner {
         }
 
         Text(item.name)
-          .fontSize(this.windowHeight < 500 ? 22 : 28)
+          .fontSize(this.windowHeight < 500 ? 20 : 28)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .margin({ top: 12, bottom: 6 })
+          .margin({ top: this.windowHeight < 500 ? 8 : 12, bottom: this.windowHeight < 500 ? 4 : 6 })
           .textShadow({
             radius: 8,
             color: 'rgba(0, 0, 0, 0.85)',
@@ -120,31 +120,31 @@ export struct HomeBanner {
           })
 
         Text(FormatUtil.joinMeta([item.year, item.cName, item.area]))
-          .fontSize(12)
+          .fontSize(this.windowHeight < 500 ? 11 : 12)
           .fontColor(AppTheme.TEXT_SECONDARY)
-          .margin({ bottom: 10 })
+          .margin({ bottom: this.windowHeight < 500 ? 6 : 10 })
 
         if (item.blurb) {
           Text(item.blurb.trim())
-            .fontSize(12)
+            .fontSize(this.windowHeight < 500 ? 11 : 12)
             .fontColor(AppTheme.TEXT_MUTED)
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .lineHeight(18)
-            .margin({ bottom: 18 })
+            .lineHeight(this.windowHeight < 500 ? 16 : 18)
+            .margin({ bottom: this.windowHeight < 500 ? 12 : 18 })
         } else {
-          Blank().height(10)
+          Blank().height(this.windowHeight < 500 ? 6 : 10)
         }
 
         Row({ space: 6 }) {
-          AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 13, color: '#FFFFFF' })
+          AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: this.windowHeight < 500 ? 12 : 13, color: '#FFFFFF' })
           Text('立即播放')
-            .fontSize(13)
+            .fontSize(this.windowHeight < 500 ? 12 : 13)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFFFFF')
         }
-        .height(38)
-        .padding({ left: 22, right: 24 })
+        .height(this.windowHeight < 500 ? 34 : 38)
+        .padding({ left: this.windowHeight < 500 ? 18 : 22, right: this.windowHeight < 500 ? 20 : 24 })
         .linearGradient({
           angle: 90,
           colors: [['#FA8C16', 0], ['#FFA940', 1]]
@@ -163,10 +163,10 @@ export struct HomeBanner {
       .constraintSize({ maxWidth: 480 })
       .height('100%')
       .padding({
-        left: 36,
+        left: this.windowHeight < 500 ? 28 : 36,
         right: 16,
-        top: 24,
-        bottom: 24
+        top: this.windowHeight < 500 ? 14 : 24,
+        bottom: this.windowHeight < 500 ? 14 : 24
       })
       .alignItems(HorizontalAlign.Start)
       .justifyContent(FlexAlign.Center)
@@ -331,12 +331,12 @@ export struct HomeBanner {
                   .animation({ duration: 250, curve: Curve.EaseInOut })
               }, (_b: BannerItem, bIdx: number) => `ind_${bIdx}`)
             }
-            .margin({ top: 12 })
+            .margin({ top: this.windowHeight < 500 ? 8 : 12 })
             .justifyContent(FlexAlign.Center)
           }
         }
         .width('100%')
-        .margin({ bottom: this.banners.length > 1 ? AppTheme.SPACE_XL : AppTheme.SPACE_LG })
+        .margin({ bottom: this.banners.length > 1 ? (Breakpoint.isWide(this.widthBp) && this.windowHeight < 500 ? 14 : AppTheme.SPACE_XL) : AppTheme.SPACE_LG })
       } else {
         Blank().height(48)
       }

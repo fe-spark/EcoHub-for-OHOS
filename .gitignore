@@ -7,3 +7,4 @@ oh_modules/
 node_modules/
 local.properties
 .ai/
+dist/

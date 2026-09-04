@@ -109,10 +109,10 @@ export struct FilmCard {
           .margin({ top: 2 })
       }
     }
-    .width(this.cardSize())
     .alignItems(HorizontalAlign.Start)
     .scale({ x: this.pressed ? 0.96 : 1, y: this.pressed ? 0.96 : 1 })
     .animation({ duration: 120, curve: Curve.EaseOut })
+    .width(this.cardSize())
     .onTouch((event: TouchEvent) => {
       if (event.type === TouchType.Down) {
         this.pressed = true;

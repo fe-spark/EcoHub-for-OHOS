@@ -490,12 +490,12 @@ export struct PlayDetailPanel {
       }
     }
     .sticky(StickyStyle.Header)
-    .width('100%')
-    .height('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .opacity(this.ready ? 1 : 0)
     .animation({ duration: 150, curve: Curve.EaseOut })
+    .width('100%')
+    .height('100%')
     .onAppear(() => {
       this.scrollToFocusedEpisode(false);
       this.syncSourceBar(false);

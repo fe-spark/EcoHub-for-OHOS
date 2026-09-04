@@ -277,7 +277,6 @@ struct Index {
             }
             if (this.tabReady[1]) {
               DailyUpdatesTab()
-                .padding({ top: this.topInset, left: this.leftInset, right: this.rightInset })
                 .visibility(this.currentTabIndex === 1 ? Visibility.Visible : Visibility.None)
             }
             if (this.tabReady[2]) {

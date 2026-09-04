@@ -7,11 +7,11 @@
         "material": {
           "certpath": "/Users/spark/.ohos/config/default_app-for-ohos_CJ4IUO3N-R8rD41cyiN8OU8VogqqnZyUo1oVYi_QbXc=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001AF68226D87915DEF0DF434C13F189C5768B1E6CAC78EE0E61B3B85566EEE1A9EC6F22660A19CD",
+          "keyPassword": "0000001ABFAB1D2EF613748A458498F42082AB5DEB8C41351D927653CCB8D67F686CA4EFC6BF58B4B3BF",
           "profile": "/Users/spark/.ohos/config/default_app-for-ohos_CJ4IUO3N-R8rD41cyiN8OU8VogqqnZyUo1oVYi_QbXc=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "/Users/spark/.ohos/config/default_app-for-ohos_CJ4IUO3N-R8rD41cyiN8OU8VogqqnZyUo1oVYi_QbXc=.p12",
-          "storePassword": "0000001AACB5A5CCFDC62004BA5FE21E955619C308AF3BDDCDB5BA4B3B28EB88015DF13B2AFDA98F00F5"
+          "storePassword": "0000001A24F711BE66F37AA2E5C9FFB4961565B1FF6D87B0F2BC434A7BB9E3FE669DFDEE18214E00143B"
         }
       }
     ],

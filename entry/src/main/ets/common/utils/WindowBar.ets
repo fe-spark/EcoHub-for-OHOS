@@ -10,6 +10,7 @@ export class WindowBar {
   private static onSize?: (size: Size) => void;
   private static onInsets?: (top: number, bottom: number, left: number, right: number) => void;
   private static onDisplay?: (left: number, right: number, width: number, height: number) => void;
+  private static avoidTimer: number = -1;
 
   static apply(context?: common.UIAbilityContext,
     onInsets?: (top: number, bottom: number, left: number, right: number) => void,
@@ -36,12 +37,17 @@ export class WindowBar {
       });
       WindowBar.bindListener(win);
       WindowBar.notifyInsets(win);
+      WindowBar.notifySize(win);
     }).catch((err: Error) => {
       console.error('apply window bar failed:', JSON.stringify(err));
     });
   }
 
   private static bindListener(win: window.Window): void {
+    if (WindowBar.avoidTimer !== -1) {
+      clearTimeout(WindowBar.avoidTimer);
+      WindowBar.avoidTimer = -1;
+    }
     if (WindowBar.listenedWin) {
       if (WindowBar.onAvoid) {
         try {
@@ -58,13 +64,24 @@ export class WindowBar {
     }
     WindowBar.listenedWin = win;
     WindowBar.onAvoid = (_data: window.AvoidAreaOptions) => {
-      if (WindowBar.listenedWin) {
-        WindowBar.notifyInsets(WindowBar.listenedWin);
+      if (WindowBar.avoidTimer !== -1) {
+        clearTimeout(WindowBar.avoidTimer);
       }
+      WindowBar.avoidTimer = setTimeout(() => {
+        WindowBar.avoidTimer = -1;
+        if (WindowBar.listenedWin) {
+          WindowBar.notifyInsets(WindowBar.listenedWin);
+        }
+      }, 80);
     };
-    WindowBar.onSize = (_size: Size) => {
+    WindowBar.onSize = (size: Size) => {
+      if (WindowBar.avoidTimer !== -1) {
+        clearTimeout(WindowBar.avoidTimer);
+        WindowBar.avoidTimer = -1;
+      }
       if (WindowBar.listenedWin) {
         WindowBar.notifyInsets(WindowBar.listenedWin);
+        WindowBar.notifySize(WindowBar.listenedWin, size);
       }
     };
     win.on('avoidAreaChange', WindowBar.onAvoid);
@@ -99,15 +116,34 @@ export class WindowBar {
       if (WindowBar.onInsets) {
         WindowBar.onInsets(topVp, bottomVp, leftVp, rightVp);
       }
-      const rect = win.getWindowProperties().windowRect;
-      const widthVp = uiContext.px2vp(rect.width);
-      const heightVp = uiContext.px2vp(rect.height);
+    } catch (err) {
+      console.error('notifyInsets failed:', JSON.stringify(err));
+    }
+  }
+
+  private static notifySize(win: window.Window, size?: Size): void {
+    try {
+      const uiContext = win.getUIContext();
+      let widthPx: number;
+      let heightPx: number;
+      if (size && size.width > 0 && size.height > 0) {
+        widthPx = size.width;
+        heightPx = size.height;
+      } else {
+        const rect = win.getWindowProperties().windowRect;
+        widthPx = rect.width;
+        heightPx = rect.height;
+      }
+      const widthVp = uiContext.px2vp(widthPx);
+      const heightVp = uiContext.px2vp(heightPx);
       Breakpoint.publish(widthVp, heightVp);
       if (WindowBar.onDisplay) {
+        const leftVp = WindowBar.leftInset();
+        const rightVp = WindowBar.rightInset();
         WindowBar.onDisplay(leftVp, rightVp, widthVp, heightVp);
       }
     } catch (err) {
-      console.error('notifyInsets failed:', JSON.stringify(err));
+      console.error('notifySize failed:', JSON.stringify(err));
     }
   }
 

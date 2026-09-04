@@ -129,7 +129,6 @@ export struct PlayerVideoLayer {
           x: this.calcScaleX(),
           y: this.calcScaleY()
         })
-        .animation({ duration: 200, curve: Curve.EaseOut })
         .hitTestBehavior(HitTestMode.None)
         .onLoad(() => {
           try {

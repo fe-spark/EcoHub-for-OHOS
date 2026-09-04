@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { DailyUpdatePane } from './DailyUpdatePane';
+import { Breakpoint } from '../common/utils/Breakpoint';
 
 const PAGE_SIZE = 21;
 
@@ -27,6 +28,23 @@ export struct DailyUpdatesTab {
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
+  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+  @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
+  @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
+  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
+  @State private headerHeight: number = 0;
+
+  private isWide(): boolean {
+    return Breakpoint.isWide(this.widthBp);
+  }
+
+  private getHeaderHeight(): number {
+    if (this.headerHeight > 0) {
+      return this.headerHeight;
+    }
+    return (this.isWide() ? 38 : 44) + this.topInset + (this.categories.length > 1 ? (this.isWide() ? 40 : 48) : 8);
+  }
+
 
   aboutToAppear() {
     this.reconnectCb = () => {
@@ -114,116 +132,150 @@ export struct DailyUpdatesTab {
   @Builder
   filterChip(index: number, item: DailyUpdateCategory) {
     Text(item.name)
-      .fontSize(13)
+      .fontSize(this.isWide() ? 13.5 : 13)
       .fontWeight(this.currentIndex === index ? FontWeight.Bold : FontWeight.Regular)
       .fontColor(this.currentIndex === index ? '#FFFFFF' : AppTheme.TEXT_SECONDARY)
-      .height(28)
-      .padding({ left: 12, right: 12 })
-      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : Color.Transparent)
+      .height(this.isWide() ? 35 : 32)
+      .padding({
+        left: this.isWide() ? 14 : 13,
+        right: this.isWide() ? 14 : 13
+      })
+      .backgroundColor(this.currentIndex === index ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.06)')
       .borderRadius(AppTheme.RADIUS_PILL)
+      .border({
+        width: 0.5,
+        color: this.currentIndex === index ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
+      })
       .onClick(() => {
         this.selectIndex(index);
       })
   }
 
-  build() {
+  @Builder
+  headerView() {
     Column() {
-      Column() {
+      Row() {
         Row() {
-          Row() {
-            AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 20, color: AppTheme.ACCENT })
-            Text('每日更新')
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .margin({ left: 6 })
+          AppIcon({ src: $r('sys.symbol.flame_fill'), iconSize: 20, color: AppTheme.ACCENT })
+          Text('每日更新')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+            .margin({ left: 6 })
 
-            if (this.categories.length > 0) {
-              Text('·')
+          if (this.categories.length > 0) {
+            Text('·')
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.TEXT_MUTED)
+              .margin({ left: 8, right: 8 })
+
+            Row() {
+              Text('近 24 小时 ')
+                .fontSize(12)
+                .fontColor(AppTheme.TEXT_MUTED)
+              Text(`${this.currentCategory().count}`)
                 .fontSize(12)
                 .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ACCENT)
+              Text(' 部')
+                .fontSize(12)
                 .fontColor(AppTheme.TEXT_MUTED)
-                .margin({ left: 8, right: 8 })
-
-              Row() {
-                Text('近 24 小时 ')
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                Text(`${this.currentCategory().count}`)
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AppTheme.ACCENT)
-                Text(' 部')
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-              }
             }
           }
-          .layoutWeight(1)
-
-          Button({ type: ButtonType.Circle, stateEffect: true }) {
-            if (this.loading) {
-              LoadingProgress()
-                .width(16)
-                .height(16)
-                .color(AppTheme.ACCENT)
-            } else {
-              AppIcon({
-                src: $r('sys.symbol.arrow_counterclockwise'),
-                iconSize: 17,
-                color: AppTheme.TEXT_SECONDARY
-              })
-            }
-          }
-          .width(32)
-          .height(32)
-          .backgroundColor(Color.Transparent)
-          .onClick(() => {
-            if (!this.fetchLock) {
-              this.loadMeta();
-            }
-          })
         }
-        .width('100%')
-        .height(38)
-        .alignItems(VerticalAlign.Center)
-        .padding({
-          left: AppTheme.SPACE_LG,
-          right: AppTheme.SPACE_LG
+        .layoutWeight(1)
+
+        Button({ type: ButtonType.Circle, stateEffect: true }) {
+          if (this.loading) {
+            LoadingProgress()
+              .width(16)
+              .height(16)
+              .color(AppTheme.ACCENT)
+          } else {
+            AppIcon({
+              src: $r('sys.symbol.arrow_counterclockwise'),
+              iconSize: 16,
+              color: AppTheme.TEXT_SECONDARY
+            })
+          }
+        }
+        .width(32)
+        .height(32)
+        .backgroundColor('rgba(255, 255, 255, 0.06)')
+        .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.10)' })
+        .onClick(() => {
+          if (!this.fetchLock) {
+            this.loadMeta();
+          }
         })
-
-        if (this.categories.length > 1) {
-          List({ space: AppTheme.SPACE_SM, scroller: this.chipsScroller }) {
-            ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {
-              ListItem() {
-                this.filterChip(index, item)
-              }
-            }, (item: DailyUpdateCategory) => `chip_${item.pid}`)
-          }
-          .listDirection(Axis.Horizontal)
-          .width('100%')
-          .height(32)
-          .contentStartOffset(AppTheme.SPACE_LG)
-          .contentEndOffset(AppTheme.SPACE_LG)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
-          })
-          .scrollBar(BarState.Off)
-          .alignListItem(ListItemAlign.Center)
-          .margin({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_XS })
-        }
       }
       .width('100%')
-      .padding({ bottom: this.categories.length > 1 ? AppTheme.SPACE_MD : AppTheme.SPACE_XS })
+      .height(44)
+      .alignItems(VerticalAlign.Center)
+      .padding({
+        left: AppTheme.SPACE_LG + this.leftInset,
+        right: AppTheme.SPACE_LG + this.rightInset
+      })
 
+      if (this.categories.length > 1) {
+        List({ space: this.isWide() ? 8 : AppTheme.SPACE_SM, scroller: this.chipsScroller }) {
+          ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {
+            ListItem() {
+              this.filterChip(index, item)
+            }
+          }, (item: DailyUpdateCategory) => `chip_${item.pid}`)
+        }
+        .listDirection(Axis.Horizontal)
+        .width('100%')
+        .height(this.isWide() ? 40 : 36)
+        .contentStartOffset(AppTheme.SPACE_LG + this.leftInset)
+        .contentEndOffset(AppTheme.SPACE_LG + this.rightInset)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
+        })
+        .scrollBar(BarState.Off)
+        .alignListItem(ListItemAlign.Center)
+        .margin({ top: this.isWide() ? 3 : 2, bottom: this.isWide() ? 3 : 4 })
+      }
+    }
+    .width('100%')
+    .padding({
+      top: this.topInset,
+      bottom: this.categories.length > 1 ? 8 : 4
+    })
+    .backgroundColor('rgba(10, 11, 16, 0.72)')
+    .backdropBlur(25)
+    .border({
+      width: { bottom: 0.5 },
+      color: 'rgba(255, 255, 255, 0.08)'
+    })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
+    .onAreaChange((_oldVal: Area, newVal: Area) => {
+      const h = Number(newVal.height);
+      if (h > 0 && Math.abs(this.headerHeight - h) > 1) {
+        this.headerHeight = h;
+      }
+    })
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopStart }) {
       if (this.loading && !this.ready) {
         LoadingView({ label: '正在加载今日更新' })
-          .layoutWeight(1)
+          .width('100%')
+          .height('100%')
+          .padding({
+            top: this.getHeaderHeight(),
+            left: this.leftInset,
+            right: this.rightInset
+          })
       } else if (!this.ready && this.errorText) {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll() {
             Column() {
+              Blank().height(this.getHeaderHeight() + 20)
               EmptyState({
                 title: '加载失败',
                 subtitle: this.errorText,
@@ -255,7 +307,7 @@ export struct DailyUpdatesTab {
         })
         .pullToRefresh(!this.fetchLock)
         .width('100%')
-        .layoutWeight(1)
+        .height('100%')
       } else {
         Swiper(this.swiperController) {
           ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {
@@ -265,7 +317,8 @@ export struct DailyUpdatesTab {
               seedPid: this.seedPid,
               seedList: this.seedList,
               seedPage: this.seedPage,
-              reloadToken: this.reloadToken
+              reloadToken: this.reloadToken,
+              headerHeight: this.getHeaderHeight()
             })
               .width('100%')
               .height('100%')
@@ -281,11 +334,14 @@ export struct DailyUpdatesTab {
           this.focusChip(index);
         })
         .width('100%')
-        .layoutWeight(1)
+        .height('100%')
       }
+
+      this.headerView()
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
   }
 }

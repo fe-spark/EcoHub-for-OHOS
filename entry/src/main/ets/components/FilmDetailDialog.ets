@@ -120,11 +120,12 @@ export struct FilmDetailDialog {
       .padding({ left: 12, right: 12, top: 12, bottom: this.tags.length > 0 ? 6 : 12 })
       .backgroundColor(AppTheme.BG_CARD)
       .borderRadius(AppTheme.RADIUS_MD)
-      .margin({ bottom: 12 })
+      .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.06)' })
+      .margin({ bottom: 10 })
 
-      // 详细内容区域：Scroll 内部不裁切、不省略、自由滚动
+      // 详细内容区域：Scroll 内部不裁切、不省略、按需自适应滚动
       Scroll() {
-        Column({ space: 14 }) {
+        Column({ space: 10 }) {
           if (this.director !== '') {
             Column({ space: 6 }) {
               Row({ space: 5 }) {
@@ -151,6 +152,7 @@ export struct FilmDetailDialog {
             .padding(10)
             .backgroundColor(AppTheme.BG_CARD)
             .borderRadius(AppTheme.RADIUS_MD)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.06)' })
           }
 
           if (this.actor !== '') {
@@ -179,6 +181,7 @@ export struct FilmDetailDialog {
             .padding(10)
             .backgroundColor(AppTheme.BG_CARD)
             .borderRadius(AppTheme.RADIUS_MD)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.06)' })
           }
 
           if (this.plot !== '') {
@@ -207,18 +210,20 @@ export struct FilmDetailDialog {
             .padding(10)
             .backgroundColor(AppTheme.BG_CARD)
             .borderRadius(AppTheme.RADIUS_MD)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.06)' })
           }
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
-        .padding({ bottom: 4 })
+        .justifyContent(FlexAlign.Start)
+        .padding({ bottom: 2 })
       }
-      .layoutWeight(1)
+      .align(Alignment.Top)
       .scrollable(ScrollDirection.Vertical)
       .scrollBar(BarState.Auto)
       .edgeEffect(EdgeEffect.Spring)
       .width('100%')
-      .constraintSize({ minHeight: 60, maxHeight: this.isLandscape() ? 150 : '56%' })
+      .constraintSize({ maxHeight: this.isLandscape() ? 150 : '50%' })
 
       // 底部确认关闭主按钮
       Button('我知道了')
@@ -242,5 +247,6 @@ export struct FilmDetailDialog {
     .backgroundColor('#181A22')
     .borderRadius({ topLeft: 20, topRight: 20 })
     .alignItems(HorizontalAlign.Start)
+    .justifyContent(FlexAlign.Start)
   }
 }

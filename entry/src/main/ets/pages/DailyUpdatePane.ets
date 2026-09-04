@@ -18,6 +18,9 @@ export struct DailyUpdatePane {
   @Prop seedList: MovieBasicInfo[] = [];
   @Prop seedPage: PageInfo = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
   @Prop @Watch('onReloadToken') reloadToken: number = 0;
+  @Prop headerHeight: number = 0;
+  @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
+  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
 
   @State private films: MovieBasicInfo[] = [];
   @State private page: PageInfo = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
@@ -32,6 +35,10 @@ export struct DailyUpdatePane {
   @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
   private hasLoaded: boolean = false;
   private listScroller: Scroller = new Scroller();
+  private touchStartY: number = 0;
+  private touchStartX: number = 0;
+  private isPulling: boolean = false;
+  @State private pullDistance: number = 0;
 
   private gridCols(): number {
     return Breakpoint.gridCols(this.widthBp, this.windowWidth);
@@ -119,6 +126,9 @@ export struct DailyUpdatePane {
       this.loading = false;
       this.loadingMore = false;
       this.refreshing = false;
+      this.getUIContext()?.animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+        this.pullDistance = 0;
+      });
       if (fromPull) {
         if (ok) {
           RefreshHint.succeed();
@@ -181,94 +191,182 @@ export struct DailyUpdatePane {
     .padding({ bottom: AppTheme.SPACE_MD })
   }
 
-  build() {
-    Stack({ alignContent: Alignment.BottomEnd }) {
-      Column() {
-        if (this.loading && this.films.length === 0) {
-          LoadingView({ label: '正在加载今日更新' })
-            .layoutWeight(1)
-        } else if (this.films.length === 0) {
-          Refresh({ refreshing: $$this.refreshing }) {
-            Scroll() {
-              if (this.errorText) {
-                EmptyState({
-                  title: '加载失败',
-                  subtitle: this.errorText,
-                  icon: $r('sys.symbol.info_circle')
-                })
-              } else {
-                EmptyState({
-                  title: '暂无更新',
-                  subtitle: '近 24 小时还没有新片入库',
-                  icon: $r('sys.symbol.flame')
-                })
-              }
-            }
-            .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.None)
-            .nestedScroll({
-              scrollForward: NestedScrollMode.SELF_FIRST,
-              scrollBackward: NestedScrollMode.SELF_FIRST
-            })
-            .width('100%')
-            .height('100%')
-          }
-          .onRefreshing(() => {
-            this.onPullRefreshing();
-          })
-          .pullToRefresh(!this.fetchLock)
-          .width('100%')
-          .layoutWeight(1)
-        } else {
-          Refresh({ refreshing: $$this.refreshing }) {
-            List({ scroller: this.listScroller }) {
-              ForEach(this.rowIds(), (row: number) => {
-                ListItem() {
-                  this.filmRow(row)
-                }
-              }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
+  private handleTouch(event: TouchEvent): void {
+    if (this.refreshing || this.fetchLock) {
+      return;
+    }
+    if (event.type === TouchType.Down) {
+      this.touchStartY = event.touches[0].y;
+      this.touchStartX = event.touches[0].x;
+      this.isPulling = false;
+    } else if (event.type === TouchType.Move) {
+      let scrollY: number = 0;
+      try {
+        scrollY = this.listScroller.currentOffset().yOffset;
+      } catch (_e) {
+        scrollY = 0;
+      }
+      const currentY = event.touches[0].y;
+      const currentX = event.touches[0].x;
 
-              ListItem() {
-                Text(this.loadingMore ? '加载中...' : (this.hasMore() ? '' : '没有更多了'))
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                  .width('100%')
-                  .height(72)
-                  .textAlign(TextAlign.Center)
-              }
-            }
-            .width('100%')
-            .height('100%')
-            .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.None)
-            .onAreaChange((_oldValue: Area, newValue: Area) => {
-              const h = Number(newValue.height);
-              if (h > 0) {
-                this.listHeight = h;
-              }
-            })
-            .onDidScroll((_offset: number, _state: ScrollState) => {
-              this.syncTopFab(this.listScroller.currentOffset().yOffset);
-            })
-            .nestedScroll({
-              scrollForward: NestedScrollMode.SELF_FIRST,
-              scrollBackward: NestedScrollMode.SELF_FIRST
-            })
-            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-            .onReachEnd(() => {
-              this.load(false, false);
-            })
-          }
-          .onRefreshing(() => {
-            this.onPullRefreshing();
-          })
-          .pullToRefresh(!this.fetchLock)
-          .width('100%')
-          .layoutWeight(1)
+      if (scrollY > 0) {
+        if (this.isPulling) {
+          this.isPulling = false;
+          this.pullDistance = 0;
+        }
+        return;
+      }
+
+      const deltaY = currentY - this.touchStartY;
+      const deltaX = Math.abs(currentX - this.touchStartX);
+
+      if (scrollY <= 0 && deltaY > 0 && deltaY > deltaX * 1.2) {
+        this.isPulling = true;
+        const damping = 0.42;
+        this.pullDistance = Math.min(84, deltaY * damping);
+      } else if (this.isPulling && deltaY <= 0) {
+        this.isPulling = false;
+        this.pullDistance = 0;
+      }
+    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      if (this.isPulling) {
+        this.isPulling = false;
+        if (this.pullDistance >= 46 && !this.fetchLock) {
+          this.refreshing = true;
+          this.getUIContext()?.animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+            this.pullDistance = 60;
+          });
+          this.load(true, true);
+        } else {
+          this.getUIContext()?.animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+            this.pullDistance = 0;
+          });
         }
       }
-      .width('100%')
-      .height('100%')
+    }
+  }
+
+  @Builder
+  floatingRefreshIndicator() {
+    if (this.pullDistance > 0 || this.refreshing) {
+      Row() {
+        LoadingProgress()
+          .width(20)
+          .height(20)
+          .color(AppTheme.ACCENT)
+      }
+      .width(36)
+      .height(36)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(VerticalAlign.Center)
+      .backgroundColor('rgba(26, 28, 36, 0.85)')
+      .backdropBlur(25)
+      .borderRadius(18)
+      .border({ width: 0.8, color: 'rgba(255, 255, 255, 0.12)' })
+      .shadow({ radius: 12, color: 'rgba(0, 0, 0, 0.38)', offsetY: 2 })
+      .position({
+        x: '50%',
+        y: this.headerHeight - 36 + this.pullDistance * 0.84
+      })
+      .markAnchor({ x: '50%', y: 0 })
+      .opacity(Math.max(0, Math.min(1.0, (this.pullDistance - 6) / 16)))
+      .scale({
+        x: Math.min(1.0, 0.5 + 0.5 * (this.pullDistance / 46)),
+        y: Math.min(1.0, 0.5 + 0.5 * (this.pullDistance / 46))
+      })
+      .hitTestBehavior(HitTestMode.Transparent)
+    }
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.BottomEnd }) {
+      if (this.loading && this.films.length === 0) {
+        LoadingView({ label: '正在加载今日更新' })
+          .width('100%')
+          .height('100%')
+          .padding({ top: this.headerHeight })
+      } else if (this.films.length === 0) {
+        Scroll() {
+          Column() {
+            Blank().height(this.headerHeight + 24)
+            if (this.errorText) {
+              EmptyState({
+                title: '加载失败',
+                subtitle: this.errorText,
+                icon: $r('sys.symbol.info_circle')
+              })
+            } else {
+              EmptyState({
+                title: '暂无更新',
+                subtitle: '近 24 小时还没有新片入库',
+                icon: $r('sys.symbol.flame')
+              })
+            }
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Center)
+        }
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
+        })
+        .width('100%')
+        .height('100%')
+        .translate({ y: this.pullDistance })
+      } else {
+        List({ scroller: this.listScroller }) {
+          ListItem() {
+            Row()
+              .width('100%')
+              .height(this.headerHeight + 8)
+          }
+          .hitTestBehavior(HitTestMode.Transparent)
+
+          ForEach(this.rowIds(), (row: number) => {
+            ListItem() {
+              this.filmRow(row)
+            }
+          }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
+
+          ListItem() {
+            Text(this.loadingMore ? '加载中...' : (this.hasMore() ? '' : '没有更多了'))
+              .fontSize(12)
+              .fontColor(AppTheme.TEXT_MUTED)
+              .width('100%')
+              .height(72)
+              .textAlign(TextAlign.Center)
+          }
+        }
+        .width('100%')
+        .height('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
+        .onAreaChange((_oldValue: Area, newValue: Area) => {
+          const h = Number(newValue.height);
+          if (h > 0) {
+            this.listHeight = h;
+          }
+        })
+        .onDidScroll((_offset: number, _state: ScrollState) => {
+          this.syncTopFab(this.listScroller.currentOffset().yOffset);
+        })
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.SELF_FIRST
+        })
+        .padding({
+          left: AppTheme.SPACE_LG + this.leftInset,
+          right: AppTheme.SPACE_LG + this.rightInset
+        })
+        .translate({ y: this.pullDistance })
+        .onReachEnd(() => {
+          this.load(false, false);
+        })
+      }
+
+      this.floatingRefreshIndicator()
 
       if (!this.loading && this.films.length > 0) {
         ScrollFab({
@@ -283,5 +381,8 @@ export struct DailyUpdatePane {
     }
     .width('100%')
     .height('100%')
+    .onTouch((event: TouchEvent) => {
+      this.handleTouch(event);
+    })
   }
 }
