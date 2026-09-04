@@ -13,6 +13,7 @@ import { PlayDetailPanel } from '../components/PlayDetailPanel';
 import { FilmGrid } from '../components/FilmGrid';
 import { LoadingView } from '../components/LoadingView';
 import { EmptyState } from '../components/EmptyState';
+import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
@@ -21,13 +22,13 @@ import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
 @Component
 struct PlayPage {
   @State private filmId: string = '';
-  @State private loading: boolean = true;
   @State private errorText: string = '';
   @State private name: string = '';
   @State private picture: string = '';
   @State private subTitle: string = '';
   @State private actor: string = '';
   @State private plot: string = '';
+  @State private loading: boolean = true;
   @State private descriptor: MovieDescriptor | null = null;
   @State private sources: PlaySource[] = [];
   @State private playingSourceId: string = '';
@@ -73,42 +74,27 @@ struct PlayPage {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
-    if (this.filmId) {
-      HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
-    }
-    const paramSourceId = NavUtil.param(params, 'sourceId');
-    const paramEpisodeStr = NavUtil.param(params, 'episodeIndex');
-    const paramTimeStr = NavUtil.param(params, 'currentTime');
+    if (this.filmId) HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
+    const paramSourceId = NavUtil.param(params, 'sourceId'), paramEp = NavUtil.param(params, 'episodeIndex'), paramTime = NavUtil.param(params, 'currentTime');
+    let targetSourceId = paramSourceId, targetEpIndex = paramEp !== '' ? Number(paramEp) : -1, targetTime = paramTime !== '' ? Number(paramTime) : -1;
 
-    let targetSourceId = paramSourceId;
-    let targetEpisodeIndex = paramEpisodeStr !== '' ? Number(paramEpisodeStr) : -1;
-    let targetTime = paramTimeStr !== '' ? Number(paramTimeStr) : -1;
-
-    // 优先读取本地播放历史记录（若路由未显式指定，直接使用历史的源、剧集与进度）
     if (this.filmId) {
       try {
         const prev = await HistoryManager.find(this.filmId);
         if (prev) {
-          if (!targetSourceId && prev.sourceId) {
-            targetSourceId = prev.sourceId;
-          }
-          if (targetEpisodeIndex < 0 && prev.episodeIndex !== undefined && prev.episodeIndex !== null) {
-            targetEpisodeIndex = prev.episodeIndex;
-          }
+          if (!targetSourceId && prev.sourceId) targetSourceId = prev.sourceId;
+          if (targetEpIndex < 0 && prev.episodeIndex !== undefined && prev.episodeIndex !== null) targetEpIndex = prev.episodeIndex;
           if (targetTime < 0) {
-            const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
-            targetTime = isEnded ? 0 : (prev.currentTime || 0);
+            targetTime = (prev.duration > 0 && prev.currentTime >= prev.duration - 3) ? 0 : (prev.currentTime || 0);
           }
           this.lastDuration = prev.duration || 0;
         }
-      } catch (_e) {
-      }
+      } catch (_e) {}
     }
 
-    this.episodeIndex = Math.max(0, targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0);
+    this.episodeIndex = Math.max(0, targetEpIndex >= 0 ? targetEpIndex : 0);
     this.initialTime = Math.max(0, targetTime >= 0 ? targetTime : 0);
     this.lastCurrentTime = this.initialTime;
-
     this.loadPlay(targetSourceId);
     this.loadRelate();
 
@@ -116,9 +102,7 @@ struct PlayPage {
       this.persistEnabled = false;
       this.historySeq++;
       this.playUrl = '';
-      if (!this.filmId) {
-        return;
-      }
+      if (!this.filmId) return;
       this.loadPlay(this.playingSourceId);
       this.loadRelate();
     };
@@ -188,63 +172,44 @@ struct PlayPage {
       this.persistEnabled = true;
       this.persistHistory();
     } catch (err) {
-      if (token !== this.loadToken) {
-        return;
-      }
-      const message = err instanceof Error ? err.message : '播放数据获取失败';
+      if (token !== this.loadToken) return;
+      const msg = err instanceof Error ? err.message : '播放数据获取失败';
       if (this.name) {
-        try {
-          this.getUIContext().getPromptAction().showToast({ message: message });
-        } catch (_e) {
-        }
+        try { this.getUIContext().getPromptAction().showToast({ message: msg }); } catch (_e) {}
       } else {
-        this.errorText = message;
+        this.errorText = msg;
       }
     } finally {
-      if (token === this.loadToken) {
-        this.loading = false;
-      }
+      if (token === this.loadToken) this.loading = false;
     }
   }
 
   private async loadRelate(): Promise<void> {
-    if (!this.filmId) {
-      return;
-    }
+    if (!this.filmId) return;
     const token = ++this.relateToken;
     this.relateLoading = true;
     try {
       const list = await FilmApi.getRelate(this.filmId);
-      if (token !== this.relateToken) {
-        return;
-      }
+      if (token !== this.relateToken) return;
       this.related = list;
-    } catch (err) {
-      if (token !== this.relateToken) {
-        return;
-      }
+    } catch (_err) {
+      if (token !== this.relateToken) return;
       this.related = [];
     } finally {
-      if (token === this.relateToken) {
-        this.relateLoading = false;
-      }
+      if (token === this.relateToken) this.relateLoading = false;
     }
   }
 
   private findSource(id: string): PlaySource | null {
     for (let i = 0; i < this.sources.length; i++) {
-      if (this.sources[i].id === id) {
-        return this.sources[i];
-      }
+      if (this.sources[i].id === id) return this.sources[i];
     }
     return this.sources.length > 0 ? this.sources[0] : null;
   }
 
   private selectEpisode(sourceId: string, index: number): void {
     const source = this.findSource(sourceId);
-    if (!source || index < 0 || index >= source.linkList.length) {
-      return;
-    }
+    if (!source || index < 0 || index >= source.linkList.length) return;
     const episode: MovieUrlInfo = source.linkList[index];
     this.playingSourceId = sourceId;
     this.viewingSourceId = sourceId;
@@ -290,29 +255,18 @@ struct PlayPage {
   }
 
   private persistHistory(currentTime?: number, duration?: number): void {
-    if (!this.persistEnabled || !this.filmId || !this.name || !ServerConfigManager.getInstance().storageScope()) {
-      return;
-    }
-    const seq = ++this.historySeq;
-    const filmId = this.filmId;
-    const sourceId = this.playingSourceId;
-    const source = this.findSource(sourceId);
-    const episodeIndex = this.episodeIndex;
+    if (!this.persistEnabled || !this.filmId || !this.name || !ServerConfigManager.getInstance().storageScope()) return;
+    const seq = ++this.historySeq, filmId = this.filmId, sourceId = this.playingSourceId;
+    const source = this.findSource(sourceId), episodeIndex = this.episodeIndex;
     const fallback: MovieUrlInfo = { episode: this.playTitle, link: this.playUrl };
     const episode: MovieUrlInfo = source && source.linkList.length > episodeIndex ? source.linkList[episodeIndex] : fallback;
 
     HistoryManager.find(filmId).then((previous: HistoryItem | null) => {
-      if (seq !== this.historySeq || !this.persistEnabled) {
-        return;
-      }
+      if (seq !== this.historySeq || !this.persistEnabled) return;
       HistoryManager.save({
-        id: filmId,
-        name: this.name,
-        picture: this.picture,
-        sourceId: sourceId,
-        sourceName: source ? source.name : this.sourceName,
-        episodeIndex: episodeIndex,
-        episode: episode.episode,
+        id: filmId, name: this.name, picture: this.picture,
+        sourceId: sourceId, sourceName: source ? source.name : this.sourceName,
+        episodeIndex: episodeIndex, episode: episode.episode,
         currentTime: currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0),
         duration: duration !== undefined ? duration : (previous ? previous.duration : 0),
         timeStamp: Date.now()
@@ -322,9 +276,7 @@ struct PlayPage {
 
   private async openRelated(film: MovieBasicInfo): Promise<void> {
     const id = FormatUtil.filmId(film);
-    if (!id || id === this.filmId) {
-      return;
-    }
+    if (!id || id === this.filmId) return;
     this.filmId = id;
     HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
     this.name = '';
@@ -333,32 +285,23 @@ struct PlayPage {
     this.activeTab = 0;
     this.loading = true;
 
-    let targetSourceId = '';
-    let targetEpisodeIndex = -1;
-    let targetTime = -1;
-
+    let targetSourceId = '', targetEpisodeIndex = -1, targetTime = -1;
     try {
       const prev = await HistoryManager.find(this.filmId);
       if (prev) {
-        if (prev.sourceId) {
-          targetSourceId = prev.sourceId;
-        }
-        if (prev.episodeIndex !== undefined && prev.episodeIndex !== null && prev.episodeIndex >= 0) {
-          targetEpisodeIndex = prev.episodeIndex;
-        }
+        if (prev.sourceId) targetSourceId = prev.sourceId;
+        if (prev.episodeIndex !== undefined && prev.episodeIndex !== null && prev.episodeIndex >= 0) targetEpisodeIndex = prev.episodeIndex;
         if (targetTime < 0) {
           const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
           targetTime = isEnded ? 0 : (prev.currentTime || 0);
         }
         this.lastDuration = prev.duration || 0;
       }
-    } catch (_e) {
-    }
+    } catch (_e) {}
 
     this.episodeIndex = Math.max(0, targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0);
     this.initialTime = Math.max(0, targetTime >= 0 ? targetTime : 0);
     this.lastCurrentTime = this.initialTime;
-
     this.loadPlay(targetSourceId);
     this.loadRelate();
   }
@@ -410,15 +353,10 @@ struct PlayPage {
           rightInset: this.playerFull ? this.rightInset : 0,
           bottomInset: this.playerFull ? this.bottomInset : 0,
           onBack: () => {
-            try {
-              this.getUIContext().getRouter().back();
-            } catch (_e) {
-            }
+            try { this.getUIContext().getRouter().back(); } catch (_e) {}
           },
           onEnded: () => {
-            if (this.hasNext()) {
-              this.playNext();
-            }
+            if (this.hasNext()) this.playNext();
           },
           onPrev: () => this.playPrev(),
           onNext: () => this.playNext(),
@@ -437,8 +375,7 @@ struct PlayPage {
             { minHeight: 0 })
 
         if (!this.playerFull) {
-          Column()
-            .width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
+          Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
 
           Row() {
             this.playTabItem('详情', 0)
@@ -452,27 +389,29 @@ struct PlayPage {
 
           Stack() {
             Column() {
-            PlayDetailPanel({
-              name: this.name,
-              subTitle: this.subTitle,
-              actor: this.actor,
-              plot: this.plot,
-              descriptor: this.descriptor,
-              sources: this.sources,
-              playingSourceId: this.playingSourceId,
-              viewingSourceId: this.viewingSourceId,
-              episodeIndex: this.episodeIndex,
-              onViewSource: (id: string) => {
-                this.viewingSourceId = id;
-              },
-              onSelectEpisode: (sourceId: string, index: number) => {
-                this.selectEpisode(sourceId, index);
-              }
-            })
-          }
-          .width('100%')
-          .height('100%')
-          .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
+              PlayDetailPanel({
+                filmId: this.filmId,
+                picture: this.picture,
+                name: this.name,
+                subTitle: this.subTitle,
+                actor: this.actor,
+                plot: this.plot,
+                descriptor: this.descriptor,
+                sources: this.sources,
+                playingSourceId: this.playingSourceId,
+                viewingSourceId: this.viewingSourceId,
+                episodeIndex: this.episodeIndex,
+                onViewSource: (id: string) => {
+                  this.viewingSourceId = id;
+                },
+                onSelectEpisode: (sourceId: string, index: number) => {
+                  this.selectEpisode(sourceId, index);
+                }
+              })
+            }
+            .width('100%')
+            .height('100%')
+            .visibility(this.activeTab === 0 ? Visibility.Visible : Visibility.Hidden)
 
           if (this.activeTab === 1) {
             Column() {

@@ -1,5 +1,7 @@
 import { common } from '@kit.AbilityKit';
+import { pasteboard } from '@kit.BasicServicesKit';
 import { AVVolumePanel } from '@kit.AudioKit';
+import { AppTheme } from '../common/constants/AppTheme';
 import { PlayerWindow } from '../common/utils/PlayerWindow';
 import { PlayerTipKind } from '../common/utils/PlayerPan';
 import { PlayerStallWatcher } from './PlayerStallWatcher';
@@ -131,8 +133,8 @@ export struct VideoPlayer {
     this.playerAv.listener.onFinish = () => {
       if (this.observer) this.observer.handleFinish();
     };
-    this.playerAv.listener.onError = () => {
-      if (this.observer) this.observer.handleError();
+    this.playerAv.listener.onError = (detail?: string) => {
+      if (this.observer) this.observer.handleError(detail);
     };
     this.playerAv.listener.onSeeked = (timeSec: number, seq: number) => {
       if (this.observer) this.observer.handleSeeked(timeSec, seq);
@@ -343,11 +345,13 @@ export struct VideoPlayer {
   private armOpenWatch(): void {
     this.watcher.armOpenWatch(() => {
       if (this.state.live() && this.state.opening && !this.state.ready && !this.state.errorText) {
-        console.warn('[VideoPlayer] 视频打开超时(12s)，触发自动降级 failOpen');
+        console.warn('[VideoPlayer] 视频打开超时(15s)，触发自动降级 failOpen 并释放播放器');
         this.watcher.clearSeekWatch();
-        this.state.failOpen(this.videoUrl);
+        this.state.failOpen(this.videoUrl, 'Timeout (15s)');
+        this.playerAv.release();
         this.syncFromState();
         this.syncKeepScreen();
+        this.showHud = true;
       }
     }, this.state.opening);
   }
@@ -422,7 +426,28 @@ export struct VideoPlayer {
       onSpeed: () => this.openSpeedDialog(),
       onScale: () => this.openScaleDialog(),
       onRetry: () => this.retry(),
-      onErrorDetail: () => { this.getUIContext().showAlertDialog({ title: '报错详情', message: this.errorText, confirm: { value: '知道了', action: () => {} } }); },
+      onErrorDetail: () => {
+        const rawErr = this.errorText;
+        this.getUIContext().showAlertDialog({
+          title: '播放异常详情',
+          message: rawErr,
+          primaryButton: {
+            value: '复制',
+            fontColor: AppTheme.ACCENT,
+            action: () => {
+              if (rawErr) {
+                try {
+                  const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, rawErr);
+                  pasteboard.getSystemPasteboard().setDataSync(data);
+                  this.getUIContext().getPromptAction().showToast({ message: '已复制报错信息' });
+                } catch (_e) {
+                }
+              }
+            }
+          },
+          secondaryButton: { value: '知道了', action: () => {} }
+        });
+      },
       onSeekBack: () => { this.seekTo(this.currentTime - VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
       onSeekForward: () => { this.seekTo(this.currentTime + VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
       onSeekStart: (val) => { this.state.dragging = true; this.currentTime = val; this.state.currentTime = val; this.watcher.clearHide(); this.showHud = true; },

@@ -7,7 +7,7 @@ export class PlayerAvListener {
   onPause: () => void = () => {};
   onTime: (time: number) => void = (_time: number) => {};
   onFinish: () => void = () => {};
-  onError: () => void = () => {};
+  onError: (detail?: string) => void = (_detail?: string) => {};
   onSeeked: (timeSec: number, seq: number) => void = (_timeSec: number, _seq: number) => {};
   onBuffer: (buffered: number) => void = (_buffered: number) => {};
   onStalled: (stalled: boolean) => void = (_stalled: boolean) => {};
@@ -84,7 +84,8 @@ export class PlayerAv {
     } catch (err) {
       console.error(`[PlayerAv] 创建 AVPlayer 异常: ${JSON.stringify(err)}`);
       if (gen === this.gen) {
-        this.listener.onError();
+        const msg = err instanceof Error ? (err.message || String(err)) : String(err);
+        this.listener.onError(msg || 'Unknown error');
       }
     }
   }
@@ -180,7 +181,7 @@ export class PlayerAv {
         this.listener.onFinish();
       } else if (state === 'error') {
         console.error(`[PlayerAv] error 状态错误`);
-        this.listener.onError();
+        this.listener.onError('AVPlayer State: error');
       }
     });
     player.on('videoSizeChange', (width: number, height: number) => {
@@ -222,7 +223,18 @@ export class PlayerAv {
         return;
       }
       console.error(`[PlayerAv] player error: ${JSON.stringify(err)}`);
-      this.listener.onError();
+      let detail = '';
+      if (err) {
+        const parts: string[] = [];
+        if (err.code !== undefined && err.code !== null) {
+          parts.push(`code: ${err.code}`);
+        }
+        if (err.message) {
+          parts.push(`message: ${err.message}`);
+        }
+        detail = parts.length > 0 ? parts.join('\n') : String(err);
+      }
+      this.listener.onError(detail || 'Unknown error');
     });
   }
 
@@ -232,7 +244,8 @@ export class PlayerAv {
       player.prepare();
     } catch (err) {
       console.error(`[PlayerAv] prepareWithSurface 异常: ${JSON.stringify(err)}`);
-      this.listener.onError();
+      const msg = err instanceof Error ? (err.message || String(err)) : String(err);
+      this.listener.onError(msg || 'Unknown error');
     }
   }
 

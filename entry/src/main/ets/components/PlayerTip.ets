@@ -137,6 +137,19 @@ export struct PlayerLoadingCard {
     this.slowNetwork = false;
   }
 
+  private handleRetry(): void {
+    if (!this.slowNetwork) {
+      return;
+    }
+    this.hideRetry();
+    if (this.visible && this.allowRetry) {
+      this.armSlowTimer();
+    }
+    if (this.onRetry) {
+      this.onRetry();
+    }
+  }
+
   private onVisibleChange(): void {
     this.syncGates();
   }
@@ -217,9 +230,7 @@ export struct PlayerLoadingCard {
                 .fontWeight(FontWeight.Bold)
                 .fontColor(AppTheme.ACCENT)
                 .onClick(() => {
-                  if (this.onRetry) {
-                    this.onRetry();
-                  }
+                  this.handleRetry();
                 })
             }
           }
@@ -246,45 +257,56 @@ export struct PlayerErrorPad {
 
   build() {
     Column() {
-      Text('播放异常')
-        .fontSize(16)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#FFFFFF')
-      Text('视频无法播放，请重试！')
-        .fontSize(13)
-        .fontColor('rgba(255,255,255,0.82)')
-        .margin({ top: 8 })
-      Row({ space: 10 }) {
-        Text('重新播放')
-          .fontSize(13)
+      Column() {
+        Text('播放异常')
+          .fontSize(16)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-          .height(36)
-          .padding({ left: 16, right: 16 })
-          .backgroundColor(AppTheme.ACCENT)
-          .borderRadius(18)
-          .onClick(() => {
-            if (this.onRetry) {
-              this.onRetry();
-            }
-          })
-        Text('查看详情')
+          .fontColor(AppTheme.TEXT_PRIMARY)
+        Text('视频无法播放，请重试或切换其他播放源')
           .fontSize(13)
-          .fontColor('#FFFFFF')
-          .height(36)
-          .padding({ left: 16, right: 16 })
-          .border({ width: 1, color: 'rgba(255,255,255,0.16)' })
-          .borderRadius(18)
-          .onClick(() => {
-            if (this.onErrorDetail) {
-              this.onErrorDetail();
-            }
-          })
+          .fontColor(AppTheme.TEXT_SECONDARY)
+          .margin({ top: 6 })
+        Row({ space: 12 }) {
+          Text('重新播放')
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+            .height(36)
+            .padding({ left: 18, right: 18 })
+            .backgroundColor(AppTheme.ACCENT)
+            .borderRadius(18)
+            .onClick(() => {
+              if (this.onRetry) {
+                this.onRetry();
+              }
+            })
+          Text('查看详情')
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+            .height(36)
+            .padding({ left: 18, right: 18 })
+            .backgroundColor('rgba(255, 255, 255, 0.12)')
+            .border({ width: 1, color: 'rgba(255, 255, 255, 0.22)' })
+            .borderRadius(18)
+            .onClick(() => {
+              if (this.onErrorDetail) {
+                this.onErrorDetail();
+              }
+            })
+        }
+        .margin({ top: 14 })
       }
-      .margin({ top: 12 })
+      .padding({ left: 24, right: 24, top: 18, bottom: 18 })
+      .backgroundColor('rgba(20, 22, 26, 0.88)')
+      .borderRadius(16)
+      .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.12)' })
+      .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.5)', offsetX: 0, offsetY: 8 })
+      .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .height('100%')
+    .backgroundColor('rgba(0, 0, 0, 0.68)')
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .padding(20)

@@ -154,7 +154,7 @@ export class PlayerVideoObserver {
     this.host.onUIUpdate();
   }
 
-  handleError(): void {
+  handleError(detail?: string): void {
     if (!this.host.state.live()) {
       return;
     }
@@ -168,7 +168,9 @@ export class PlayerVideoObserver {
     this.host.state.seekTarget = -1;
     this.host.state.seekSeq = 0;
     this.host.watcher.clearSeekWatch();
-    this.host.state.errorText = this.host.state.formatError(wasReady, this.host.videoUrl);
+    this.host.state.errorText = this.host.state.formatError(wasReady, this.host.videoUrl, detail);
+    this.host.state.bootGen++;
+    this.host.playerAv.release();
     this.host.revealHud();
     this.host.syncKeepScreen();
     this.host.onUIUpdate();

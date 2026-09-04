@@ -1,21 +1,29 @@
-import { MovieDescriptor } from '../model/FilmModels';
+import { FavoriteItem, MovieDescriptor } from '../model/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { AppIcon } from './AppIcon';
 import { FilmDetailDialog } from './FilmDetailDialog';
+import { FavoriteManager } from '../common/utils/FavoriteManager';
 
 @Component
 export struct FilmDetailHeader {
+  @Prop @Watch('syncFavState') filmId: string = '';
+  @Prop picture: string = '';
   @Prop name: string = '';
   @Prop subTitle: string = '';
   @Prop actor: string = '';
   @Prop @Watch('onDataChange') plot: string = '';
   @Prop @Watch('onDataChange') descriptor: MovieDescriptor | null = null;
+  @State private isFav: boolean = false;
   @State private cleanPlot: string = '';
   @State private scoreText: string = '';
   private detailDialog: CustomDialogController | null = null;
+  private favChangeCb: () => void = () => {};
 
   aboutToAppear(): void {
     this.syncDerivedState();
+    this.syncFavState();
+    this.favChangeCb = () => { this.syncFavState(); };
+    FavoriteManager.onFavoriteChange(this.favChangeCb);
   }
 
   aboutToDisappear(): void {
@@ -23,6 +31,7 @@ export struct FilmDetailHeader {
       this.detailDialog.close();
       this.detailDialog = null;
     }
+    FavoriteManager.offFavoriteChange(this.favChangeCb);
   }
 
   private openDetailDialog(): void {
@@ -135,9 +144,37 @@ export struct FilmDetailHeader {
     return raw.replace(/\s*[，,、]\s*/g, ' / ');
   }
 
+  private async syncFavState(): Promise<void> {
+    const targetId = this.filmId;
+    if (!targetId) {
+      this.isFav = false;
+      return;
+    }
+    const fav = await FavoriteManager.isFavorite(targetId);
+    if (this.filmId === targetId) {
+      this.isFav = fav;
+    }
+  }
+
+  private async handleToggleFavorite(): Promise<void> {
+    if (!this.filmId || !this.name) return;
+    const item: FavoriteItem = {
+      id: this.filmId, name: this.name, picture: this.picture,
+      cName: this.descriptor?.cName || '', remarks: this.descriptor?.remarks || '',
+      year: this.descriptor?.year || '', area: this.descriptor?.area || '',
+      subTitle: this.subTitle, actor: this.actor, director: this.descriptor?.director || '',
+      createdAt: Date.now()
+    };
+    const next: boolean = await FavoriteManager.toggleFavorite(item);
+    this.isFav = next;
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: next ? '已加入收藏' : '已取消收藏' });
+    } catch (_e) {}
+  }
+
   build() {
     Column() {
-      // 1. 标题与评分徽标行
+      // 1. 标题与收藏操作按钮行
       Row() {
         Text(this.name)
           .fontSize(19)
@@ -147,7 +184,35 @@ export struct FilmDetailHeader {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
 
-        // 评分徽章
+        // 收藏按钮
+        Row() {
+          AppIcon({
+            src: this.isFav ? $r('sys.symbol.star_fill') : $r('sys.symbol.star'),
+            iconSize: 13,
+            color: this.isFav ? '#FA8C16' : AppTheme.TEXT_MUTED
+          })
+          Text(this.isFav ? '已收藏' : '收藏')
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.isFav ? '#FA8C16' : AppTheme.TEXT_MUTED)
+            .margin({ left: 4 })
+        }
+        .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+        .backgroundColor(this.isFav ? 'rgba(250, 140, 22, 0.12)' : AppTheme.BG_CARD)
+        .borderRadius(13)
+        .border({ width: 0.5, color: this.isFav ? 'rgba(250, 140, 22, 0.3)' : AppTheme.BORDER })
+        .margin({ left: 10 })
+        .onClick(() => {
+          this.handleToggleFavorite();
+        })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 12, right: 12, top: 10 })
+
+      // 2. 元数据行（左侧固定评分徽章，右侧标签支持横向滚动）
+      Row() {
+        // 左侧固定评分徽章
         if (this.scoreText !== '') {
           Row({ space: 3 }) {
             Text('★')
@@ -162,10 +227,10 @@ export struct FilmDetailHeader {
               .fontColor(AppTheme.ACCENT)
               .margin({ top: 1 })
           }
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .backgroundColor(AppTheme.ACCENT_SOFT)
           .borderRadius(AppTheme.RADIUS_SM)
-          .margin({ left: 10 })
+          .margin({ right: 8 })
         } else {
           Row({ space: 3 }) {
             Text('★')
@@ -176,18 +241,13 @@ export struct FilmDetailHeader {
               .fontWeight(FontWeight.Medium)
               .fontColor(AppTheme.TEXT_MUTED)
           }
-          .padding({ left: 7, right: 7, top: 4, bottom: 4 })
+          .padding({ left: 7, right: 7, top: 3, bottom: 3 })
           .backgroundColor(AppTheme.BG_CHIP)
           .borderRadius(AppTheme.RADIUS_SM)
-          .margin({ left: 10 })
+          .margin({ right: 8 })
         }
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Top)
-      .padding({ left: 12, right: 12, top: 10 })
 
-      // 2. 元数据小胶囊组
-      if (this.metaTagsList().length > 0) {
+        // 右侧元数据小胶囊组（可横向滚动）
         Scroll() {
           Row({ space: 6 }) {
             ForEach(this.metaTagsList(), (tag: string) => {
@@ -200,12 +260,14 @@ export struct FilmDetailHeader {
             }, (tag: string) => tag)
           }
         }
+        .layoutWeight(1)
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
-        .width('100%')
         .align(Alignment.Start)
-        .padding({ left: 12, right: 12, top: 8 })
       }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 12, right: 12, top: 8 })
 
       // 3. 详细信息卡片导引条（独立整行大热区，带摘要与高亮详情入口）
       if (this.hasDetailInfo()) {

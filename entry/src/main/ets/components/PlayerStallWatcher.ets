@@ -1,7 +1,7 @@
 export class PlayerStallWatcher {
   private static readonly HIDE_DELAY_MS: number = 3000;
   private static readonly TIP_DURATION_MS: number = 1000;
-  private static readonly OPEN_TIMEOUT_MS: number = 12000;
+  private static readonly OPEN_TIMEOUT_MS: number = 15000;
   private static readonly SEEK_TIMEOUT_MS: number = 8000;
 
   private hideTimer: number = -1;

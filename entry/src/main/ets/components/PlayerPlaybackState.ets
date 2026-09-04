@@ -48,10 +48,8 @@ export class PlayerPlaybackState {
     return this.currentTime >= PlayerPlaybackState.MIN_RESUME_THRESHOLD_SEC ? this.currentTime : initialTime;
   }
 
-  public formatError(wasReady: boolean, url: string): string {
-    const stage = wasReady ? '播放过程中失败' : '打开视频失败';
-    const trimmed = url.trim();
-    return trimmed ? `${stage}\n${trimmed}` : `${stage}\n未提供播放地址`;
+  public formatError(wasReady: boolean, _url: string, detail?: string): string {
+    return detail || (wasReady ? 'Playback error' : 'Open failed');
   }
 
   public reset(videoUrl: string): void {
@@ -113,14 +111,15 @@ export class PlayerPlaybackState {
     this.seekSeq = 0;
   }
 
-  public failOpen(url: string): void {
+  public failOpen(url: string, detail?: string): void {
     this.opening = false;
     this.playRequested = false;
     this.seeking = false;
     this.seekTarget = -1;
     this.seekAt = 0;
     this.seekSeq = 0;
-    this.errorText = this.formatError(false, url);
+    this.bootGen++;
+    this.errorText = this.formatError(false, url, detail);
   }
 
   public seek(time: number, playerAv: PlayerAv): void {
