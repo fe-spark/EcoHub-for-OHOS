@@ -13,11 +13,10 @@ import { PlayerPlaybackState } from './PlayerPlaybackState';
 import { PlayerSkinEvents, PlayerSkinView } from './PlayerSkinView';
 import { PlayerObserverHost, PlayerVideoObserver } from './PlayerVideoObserver';
 import { PlayerSpeedSheet } from './PlayerSpeedSheet';
-import { markCastStartSec, peekCastStartSec, PlayerCastSheet } from './PlayerCastSheet';
+import { PlayerCastSheet } from './PlayerCastSheet';
 import { PlayerCastHud } from './PlayerCastHud';
-import { DlnaClient } from '../common/utils/DlnaClient';
+import { PlayerCastController, PlayerCastHost } from './PlayerCastController';
 import { DlnaDevice } from '../common/utils/DlnaTypes';
-import { CastSession } from '../common/utils/CastSession';
 import { PlayerScale, PlayerScaleMode } from '../common/utils/PlayerScale';
 import { PlayerScaleController } from './PlayerScaleController';
 import { PlayerAv } from '../common/utils/PlayerAv';
@@ -81,9 +80,8 @@ export struct VideoPlayer {
   @State private castConnectedUsn: string = '';
   @State private castDevice: DlnaDevice | null = null;
   @State private castStartSec: number = 0;
-  private pausedForPicker: boolean = false;
-  /** Phone was playing when the picker opened; restore this on auto-exit / fail. */
-  private castWasPlaying: boolean = false;
+  @State private castPhase: string = '';
+  @State private castTransport: string = '';
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -97,16 +95,11 @@ export struct VideoPlayer {
   private playerW: number = 1;
   private playerH: number = 1;
   private volumeSub: (() => void) | null = null;
-  private lastCastVolPct: number = -1;
-  private castVolBusy: boolean = false;
-  private endingCast: boolean = false;
-  private castClient: DlnaClient = new DlnaClient();
-  private castSession: CastSession = new CastSession();
+  private castCtrl: PlayerCastController = new PlayerCastController();
 
   aboutToAppear() {
-    this.castSession.onRemoteDisconnected = (positionSec: number) => {
-      this.handleRemoteCastDisconnect(positionSec);
-    };
+    this.castCtrl.updateHost(this.castHost());
+    this.castCtrl.bindCallbacks();
     this.observer = new PlayerVideoObserver(this.observerHost());
     this.setupPlayerAvListener();
     this.nonce = 1;
@@ -163,12 +156,12 @@ export struct VideoPlayer {
     this.closeCastDialog();
     // True leave of PlayPage (navigate away). Screen-off uses onPageHide → pageActive=false
     // and must NOT Stop the TV — that path only closes the cast dialog UI.
-    this.stopCastSession();
+    this.ctrl().stopSession();
     this.playerAv.release();
     this.watcher.clearAll();
     this.closeSpeedDialog();
     this.state.bootGen++;
-    this.syncCastProgressToState();
+    this.ctrl().syncCastProgressToState();
     if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
     const ctx = this.ctx();
     PlayerWindow.resetBrightness(ctx);
@@ -178,8 +171,17 @@ export struct VideoPlayer {
     }
   }
 
-  onUrlChange(): void { this.resetPlayState(); this.remountPlayer(); }
-  onReloadTokenChange(): void { this.resetPlayState(); this.remountPlayer(); }
+  onUrlChange(): void { this.handleSourceChange(); }
+  onReloadTokenChange(): void { this.handleSourceChange(); }
+
+  private handleSourceChange(): void {
+    if (this.ctrl().handleSourceChange()) {
+      this.syncCastUi();
+      return;
+    }
+    this.resetPlayState();
+    this.remountPlayer();
+  }
 
   private observerHost(): PlayerObserverHost {
     return {
@@ -229,11 +231,11 @@ export struct VideoPlayer {
       });
       // Wake / page show while still casting: resume progress sync only; do not re-cast
       // and do not resume local AVPlayer (TV is the playback surface).
-      if (this.castSession.active || this.castConnectedUsn) {
+      if (this.ctrl().isCasting() || this.castConnectedUsn) {
         this.pageWasHidden = false;
         this.state.stalled = false;
         this.syncFromState();
-        this.resumeCastSync();
+        this.ctrl().resumeCastSync();
         return;
       }
       if (!this.pageWasHidden || !this.videoUrl || this.state.completed || this.state.errorText) return;
@@ -248,7 +250,7 @@ export struct VideoPlayer {
       this.closeSpeedDialog();
       // Close cast *dialog* only — keep castDevice / connectedUsn / session; TV keeps playing.
       this.closeCastDialog();
-      this.syncCastProgressToState();
+      this.ctrl().syncCastProgressToState();
       this.syncFromState();
       if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
       if (this.state.isPlaying) this.playerAv.pause();
@@ -289,7 +291,7 @@ export struct VideoPlayer {
   }
 
   private isCasting(): boolean {
-    return !!this.castConnectedUsn || !!this.castDeviceName || this.castSession.active;
+    return this.castCtrl.isCasting();
   }
 
   private toggleFull(): void {
@@ -398,245 +400,86 @@ export struct VideoPlayer {
     return Math.max(live, hist, 0);
   }
 
-  private openCastDialog(): void {
-    if (this.fullNow()) {
-      return;
-    }
-    this.closeSpeedDialog();
-    this.castStartSec = this.logicalPlayhead();
-    markCastStartSec(this.castStartSec);
-    this.castWasPlaying = this.state.playRequested && !this.state.errorText && !this.state.completed;
-    console.info(`[VideoPlayer] cast snapshot startSec=${this.castStartSec} current=${this.state.currentTime} initial=${this.initialTime} wasPlaying=${this.castWasPlaying}`);
-    if (this.castWasPlaying) {
-      this.pausedForPicker = true;
-      this.state.playRequested = false;
-      this.state.isPlaying = false;
-      this.playerAv.pause();
-      this.syncFromState();
-    }
-    this.castOpenSeq += 1;
-    this.pulseHud();
+  private ctrl(): PlayerCastController {
+    this.castCtrl.updateHost(this.castHost());
+    return this.castCtrl;
   }
+
+  private castHost(): PlayerCastHost {
+    return {
+      state: this.state,
+      playerAv: this.playerAv,
+      watcher: this.watcher,
+      audioBridge: this.audioBridge,
+      videoUrl: this.videoUrl,
+      title: this.title,
+      hasNext: () => this.hasNext,
+      volumeIndex: this.volumeIndex,
+      onEnded: this.onEnded,
+      onProgress: this.onProgress,
+      syncFromState: () => this.syncFromState(),
+      syncKeepScreen: () => this.syncKeepScreen(),
+      remountPlayer: () => this.remountPlayer(),
+      pulseHud: () => this.pulseHud(),
+      closeCastDialog: () => this.closeCastDialog(),
+      closeSpeedDialog: () => this.closeSpeedDialog(),
+      openCastSheet: () => {
+        this.castOpenSeq += 1;
+      },
+      onCastUi: () => this.syncCastUi(),
+      toast: (msg: string) => {
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: msg });
+        } catch (_e) {
+        }
+      },
+      fullNow: () => this.fullNow(),
+      exitFullForCast: () => {
+        if (!this.fullNow()) {
+          return;
+        }
+        this.innerFull = false;
+        const isPort: boolean = this.state.isPortrait();
+        if (this.onFullscreenChange) {
+          this.onFullscreenChange(false, isPort);
+        } else {
+          PlayerWindow.setFullscreen(this.ctx(), false, isPort);
+        }
+      },
+      logicalPlayhead: () => this.logicalPlayhead()
+    };
+  }
+
+  private syncCastUi(): void {
+    this.castDevice = this.castCtrl.device;
+    this.castDeviceName = this.castCtrl.deviceName;
+    this.castConnectedUsn = this.castCtrl.connectedUsn;
+    this.castStartSec = this.castCtrl.startSec;
+    this.castPhase = this.castCtrl.session.phase;
+    this.castTransport = this.castCtrl.session.transportState;
+    this.currentTime = this.castCtrl.session.positionSec;
+    this.duration = this.castCtrl.session.durationSec > 0 ?
+      this.castCtrl.session.durationSec : this.duration;
+  }
+
+  private openCastDialog(): void {
+    this.ctrl().openCastDialog();
+    this.syncCastUi();
+  }
+
   private closeCastDialog(): void {
     this.castOpenSeq = 0;
-    this.resumeAfterPickerCancel();
+    this.ctrl().resumeAfterPickerCancel();
   }
 
-  private resumeAfterPickerCancel(): void {
-    if (!this.pausedForPicker || this.isCasting()) {
-      this.pausedForPicker = false;
-      return;
-    }
-    this.pausedForPicker = false;
-    this.state.playRequested = true;
-    this.playerAv.play();
-    this.syncFromState();
-  }
-
-  private hudOwnsPoll(): boolean {
-    return !!this.castDeviceName && !this.fullNow();
-  }
-
-  private syncCastProgressToState(): void {
-    if (!this.isCasting()) {
-      return;
-    }
-    const p: number = this.castSession.positionSec;
-    const d: number = this.castSession.durationSec;
-    if (p > 0) {
-      this.state.currentTime = p;
-    }
-    if (d > 0) {
-      this.state.duration = d;
-    }
-    this.syncFromState();
-  }
-  /** Tear down local AVPlayer while TV is the playback surface (Bilibili-style). */
-  private parkPlayerForCast(): void {
-    this.watcher.clearOpenWatch();
-    this.watcher.clearSeekWatch();
-    this.watcher.clearHide();
-    this.state.bootGen += 1;
-    this.state.playerOn = false;
-    this.state.errorText = '';
-    this.state.opening = false;
-    this.state.stalled = false;
-    this.state.playRequested = false;
-    this.state.isPlaying = false;
-    this.state.ready = false;
-    this.state.seeking = false;
-    this.playerAv.release();
-    this.syncFromState();
-    this.syncKeepScreen();
-    this.showHud = true;
-  }
-
-  private resumePlayerAfterCast(resumeAt: number, resumePlay: boolean = true): void {
-    const t: number = Math.max(0, resumeAt);
-    this.state.currentTime = t;
-    this.state.pendingResumeSec = t;
-    this.state.errorText = '';
-    this.state.completed = false;
-    this.state.stalled = false;
-    this.state.playRequested = resumePlay;
-    this.state.isPlaying = false;
-    this.state.ready = false;
-    this.state.opening = !!this.videoUrl;
-    this.syncFromState();
-    this.showHud = true;
-    this.remountPlayer();
-  }
-  private resumeCastSync(): void {
-    if (!this.castSession.active) {
-      if (this.castDevice) {
-        this.castSession.attach(this.castDevice);
-      } else {
-        return;
-      }
-    }
-    if (this.hudOwnsPoll()) {
-      this.castSession.stopPoll();
-      return;
-    }
-    this.castSession.startPoll(2000);
-    this.castSession.refreshVolume();
-  }
-  private bindCastDevice(device: DlnaDevice): void {
-    this.castDevice = device;
-    this.castDeviceName = device.friendlyName;
-    this.castConnectedUsn = device.usn;
-    this.castSession.attach(device);
-    const start: number = Math.max(this.castStartSec, peekCastStartSec(), this.state.currentTime);
-    this.castSession.positionSec = start;
-    this.castSession.durationSec = this.state.duration;
-    console.info(`[VideoPlayer] bindCast start=${start} dur=${this.state.duration}`);
-    this.lastCastVolPct = -1;
-    this.pushCastVolume();
-    this.exitFullForCast();
-  }
-
-  /** Map phone MEDIA volume 0–max → TV RenderingControl 0–100. No HUD slider. */
   private pushCastVolume(): void {
-    if (!this.isCasting()) {
-      return;
-    }
-    const device: DlnaDevice | null = this.castDevice;
-    if (!device || !device.renderingControlURL) {
-      return;
-    }
-    const max: number = Math.max(1, this.audioBridge.max);
-    const pct: number = Math.max(0, Math.min(100, Math.round(this.volumeIndex / max * 100)));
-    if (pct === this.lastCastVolPct || this.castVolBusy) {
-      return;
-    }
-    this.lastCastVolPct = pct;
-    this.castVolBusy = true;
-    this.castClient.setVolume(device, pct).then(() => {
-      this.castVolBusy = false;
-      const latest: number = Math.max(0, Math.min(100, Math.round(this.volumeIndex / max * 100)));
-      if (latest !== this.lastCastVolPct) {
-        this.pushCastVolume();
-      }
-    }).catch((err: Object) => {
-      this.castVolBusy = false;
-      console.info(`[VideoPlayer] cast volume skip: ${JSON.stringify(err)}`);
-    });
+    this.ctrl().pushCastVolume();
   }
 
-  private exitFullForCast(): void {
-    if (!this.fullNow()) {
-      return;
-    }
-    this.innerFull = false;
-    const isPort = this.state.isPortrait();
-    if (this.onFullscreenChange) {
-      this.onFullscreenChange(false, isPort);
-    } else {
-      PlayerWindow.setFullscreen(this.ctx(), false, isPort);
-    }
-  }
-  private clearCastLocal(): void {
-    this.castDevice = null;
-    this.castDeviceName = '';
-    this.castConnectedUsn = '';
-    this.lastCastVolPct = -1;
-    this.castVolBusy = false;
-    this.castSession.clearLocal();
-  }
-  /** TV stopped / powered off / network drop — local clear only, no Stop SOAP. */
-  private handleRemoteCastDisconnect(resumeAt: number): void {
-    if (this.endingCast) {
-      return;
-    }
-    this.endingCast = true;
-    this.clearCastLocal();
-    this.closeCastDialog();
-    this.resumePlayerAfterCast(resumeAt, this.castWasPlaying);
-    try {
-      this.getUIContext().getPromptAction().showToast({ message: '电视已停止投屏' });
-    } catch (_e) {
-    }
-    this.endingCast = false;
-    this.pulseHud();
+  private endCastByUser(): void {
+    this.ctrl().endCastByUser();
   }
 
-  /** SetURI/Play 成功但电视未真正起播，或进度/状态一直无效。 */
-  private handleCastPlaybackFailed(resumeAt: number): void {
-    if (this.endingCast) {
-      return;
-    }
-    this.endingCast = true;
-    const device: DlnaDevice | null = this.castDevice || this.castSession.device;
-    const play: boolean = this.castWasPlaying;
-    const pos: number = Math.max(resumeAt, this.castStartSec, this.state.currentTime);
-    this.clearCastLocal();
-    this.closeCastDialog();
-    if (device) {
-      this.castClient.stop(device).catch((err: Object) => {
-        console.error(`[VideoPlayer] fail-stop: ${JSON.stringify(err)}`);
-      });
-    }
-    this.resumePlayerAfterCast(pos, play);
-    try {
-      this.getUIContext().getPromptAction().showToast({ message: '投屏失败，已回到手机' });
-    } catch (_e) {
-    }
-    this.endingCast = false;
-    this.pulseHud();
-  }
-  private stopCastSession(): void {
-    const device: DlnaDevice | null = this.castDevice || this.castSession.device;
-    this.clearCastLocal();
-    if (!device) {
-      return;
-    }
-    this.castClient.stop(device).catch((err: Object) => {
-      console.error(`[VideoPlayer] cast stop failed: ${JSON.stringify(err)}`);
-    });
-  }
-
-  private async endCastByUser(): Promise<void> {
-    if (this.endingCast || !this.isCasting()) {
-      return;
-    }
-    this.endingCast = true;
-    const device: DlnaDevice | null = this.castDevice || this.castSession.device;
-    const pos: number = Math.max(this.castSession.positionSec, this.state.currentTime);
-    this.clearCastLocal();
-    try {
-      if (device) {
-        await this.castClient.stop(device);
-      }
-    } catch (err) {
-      console.error(`[VideoPlayer] end cast failed: ${JSON.stringify(err)}`);
-    }
-    this.endingCast = false;
-    this.resumePlayerAfterCast(pos, this.castWasPlaying);
-    try {
-      this.getUIContext().getPromptAction().showToast({ message: '已停止投屏' });
-    } catch (_e) {
-    }
-  }
   private cycleScaleMode(): void {
     const next = this.scaleCtrl.cycle();
     this.scaleMode = next;
@@ -775,26 +618,11 @@ export struct VideoPlayer {
         Column() {
           PlayerCastHud({
             deviceName: this.castDeviceName,
-            seedDuration: this.duration,
-            seedDevice: this.castDevice,
-            castSession: this.castSession,
-            onStopped: (positionSec: number) => {
-              this.clearCastLocal();
-              this.resumePlayerAfterCast(positionSec, this.castWasPlaying);
-            },
-            onFailed: (positionSec: number) => {
-              this.handleCastPlaybackFailed(positionSec);
-            },
-            onProgress: (positionSec: number, durationSec: number) => {
-              if (positionSec > 0) {
-                this.state.currentTime = positionSec;
-              }
-              if (durationSec > 0) {
-                this.state.duration = durationSec;
-              }
-              this.syncFromState();
-              this.state.emitProgress(this.onProgress, false);
-            }
+            positionSec: this.currentTime,
+            durationSec: this.duration,
+            phase: this.castPhase,
+            transportState: this.castTransport,
+            castSession: this.castCtrl.session
           })
         }
         .width('100%')
@@ -833,11 +661,8 @@ export struct VideoPlayer {
         connectedUsn: this.castConnectedUsn,
         seedDevice: this.castDevice,
         onCasted: (device: DlnaDevice) => {
-          this.pausedForPicker = false;
-          this.bindCastDevice(device);
-          this.parkPlayerForCast();
-          this.closeCastDialog();
-          this.pulseHud();
+          this.ctrl().bindCastDevice(device);
+          this.syncCastUi();
         },
         onClosed: () => this.closeCastDialog()
       })

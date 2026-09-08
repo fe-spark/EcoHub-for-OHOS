@@ -1,6 +1,6 @@
 import { http, socket } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { DlnaDevice, DlnaPositionInfo } from './DlnaTypes';
+import { DlnaDevice, DlnaPositionInfo, DlnaSoapError } from './DlnaTypes';
 
 interface SsdpMessageInfo {
   message: ArrayBuffer;
@@ -410,8 +410,10 @@ export class DlnaClient {
       const code: number = response.responseCode;
       const resultText: string = typeof response.result === 'string' ? response.result : '';
       if (code < 200 || code >= 300 || /<\w*:?Fault[\s>]/i.test(resultText)) {
-        console.error(`${DlnaClient.TAG} SOAP ${action} HTTP ${code}: ${resultText.substring(0, 200)}`);
-        throw new Error(`投屏指令失败 (${action}, HTTP ${code})`);
+        const soap: DlnaSoapError = this.buildSoapError(action, code, resultText);
+        console.error(`${DlnaClient.TAG} SOAP ${action} HTTP ${code} errorCode=${soap.errorCode}: ` +
+          `${resultText.substring(0, 200)}`);
+        throw new Error(soap.message);
       }
       console.info(`${DlnaClient.TAG} SOAP ${action} ok`);
       return resultText;
@@ -515,6 +517,23 @@ export class DlnaClient {
       }
     }
     return '';
+  }
+
+  private buildSoapError(action: string, httpCode: number, body: string): DlnaSoapError {
+    const err: DlnaSoapError = new DlnaSoapError();
+    err.action = action;
+    err.httpCode = httpCode;
+    const codeRaw: string = this.extractTag(body, 'errorCode');
+    const parsed: number = parseInt(codeRaw, 10);
+    err.errorCode = isNaN(parsed) ? 0 : parsed;
+    err.errorDescription = this.extractTag(body, 'errorDescription');
+    const codePart: string = err.errorCode > 0 ? `${err.errorCode}` : `HTTP ${httpCode}`;
+    if (err.errorDescription) {
+      err.message = `${err.errorDescription} (${action}, ${codePart})`;
+    } else {
+      err.message = `投屏指令失败 (${action}, ${codePart})`;
+    }
+    return err;
   }
 
   private extractTag(xml: string, tag: string): string {
@@ -676,6 +695,7 @@ export class DlnaClient {
           family: 1
         };
         this.multicast.dropMembership(addr).catch(() => {});
+        this.multicast.close();
       } catch (_e) {
       }
       this.multicast = null;

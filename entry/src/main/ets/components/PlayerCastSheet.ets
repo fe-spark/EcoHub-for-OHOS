@@ -1,6 +1,6 @@
 import { AppTheme } from '../common/constants/AppTheme';
 import { DlnaClient } from '../common/utils/DlnaClient';
-import { DlnaDevice, DlnaScanState } from '../common/utils/DlnaTypes';
+import { DlnaDevice, DlnaScanState, soapErrorMessage } from '../common/utils/DlnaTypes';
 
 let launchStartSec: number = 0;
 
@@ -147,7 +147,7 @@ struct PlayerCastPicker {
         this.controller.close();
       }
     } catch (err) {
-      const msg: string = err instanceof Error ? err.message : '投屏失败';
+      const msg: string = soapErrorMessage(err);
       this.errorText = msg;
       this.toast(msg);
     } finally {

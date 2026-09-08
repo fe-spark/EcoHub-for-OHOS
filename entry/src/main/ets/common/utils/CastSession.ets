@@ -1,39 +1,50 @@
 import { DlnaClient } from './DlnaClient';
-import { DlnaDevice, DlnaPositionInfo } from './DlnaTypes';
+import { CastPhase, DlnaDevice } from './DlnaTypes';
+import { CastPollHost, CastSessionPoll } from './CastSessionPoll';
 
 /**
- * Lightweight cast session that outlives the cast dialog.
- * Keeps device state + optional background GetPositionInfo poll so
- * screen-off / brief background does not tear down TV playback, and
- * progress stays fresh when the sheet reopens.
- *
- * Also watches transport / poll health: when the TV stops or drops off
- * the network, clearLocal() only (never Stop SOAP) and notify UI.
+ * Unique cast session: device, phase, poll, Stop, launch confirm, EOS vs disconnect.
  */
-export class CastSession {
+export class CastSession implements CastPollHost {
+  private static readonly TAG: string = '[CastSession]';
+  private static readonly SLOW_MS: number = 35000;
+  private static readonly FAST_MS: number = 20000;
+  private static readonly HUD_POLL_MS: number = 1000;
+  private static readonly BG_POLL_MS: number = 2000;
+  private static readonly SLOW_NAME_SUBSTR: string[] = ['macast', 'kodi', 'mpv', 'xbmc'];
+
   device: DlnaDevice | null = null;
   positionSec: number = 0;
   durationSec: number = 0;
   volume: number = 50;
   volumeSupported: boolean = false;
   transportState: string = '';
+  phase: string = CastPhase.IDLE;
+  relTimeUnavailable: boolean = false;
+  needRelTimeToast: boolean = false;
+  pendingStartSec: number = -1;
 
-  /** Fired after clearLocal on remote STOPPED / poll-fail disconnect. Position is the last known TV time. */
-  onRemoteDisconnected: ((positionSec: number) => void) | null = null;
+  onFailed: ((positionSec: number) => void) | null = null;
+  onCompleted: (() => void) | null = null;
+  onDisconnected: ((positionSec: number) => void) | null = null;
+  onState: (() => void) | null = null;
 
-  private client: DlnaClient = new DlnaClient();
+  client: DlnaClient = new DlnaClient();
+  pollToken: number = 0;
+  pollBusy: boolean = false;
+  terminal: boolean = false;
+  failStreak: number = 0;
+  relNiStreak: number = 0;
+  originMs: number = 0;
+  launchAtMs: number = 0;
+  timeoutMs: number = CastSession.FAST_MS;
+  stoppedStreak: number = 0;
+  eosStopStreak: number = 0;
+  startSeekTries: number = 0;
+  startSeeking: boolean = false;
   private pollTimer: number = -1;
-  private pollToken: number = 0;
-
-  /** True once we have seen PLAYING or TRANSITIONING after attach. */
-  private everPlayed: boolean = false;
-  private stoppedStreak: number = 0;
-  private failStreak: number = 0;
-
-  /** Consecutive STOPPED / NO_MEDIA_PRESENT polls after everPlayed. */
-  private static readonly STOPPED_THRESHOLD: number = 3;
-  /** Consecutive failed GetPositionInfo+GetTransportInfo polls while active. */
-  private static readonly FAIL_THRESHOLD: number = 3;
+  private hudPolling: boolean = false;
+  private poller: CastSessionPoll = new CastSessionPoll();
 
   get active(): boolean {
     return this.device !== null;
@@ -47,15 +58,35 @@ export class CastSession {
     return this.device ? this.device.friendlyName : '';
   }
 
+  /** Set device only. Progress is assigned by beginLaunch / replaceUri. */
   attach(device: DlnaDevice): void {
     this.device = device;
-    this.positionSec = 0;
-    this.durationSec = 0;
     this.transportState = '';
+    this.relTimeUnavailable = false;
+    this.needRelTimeToast = false;
+    this.relNiStreak = 0;
     this.resetHealthCounters();
+    this.timeoutMs = CastSession.matchSlow(device) ? CastSession.SLOW_MS : CastSession.FAST_MS;
   }
 
-  /** Clear local session state without sending Stop to the renderer. */
+  beginLaunch(positionSec: number, durationSec: number): void {
+    if (positionSec >= 0) {
+      this.positionSec = positionSec;
+    }
+    if (durationSec > 0) {
+      this.durationSec = durationSec;
+    }
+    this.pendingStartSec = positionSec >= 2 ? positionSec : -1;
+    this.startSeekTries = 0;
+    this.startSeeking = false;
+    this.originMs = 0;
+    this.terminal = false;
+    this.launchAtMs = Date.now();
+    this.setPhase(CastPhase.LAUNCHING);
+    this.startPoll(this.pollInterval());
+    this.emitState();
+  }
+
   clearLocal(): void {
     this.stopPoll();
     this.device = null;
@@ -64,19 +95,32 @@ export class CastSession {
     this.volume = 50;
     this.volumeSupported = false;
     this.transportState = '';
+    this.pendingStartSec = -1;
+    this.relTimeUnavailable = false;
+    this.needRelTimeToast = false;
+    this.originMs = 0;
+    this.terminal = false;
     this.resetHealthCounters();
+    this.setPhase(CastPhase.IDLE);
   }
 
-  startPoll(intervalMs: number = 2000): void {
+  setHudPolling(on: boolean): void {
+    this.hudPolling = on;
+    if (this.device) {
+      this.startPoll(this.pollInterval());
+    }
+  }
+
+  startPoll(intervalMs: number = CastSession.BG_POLL_MS): void {
     this.stopPoll();
     if (!this.device || !this.device.controlURL) {
       return;
     }
     this.pollToken += 1;
     const token: number = this.pollToken;
-    this.tickOnce(token);
+    this.poller.tickOnce(this, token);
     this.pollTimer = setInterval(() => {
-      this.tickOnce(token);
+      this.poller.tickOnce(this, token);
     }, intervalMs) as number;
   }
 
@@ -98,16 +142,63 @@ export class CastSession {
       this.volume = await this.client.getVolume(device);
       this.volumeSupported = true;
     } catch (err) {
-      console.error(`[CastSession] GetVolume fail: ${JSON.stringify(err)}`);
+      console.error(`${CastSession.TAG} GetVolume fail: ${JSON.stringify(err)}`);
       this.volumeSupported = false;
     }
   }
 
-  /**
-   * Send Stop to the renderer and clear local state.
-   * Only call on explicit user Stop or true leave of PlayPage.
-   */
+  async setVolume(pct: number): Promise<void> {
+    const device: DlnaDevice | null = this.device;
+    if (!device || !device.renderingControlURL) {
+      return;
+    }
+    await this.client.setVolume(device, pct);
+  }
+
+  async play(): Promise<void> {
+    const device: DlnaDevice | null = this.device;
+    if (!device) {
+      return;
+    }
+    await this.client.play(device);
+    this.transportState = 'PLAYING';
+    this.originMs = Date.now() - Math.max(0, this.positionSec) * 1000;
+    this.setPhase(CastPhase.PLAYING);
+    this.emitState();
+  }
+
+  async pause(): Promise<void> {
+    const device: DlnaDevice | null = this.device;
+    if (!device) {
+      return;
+    }
+    await this.client.pause(device);
+    this.transportState = 'PAUSED_PLAYBACK';
+    this.originMs = 0;
+    this.setPhase(CastPhase.PAUSED);
+    this.emitState();
+  }
+
+  async seek(positionSec: number): Promise<void> {
+    const device: DlnaDevice | null = this.device;
+    if (!device) {
+      return;
+    }
+    const target: number = this.durationSec > 0 ?
+      Math.max(0, Math.min(positionSec, this.durationSec)) : Math.max(0, positionSec);
+    await this.client.seek(device, target);
+    this.pendingStartSec = -1;
+    this.positionSec = target;
+    this.originMs = Date.now() - target * 1000;
+    this.emitState();
+  }
+
+  /** Unique Stop SOAP entry. */
   async stopRemote(): Promise<void> {
+    if (this.phase === CastPhase.STOPPING) {
+      return;
+    }
+    this.setPhase(CastPhase.STOPPING);
     const device: DlnaDevice | null = this.device;
     this.clearLocal();
     if (!device) {
@@ -116,127 +207,75 @@ export class CastSession {
     try {
       await this.client.stop(device);
     } catch (err) {
-      console.error(`[CastSession] stop failed: ${JSON.stringify(err)}`);
+      console.error(`${CastSession.TAG} stop failed: ${JSON.stringify(err)}`);
     }
   }
 
-  /** Reset fail/STOPPED counters (e.g. after successful cast attach). */
-  resetHealthCounters(): void {
-    this.everPlayed = false;
-    this.stoppedStreak = 0;
-    this.failStreak = 0;
-  }
-
-  /** Reset fail streak after a successful position/transport poll. */
-  notePollSuccess(): void {
-    this.failStreak = 0;
-  }
-
-  /**
-   * Record a failed GetPositionInfo / GetTransportInfo tick while session active.
-   * @returns true if remote disconnect was triggered (clearLocal already ran).
-   */
-  notePollFailure(): boolean {
-    if (!this.device) {
-      return false;
-    }
-    this.failStreak += 1;
-    if (this.failStreak >= CastSession.FAIL_THRESHOLD) {
-      console.info(`[CastSession] remote disconnect: poll fail x${this.failStreak}`);
-      this.handleRemoteDisconnect();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Observe CurrentTransportState from GetTransportInfo (or sheet poll).
-   * STOPPED / NO_MEDIA_PRESENT for N polls after ever PLAYING/TRANSITIONING → disconnect.
-   * @returns true if remote disconnect was triggered (clearLocal already ran).
-   */
-  noteTransportState(state: string): boolean {
-    this.transportState = state ? state : '';
-    const upper: string = (state || '').toUpperCase();
-    if (upper === 'PLAYING' || upper === 'TRANSITIONING') {
-      this.everPlayed = true;
-      this.stoppedStreak = 0;
-      this.failStreak = 0;
-      return false;
-    }
-    if (!this.device || !this.everPlayed) {
-      this.stoppedStreak = 0;
-      return false;
-    }
-    if (upper === 'STOPPED' || upper === 'NO_MEDIA_PRESENT') {
-      this.stoppedStreak += 1;
-      if (this.stoppedStreak >= CastSession.STOPPED_THRESHOLD) {
-        console.info(`[CastSession] remote disconnect: ${upper} x${this.stoppedStreak}`);
-        this.handleRemoteDisconnect();
-        return true;
-      }
-      return false;
-    }
-    // PAUSED_PLAYBACK and other states: not a remote stop.
-    this.stoppedStreak = 0;
-    return false;
-  }
-
-  private handleRemoteDisconnect(): void {
-    const pos: number = this.positionSec;
-    const cb: ((positionSec: number) => void) | null = this.onRemoteDisconnected;
-    this.clearLocal();
-    if (cb) {
-      cb(pos);
-    }
-  }
-
-  private async tickOnce(token: number): Promise<void> {
-    if (token !== this.pollToken) {
-      return;
-    }
+  async replaceUri(url: string, title: string, startSec: number): Promise<void> {
     const device: DlnaDevice | null = this.device;
     if (!device || !device.controlURL) {
-      return;
+      throw new Error('投屏设备已断开');
     }
-
-    let positionOk: boolean = false;
-    let transportOk: boolean = false;
-
+    this.stopPoll();
     try {
-      const info: DlnaPositionInfo = await this.client.getPositionInfo(device);
-      if (token !== this.pollToken) {
-        return;
-      }
-      positionOk = true;
-      this.positionSec = info.positionSec;
-      if (info.durationSec > 0) {
-        this.durationSec = info.durationSec;
-      }
-    } catch (err) {
-      console.error(`[CastSession] GetPositionInfo fail: ${JSON.stringify(err)}`);
-    }
-
-    try {
-      const state: string = await this.client.getTransportInfo(device);
-      if (token !== this.pollToken) {
-        return;
-      }
-      transportOk = true;
-      if (this.noteTransportState(state)) {
-        return;
-      }
+      await this.client.stop(device);
     } catch (_e) {
-      // Optional; counted toward fail streak with position below.
     }
+    this.positionSec = startSec;
+    this.durationSec = 0;
+    this.pendingStartSec = startSec >= 2 ? startSec : -1;
+    this.relTimeUnavailable = false;
+    this.needRelTimeToast = false;
+    this.relNiStreak = 0;
+    this.originMs = 0;
+    this.startSeekTries = 0;
+    this.startSeeking = false;
+    this.terminal = false;
+    this.resetHealthCounters();
+    this.transportState = '';
+    this.launchAtMs = Date.now();
+    this.timeoutMs = CastSession.matchSlow(device) ? CastSession.SLOW_MS : CastSession.FAST_MS;
+    this.setPhase(CastPhase.LAUNCHING);
+    this.emitState();
+    await this.client.cast(device, url, title, startSec, 0);
+    this.startPoll(this.pollInterval());
+  }
 
-    if (token !== this.pollToken || !this.device) {
+  confirmed(): boolean {
+    return this.phase === CastPhase.PLAYING || this.phase === CastPhase.PAUSED;
+  }
+
+  setPhase(next: string): void {
+    if (this.phase === next) {
       return;
     }
+    console.info(`${CastSession.TAG} phase ${this.phase} -> ${next}`);
+    this.phase = next;
+  }
 
-    if (positionOk || transportOk) {
-      this.notePollSuccess();
-    } else if (this.notePollFailure()) {
-      return;
+  emitState(): void {
+    if (this.onState) {
+      this.onState();
     }
+  }
+
+  private resetHealthCounters(): void {
+    this.stoppedStreak = 0;
+    this.failStreak = 0;
+    this.eosStopStreak = 0;
+  }
+
+  private pollInterval(): number {
+    return this.hudPolling ? CastSession.HUD_POLL_MS : CastSession.BG_POLL_MS;
+  }
+
+  private static matchSlow(device: DlnaDevice): boolean {
+    const blob: string = `${device.manufacturer} ${device.friendlyName}`.toLowerCase();
+    for (let i = 0; i < CastSession.SLOW_NAME_SUBSTR.length; i++) {
+      if (blob.indexOf(CastSession.SLOW_NAME_SUBSTR[i]) >= 0) {
+        return true;
+      }
+    }
+    return false;
   }
 }
