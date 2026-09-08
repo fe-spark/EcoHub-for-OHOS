@@ -56,6 +56,7 @@ export struct PlayerSkin {
   onPanMove?: (event: GestureEvent) => void;
   onPanEnd?: () => void;
   onPanCancel?: () => void;
+  onCast?: () => void;
 
   private continuing(): boolean {
     return this.playRequested && !this.completed && !this.errorText;
@@ -109,8 +110,12 @@ export struct PlayerSkin {
   }
 
   private handleCast(): void {
+    if (this.onCast) {
+      this.onCast();
+      return;
+    }
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '正在开发中' });
+      this.getUIContext().getPromptAction().showToast({ message: '投屏不可用' });
     } catch (_e) {}
   }
 
@@ -171,6 +176,12 @@ export struct PlayerSkin {
           .layoutWeight(1)
           .margin({ left: 4, right: 8 })
         this.skipBtns()
+        PlayerIconBtn({
+          src: $r('sys.symbol.wireless_projection'),
+          iconSize: 20,
+          boxSize: 40,
+          onTap: () => this.handleCast()
+        })
       }
       .width('100%')
       .padding({

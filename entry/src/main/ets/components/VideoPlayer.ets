@@ -13,6 +13,9 @@ import { PlayerPlaybackState } from './PlayerPlaybackState';
 import { PlayerSkinEvents, PlayerSkinView } from './PlayerSkinView';
 import { PlayerObserverHost, PlayerVideoObserver } from './PlayerVideoObserver';
 import { PlayerSpeedSheet } from './PlayerSpeedSheet';
+import { PlayerCastSheet } from './PlayerCastSheet';
+import { DlnaClient } from '../common/utils/DlnaClient';
+import { DlnaDevice } from '../common/utils/DlnaTypes';
 import { PlayerScale, PlayerScaleMode } from '../common/utils/PlayerScale';
 import { PlayerScaleController } from './PlayerScaleController';
 import { PlayerAv } from '../common/utils/PlayerAv';
@@ -71,6 +74,8 @@ export struct VideoPlayer {
   @State private playSrc: string = '';
   @State private playerOn: boolean = false;
   @State private speedOpenSeq: number = 0;
+  @State private castOpenSeq: number = 0;
+  @State private castDeviceName: string = '';
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -84,6 +89,8 @@ export struct VideoPlayer {
   private playerW: number = 1;
   private playerH: number = 1;
   private volumeSub: (() => void) | null = null;
+  private castClient: DlnaClient = new DlnaClient();
+  private castDevice: DlnaDevice | null = null;
 
   aboutToAppear() {
     this.observer = new PlayerVideoObserver(this.observerHost());
@@ -138,6 +145,8 @@ export struct VideoPlayer {
       this.volumeSub();
       this.volumeSub = null;
     }
+    this.closeCastDialog();
+    this.stopCastSession();
     this.playerAv.release();
     this.watcher.clearAll();
     this.closeSpeedDialog();
@@ -210,6 +219,7 @@ export struct VideoPlayer {
       this.state.stalled = false;
       this.watcher.clearHide();
       this.closeSpeedDialog();
+      this.closeCastDialog();
       this.syncFromState();
       if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
       if (this.state.isPlaying) this.playerAv.pause();
@@ -334,6 +344,34 @@ export struct VideoPlayer {
 
   private openSpeedDialog(): void { this.speedCtrl.setShowing(true); this.speedOpenSeq += 1; }
   private closeSpeedDialog(): void { this.speedCtrl.setShowing(false); this.speedOpenSeq = 0; }
+  private openCastDialog(): void {
+    this.closeSpeedDialog();
+    this.castOpenSeq += 1;
+    this.pulseHud();
+  }
+  private closeCastDialog(): void { this.castOpenSeq = 0; }
+  private pauseForCast(): void {
+    if (this.state.playRequested || this.state.isPlaying) {
+      this.state.playRequested = false;
+      this.state.isPlaying = false;
+      this.playerAv.pause();
+      this.syncFromState();
+      this.syncKeepScreen();
+      this.showHud = true;
+      this.watcher.clearHide();
+    }
+  }
+  private stopCastSession(): void {
+    const device: DlnaDevice | null = this.castDevice;
+    this.castDevice = null;
+    this.castDeviceName = '';
+    if (!device) {
+      return;
+    }
+    this.castClient.stop(device).catch((err: Object) => {
+      console.error(`[VideoPlayer] cast stop failed: ${JSON.stringify(err)}`);
+    });
+  }
   private cycleScaleMode(): void {
     const next = this.scaleCtrl.cycle();
     this.scaleMode = next;
@@ -420,7 +458,8 @@ export struct VideoPlayer {
         }
       },
       onPanStart: (e) => this.gestures.start(e, this.state.canPlay(), this.longPressing, this.currentTime, this.playerW, this.ctx()),
-      onPanMove: (e) => this.panMove(e), onPanEnd: () => this.finishPanSeek(), onPanCancel: () => this.finishPanSeek()
+      onPanMove: (e) => this.panMove(e), onPanEnd: () => this.finishPanSeek(), onPanCancel: () => this.finishPanSeek(),
+      onCast: () => this.openCastDialog()
     };
   }
 
@@ -458,6 +497,23 @@ export struct VideoPlayer {
         onClosed: () => this.speedCtrl.setShowing(false)
       })
 
+      PlayerCastSheet({
+        openSeq: this.castOpenSeq,
+        mediaUrl: this.videoUrl,
+        mediaTitle: this.title,
+        onCasted: (device: DlnaDevice) => {
+          this.castDevice = device;
+          this.castDeviceName = device.friendlyName;
+          this.pauseForCast();
+          this.pulseHud();
+        },
+        onStopped: () => {
+          this.castDevice = null;
+          this.castDeviceName = '';
+          this.pulseHud();
+        },
+        onClosed: () => this.closeCastDialog()
+      })
 
       PlayerSkinView({
         isFull: this.fullNow(), showHud: this.showHud, showBack: this.showBack, title: this.title,
