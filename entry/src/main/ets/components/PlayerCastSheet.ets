@@ -45,6 +45,17 @@ struct PlayerCastDialog {
     return null;
   }
 
+
+  private connectedName(): string {
+    const d: DlnaDevice | null = this.connectedDevice();
+    return d ? d.friendlyName : '已连接设备';
+  }
+
+  private connectedHost(): string {
+    const d: DlnaDevice | null = this.connectedDevice();
+    return d ? d.host : '';
+  }
+
   private async castTo(device: DlnaDevice): Promise<void> {
     if (!this.mediaUrl) {
       try {
