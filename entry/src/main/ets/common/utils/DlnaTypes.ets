@@ -10,7 +10,17 @@ export interface DlnaDevice {
   location: string;
   /** Absolute AVTransport controlURL. */
   controlURL: string;
+  /** Absolute RenderingControl controlURL (may be empty). */
+  renderingControlURL: string;
   host: string;
+}
+
+/** Parsed AVTransport GetPositionInfo. Times are seconds. */
+export interface DlnaPositionInfo {
+  positionSec: number;
+  durationSec: number;
+  relTime: string;
+  trackDuration: string;
 }
 
 export enum DlnaScanState {
