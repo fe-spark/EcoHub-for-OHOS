@@ -31,6 +31,8 @@ export class PlayerPlaybackState {
   public dragging: boolean = false;
   public videoWidth: number = 0;
   public videoHeight: number = 0;
+  /** Consume-once resume after stopping cast; -1 = unset. */
+  public pendingResumeSec: number = -1;
 
   public live(): boolean {
     return this.playerOn && this.bootGen === this.mountGen;
@@ -45,6 +47,11 @@ export class PlayerPlaybackState {
   }
 
   public resumeTime(initialTime: number): number {
+    if (this.pendingResumeSec >= 0) {
+      const t: number = this.pendingResumeSec;
+      this.pendingResumeSec = -1;
+      return t;
+    }
     return this.currentTime >= PlayerPlaybackState.MIN_RESUME_THRESHOLD_SEC ? this.currentTime : initialTime;
   }
 
@@ -71,6 +78,7 @@ export class PlayerPlaybackState {
     this.lastToggleAt = 0;
     this.videoWidth = 0;
     this.videoHeight = 0;
+    this.pendingResumeSec = -1;
   }
 
   public emitProgress(cb?: ProgressCallback, force: boolean = false): void {
@@ -93,6 +101,9 @@ export class PlayerPlaybackState {
     if (this.seeking || this.seekTarget >= 0) {
       return false;
     }
+    if (this.pendingResumeSec >= 0 && this.opening) {
+      return false;
+    }
     this.currentTime = time;
     return true;
   }
@@ -109,6 +120,7 @@ export class PlayerPlaybackState {
     this.seekTarget = -1;
     this.seekAt = 0;
     this.seekSeq = 0;
+    this.pendingResumeSec = -1;
   }
 
   public failOpen(url: string, detail?: string): void {

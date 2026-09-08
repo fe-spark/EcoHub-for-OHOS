@@ -20,6 +20,17 @@ export struct NoticeDialog {
     return this.windowHeight > 0 && this.windowHeight < 500;
   }
 
+  // 正文随内容收紧；仅在超出上限时滚动，避免短公告被 layoutWeight 撑高
+  private contentMaxHeight(): number {
+    const pad = this.isLandscape() ? 14 : AppTheme.SPACE_LG;
+    const headerGap = this.isLandscape() ? 8 : AppTheme.SPACE_MD;
+    const btnGap = this.isLandscape() ? 10 : AppTheme.SPACE_LG;
+    const btnH = this.isLandscape() ? 36 : 42;
+    const chrome = pad * 2 + 32 + headerGap + btnGap + btnH + Math.max(12, this.bottomInset);
+    const available = this.windowHeight * 0.85 - chrome;
+    return Math.max(48, Math.min(260, available));
+  }
+
   aboutToAppear(): void {
     setTimeout(() => {
       this.maskOpacity = 1;
@@ -99,7 +110,7 @@ export struct NoticeDialog {
         .alignItems(VerticalAlign.Center)
         .margin({ bottom: this.isLandscape() ? 8 : AppTheme.SPACE_MD })
 
-        // 公告正文（可滚动容器，弹性收缩保护底部按钮）
+        // 公告正文：高度随内容，超上限才滚动，横屏用窗口剩余高度封顶保按钮可见
         Scroll() {
           Column() {
             Text(this.content)
@@ -111,11 +122,10 @@ export struct NoticeDialog {
           .width('100%')
           .alignItems(HorizontalAlign.Start)
         }
-        .layoutWeight(1)
         .scrollable(ScrollDirection.Vertical)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
-        .constraintSize({ minHeight: 60, maxHeight: 260 })
+        .constraintSize({ maxHeight: this.contentMaxHeight() })
         .width('100%')
         .padding(AppTheme.SPACE_MD)
         .backgroundColor(AppTheme.BG_CARD)

@@ -9,6 +9,7 @@ export struct PlayerIconBtn {
   @Prop circle: boolean = false;
   @Prop prominent: boolean = false;
   @Prop canTap: boolean = true;
+  @Prop iconColor: string = '#FFFFFF';
   onTap?: () => void;
   private lastTapAt: number = 0;
 
@@ -37,7 +38,7 @@ export struct PlayerIconBtn {
     Column() {
       SymbolGlyph(this.src)
         .fontSize(this.iconSize)
-        .fontColor(['#FFFFFF'])
+        .fontColor([this.iconColor])
         .fontWeight(FontWeight.Medium)
         .hitTestBehavior(HitTestMode.None)
     }
