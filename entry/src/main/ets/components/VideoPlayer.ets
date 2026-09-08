@@ -16,6 +16,7 @@ import { PlayerSpeedSheet } from './PlayerSpeedSheet';
 import { PlayerCastSheet } from './PlayerCastSheet';
 import { DlnaClient } from '../common/utils/DlnaClient';
 import { DlnaDevice } from '../common/utils/DlnaTypes';
+import { CastSession } from '../common/utils/CastSession';
 import { PlayerScale, PlayerScaleMode } from '../common/utils/PlayerScale';
 import { PlayerScaleController } from './PlayerScaleController';
 import { PlayerAv } from '../common/utils/PlayerAv';
@@ -76,6 +77,8 @@ export struct VideoPlayer {
   @State private speedOpenSeq: number = 0;
   @State private castOpenSeq: number = 0;
   @State private castDeviceName: string = '';
+  @State private castConnectedUsn: string = '';
+  @State private castDevice: DlnaDevice | null = null;
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -90,7 +93,7 @@ export struct VideoPlayer {
   private playerH: number = 1;
   private volumeSub: (() => void) | null = null;
   private castClient: DlnaClient = new DlnaClient();
-  private castDevice: DlnaDevice | null = null;
+  private castSession: CastSession = new CastSession();
 
   aboutToAppear() {
     this.observer = new PlayerVideoObserver(this.observerHost());
@@ -146,6 +149,8 @@ export struct VideoPlayer {
       this.volumeSub = null;
     }
     this.closeCastDialog();
+    // True leave of PlayPage (navigate away). Screen-off uses onPageHide → pageActive=false
+    // and must NOT Stop the TV — that path only closes the cast dialog UI.
     this.stopCastSession();
     this.playerAv.release();
     this.watcher.clearAll();
@@ -209,6 +214,15 @@ export struct VideoPlayer {
         this.playerAv.setMuted(isMuted);
         this.gestures.pan.primeVolume(this.audioBridge.max > 0 ? vol / this.audioBridge.max : 0);
       });
+      // Wake / page show while still casting: resume progress sync only; do not re-cast
+      // and do not resume local AVPlayer (TV is the playback surface).
+      if (this.castSession.active || this.castConnectedUsn) {
+        this.pageWasHidden = false;
+        this.state.stalled = false;
+        this.syncFromState();
+        this.resumeCastSync();
+        return;
+      }
       if (!this.pageWasHidden || !this.videoUrl || this.state.completed || this.state.errorText) return;
       this.pageWasHidden = false;
       this.state.stalled = false;
@@ -219,7 +233,11 @@ export struct VideoPlayer {
       this.state.stalled = false;
       this.watcher.clearHide();
       this.closeSpeedDialog();
+      // Close cast *dialog* only — keep castDevice / connectedUsn / session; TV keeps playing.
       this.closeCastDialog();
+      if (this.castSession.active) {
+        this.castSession.startPoll(2000);
+      }
       this.syncFromState();
       if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
       if (this.state.isPlaying) this.playerAv.pause();
@@ -346,10 +364,20 @@ export struct VideoPlayer {
   private closeSpeedDialog(): void { this.speedCtrl.setShowing(false); this.speedOpenSeq = 0; }
   private openCastDialog(): void {
     this.closeSpeedDialog();
+    // Sheet owns interactive 1s poll while open; pause background poll to avoid double traffic.
+    if (this.castSession.active) {
+      this.castSession.stopPoll();
+    }
     this.castOpenSeq += 1;
     this.pulseHud();
   }
-  private closeCastDialog(): void { this.castOpenSeq = 0; }
+  private closeCastDialog(): void {
+    this.castOpenSeq = 0;
+    // Dialog closed (screen-off / dismiss): keep session, resume lightweight bg poll.
+    if (this.castSession.active) {
+      this.castSession.startPoll(2000);
+    }
+  }
   private pauseForCast(): void {
     if (this.state.playRequested || this.state.isPlaying) {
       this.state.playRequested = false;
@@ -361,10 +389,37 @@ export struct VideoPlayer {
       this.watcher.clearHide();
     }
   }
-  private stopCastSession(): void {
-    const device: DlnaDevice | null = this.castDevice;
+  private resumeCastSync(): void {
+    if (!this.castSession.active) {
+      if (this.castDevice) {
+        this.castSession.attach(this.castDevice);
+      } else {
+        return;
+      }
+    }
+    // Sheet open → dialog polls; otherwise keep bg poll for fresh reopen / chip.
+    if (this.castOpenSeq > 0) {
+      this.castSession.stopPoll();
+    } else {
+      this.castSession.startPoll(2000);
+      this.castSession.refreshVolume();
+    }
+  }
+  private bindCastDevice(device: DlnaDevice): void {
+    this.castDevice = device;
+    this.castDeviceName = device.friendlyName;
+    this.castConnectedUsn = device.usn;
+    this.castSession.attach(device);
+  }
+  private clearCastLocal(): void {
     this.castDevice = null;
     this.castDeviceName = '';
+    this.castConnectedUsn = '';
+    this.castSession.clearLocal();
+  }
+  private stopCastSession(): void {
+    const device: DlnaDevice | null = this.castDevice || this.castSession.device;
+    this.clearCastLocal();
     if (!device) {
       return;
     }
@@ -501,15 +556,19 @@ export struct VideoPlayer {
         openSeq: this.castOpenSeq,
         mediaUrl: this.videoUrl,
         mediaTitle: this.title,
+        connectedUsn: $castConnectedUsn,
+        seedDevice: this.castDevice,
+        seedPosition: this.castSession.positionSec,
+        seedDuration: this.castSession.durationSec,
+        seedVolume: this.castSession.volume,
+        seedVolumeSupported: this.castSession.volumeSupported,
         onCasted: (device: DlnaDevice) => {
-          this.castDevice = device;
-          this.castDeviceName = device.friendlyName;
+          this.bindCastDevice(device);
           this.pauseForCast();
           this.pulseHud();
         },
         onStopped: () => {
-          this.castDevice = null;
-          this.castDeviceName = '';
+          this.clearCastLocal();
           this.pulseHud();
         },
         onClosed: () => this.closeCastDialog()
@@ -526,6 +585,27 @@ export struct VideoPlayer {
         topInset: this.topInset, leftInset: this.leftInset, rightInset: this.rightInset, bottomInset: this.bottomInset,
         edgeHud: this.edgeHud, ready: this.ready, events: this.skinEvents()
       })
+
+      // Optional HUD chip while casting — sheet not required; tap reopens controls.
+      if (this.castDeviceName && this.showHud) {
+        Row() {
+          Text(`正在投屏 · ${this.castDeviceName}`)
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .constraintSize({ maxWidth: '72%' })
+        .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+        .backgroundColor(AppTheme.ACCENT_SOFT)
+        .borderRadius(AppTheme.RADIUS_PILL)
+        .margin({
+          top: (this.edgeHud ? this.topInset : this.topInset) + 44,
+          left: this.leftInset + 12
+        })
+        .onClick(() => this.openCastDialog())
+      }
     }
     .width('100%')
     .height('100%')
