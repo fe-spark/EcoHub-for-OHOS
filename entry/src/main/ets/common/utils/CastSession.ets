@@ -18,8 +18,8 @@ export class CastSession {
   volumeSupported: boolean = false;
   transportState: string = '';
 
-  /** Fired after clearLocal on remote STOPPED / poll-fail disconnect. */
-  onRemoteDisconnected: (() => void) | null = null;
+  /** Fired after clearLocal on remote STOPPED / poll-fail disconnect. Position is the last known TV time. */
+  onRemoteDisconnected: ((positionSec: number) => void) | null = null;
 
   private client: DlnaClient = new DlnaClient();
   private pollTimer: number = -1;
@@ -182,10 +182,11 @@ export class CastSession {
   }
 
   private handleRemoteDisconnect(): void {
-    const cb: (() => void) | null = this.onRemoteDisconnected;
+    const pos: number = this.positionSec;
+    const cb: ((positionSec: number) => void) | null = this.onRemoteDisconnected;
     this.clearLocal();
     if (cb) {
-      cb();
+      cb(pos);
     }
   }
 

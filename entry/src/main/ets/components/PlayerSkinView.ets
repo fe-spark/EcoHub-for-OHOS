@@ -24,6 +24,7 @@ export interface PlayerSkinEvents {
   onPanEnd: () => void;
   onPanCancel: () => void;
   onCast: () => void;
+  onStopCast: () => void;
 }
 
 @Component
@@ -55,6 +56,7 @@ export struct PlayerSkinView {
   @Prop bottomInset: number = 0;
   @Prop edgeHud: boolean = false;
   @Prop ready: boolean = false;
+  @Prop castDeviceName: string = '';
 
   events?: PlayerSkinEvents;
 
@@ -87,6 +89,7 @@ export struct PlayerSkinView {
       bottomInset: this.bottomInset,
       edgeHud: this.edgeHud,
       ready: this.ready,
+      castDeviceName: this.castDeviceName,
       onBack: () => { if (this.events) this.events.onBack(); },
       onPlay: () => { if (this.events) this.events.onPlay(); },
       onFull: () => { if (this.events) this.events.onFull(); },
@@ -109,7 +112,8 @@ export struct PlayerSkinView {
       onPanMove: (e: GestureEvent) => { if (this.events) this.events.onPanMove(e); },
       onPanEnd: () => { if (this.events) this.events.onPanEnd(); },
       onPanCancel: () => { if (this.events) this.events.onPanCancel(); },
-      onCast: () => { if (this.events) this.events.onCast(); }
+      onCast: () => { if (this.events) this.events.onCast(); },
+      onStopCast: () => { if (this.events) this.events.onStopCast(); }
     })
       .width('100%')
       .height('100%')

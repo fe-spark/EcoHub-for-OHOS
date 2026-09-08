@@ -66,14 +66,37 @@ export class DlnaClient {
     this.closeSockets();
   }
 
-  public async cast(device: DlnaDevice, mediaUrl: string, title: string = 'EcoHub'): Promise<void> {
+  public async cast(device: DlnaDevice, mediaUrl: string, title: string = 'EcoHub',
+    startSec: number = 0, durationSec: number = 0): Promise<void> {
     if (!mediaUrl) {
       throw new Error('当前没有可投屏的地址');
     }
-    console.info(`${DlnaClient.TAG} cast -> ${device.friendlyName} ${device.controlURL}`);
+    console.info(`${DlnaClient.TAG} cast -> ${device.friendlyName} start=${startSec} dur=${durationSec}`);
     await this.soapAction(device.controlURL, DlnaClient.AVT, 'SetAVTransportURI',
-      this.buildSetUriBody(mediaUrl, title));
+      this.buildSetUriBody(mediaUrl, title, durationSec));
+    // One REL_TIME try while STOPPED. Do not run padded/ABS fallbacks here — those extra
+    // Faults would stall the picker. HUD retries after TrackDuration is known.
+    if (startSec >= 2) {
+      try {
+        const hms: string = DlnaClient.formatRelTime(startSec);
+        console.info(`${DlnaClient.TAG} pre-play seek REL_TIME ${hms}`);
+        await this.soapAction(device.controlURL, DlnaClient.AVT, 'Seek',
+          this.buildSeekBody(hms, 'REL_TIME'));
+      } catch (err) {
+        console.info(`${DlnaClient.TAG} pre-play seek ignored: ${JSON.stringify(err)}`);
+      }
+    }
+    await this.play(device);
+  }
+
+  public async play(device: DlnaDevice): Promise<void> {
+    console.info(`${DlnaClient.TAG} play -> ${device.friendlyName}`);
     await this.soapAction(device.controlURL, DlnaClient.AVT, 'Play', this.buildPlayBody());
+  }
+
+  public async pause(device: DlnaDevice): Promise<void> {
+    console.info(`${DlnaClient.TAG} pause -> ${device.friendlyName}`);
+    await this.soapAction(device.controlURL, DlnaClient.AVT, 'Pause', this.buildPauseBody());
   }
 
   public async stop(device: DlnaDevice): Promise<void> {
@@ -82,19 +105,40 @@ export class DlnaClient {
   }
 
   public async seek(device: DlnaDevice, positionSec: number): Promise<void> {
-    const target: string = DlnaClient.formatRelTime(positionSec);
-    console.info(`${DlnaClient.TAG} seek -> ${device.friendlyName} ${target}`);
-    await this.soapAction(device.controlURL, DlnaClient.AVT, 'Seek', this.buildSeekBody(target));
+    const hms: string = DlnaClient.formatRelTime(positionSec);
+    const padded: string = DlnaClient.formatRelTimePadded(positionSec);
+    try {
+      console.info(`${DlnaClient.TAG} seek REL_TIME -> ${device.friendlyName} ${hms}`);
+      await this.soapAction(device.controlURL, DlnaClient.AVT, 'Seek', this.buildSeekBody(hms, 'REL_TIME'));
+      return;
+    } catch (_rel) {
+      try {
+        console.info(`${DlnaClient.TAG} seek REL_TIME padded -> ${device.friendlyName} ${padded}`);
+        await this.soapAction(device.controlURL, DlnaClient.AVT, 'Seek', this.buildSeekBody(padded, 'REL_TIME'));
+        return;
+      } catch (_pad) {
+        console.info(`${DlnaClient.TAG} seek ABS_TIME -> ${device.friendlyName} ${hms}`);
+        await this.soapAction(device.controlURL, DlnaClient.AVT, 'Seek', this.buildSeekBody(hms, 'ABS_TIME'));
+      }
+    }
   }
 
   public async getPositionInfo(device: DlnaDevice): Promise<DlnaPositionInfo> {
     const xml: string = await this.soapAction(device.controlURL, DlnaClient.AVT, 'GetPositionInfo',
       this.buildGetPositionInfoBody());
     const relTime: string = this.extractTag(xml, 'RelTime');
-    const trackDuration: string = this.extractTag(xml, 'TrackDuration');
+    let trackDuration: string = this.extractTag(xml, 'TrackDuration');
+    let durationSec: number = DlnaClient.parseRelTime(trackDuration);
+    if (durationSec <= 0) {
+      const fromMeta: string = this.extractAttr(xml, 'duration');
+      if (fromMeta) {
+        trackDuration = fromMeta;
+        durationSec = DlnaClient.parseRelTime(fromMeta);
+      }
+    }
     return {
       positionSec: DlnaClient.parseRelTime(relTime),
-      durationSec: DlnaClient.parseRelTime(trackDuration),
+      durationSec: durationSec,
       relTime: relTime,
       trackDuration: trackDuration
     };
@@ -136,7 +180,8 @@ export class DlnaClient {
       return 0;
     }
     const trimmed: string = value.trim();
-    if (!trimmed || trimmed === 'NOT_IMPLEMENTED' || trimmed.indexOf(':') < 0) {
+    if (!trimmed || trimmed === 'NOT_IMPLEMENTED' || trimmed === '*' || trimmed === '-' ||
+      trimmed.indexOf(':') < 0) {
       return 0;
     }
     const parts: string[] = trimmed.split(':');
@@ -160,16 +205,27 @@ export class DlnaClient {
     return Math.max(0, hours * 3600 + minutes * 60 + seconds);
   }
 
-  /** Format seconds as H:MM:SS for Seek REL_TIME. */
+  /** UPnP RelTime is H+:MM:SS — unpadded hours. Many renderers reject 00:MM:SS. */
   public static formatRelTime(totalSec: number): string {
+    const parts: number[] = DlnaClient.splitHms(totalSec);
+    const mm: string = parts[1] < 10 ? `0${parts[1]}` : `${parts[1]}`;
+    const ss: string = parts[2] < 10 ? `0${parts[2]}` : `${parts[2]}`;
+    return `${parts[0]}:${mm}:${ss}`;
+  }
+
+  public static formatRelTimePadded(totalSec: number): string {
+    const parts: number[] = DlnaClient.splitHms(totalSec);
+    const hh: string = parts[0] < 10 ? `0${parts[0]}` : `${parts[0]}`;
+    const mm: string = parts[1] < 10 ? `0${parts[1]}` : `${parts[1]}`;
+    const ss: string = parts[2] < 10 ? `0${parts[2]}` : `${parts[2]}`;
+    return `${hh}:${mm}:${ss}`;
+  }
+
+  private static splitHms(totalSec: number): number[] {
     let sec: number = Math.max(0, Math.floor(totalSec));
     const hours: number = Math.floor(sec / 3600);
     sec = sec % 3600;
-    const minutes: number = Math.floor(sec / 60);
-    const seconds: number = sec % 60;
-    const mm: string = minutes < 10 ? `0${minutes}` : `${minutes}`;
-    const ss: string = seconds < 10 ? `0${seconds}` : `${seconds}`;
-    return `${hours}:${mm}:${ss}`;
+    return [hours, Math.floor(sec / 60), sec % 60];
   }
 
   private async startUdpListener(token: number, onUpdate?: (list: DlnaDevice[]) => void): Promise<void> {
@@ -242,25 +298,21 @@ export class DlnaClient {
   }
 
   private handleSsdpText(text: string, token: number, onUpdate?: (list: DlnaDevice[]) => void): void {
-    if (!text || text.indexOf('LOCATION:') < 0 && text.indexOf('Location:') < 0) {
-      // Still accept lowercase variants via header parse.
-    }
     const location: string = this.headerValue(text, 'LOCATION');
-    const usn: string = this.headerValue(text, 'USN') || location;
-    const st: string = this.headerValue(text, 'ST');
     if (!location) {
       return;
     }
-    if (st && st.indexOf('MediaRenderer') < 0 && text.indexOf('MediaRenderer') < 0) {
-      // Prefer MediaRenderer; still allow empty ST (NOTIFY) if LOCATION looks usable.
-      if (text.indexOf('NOTIFY') >= 0 && text.indexOf('MediaRenderer') < 0) {
-        return;
-      }
-    }
-    if (this.devices.has(usn)) {
+    const rawUsn: string = this.headerValue(text, 'USN') || location;
+    const st: string = this.headerValue(text, 'ST');
+    const nt: string = this.headerValue(text, 'NT');
+    // UPnP 同一台设备会为 root/MediaRenderer/AVTransport/RCS 各发一条，USN 后缀不同。
+    if (`${st} ${nt} ${rawUsn}`.indexOf('MediaRenderer') < 0) {
       return;
     }
-    // Placeholder until description XML is fetched.
+    const usn: string = this.deviceId(rawUsn, location);
+    if (this.devices.has(usn) || this.hasLocation(location)) {
+      return;
+    }
     this.devices.set(usn, {
       usn: usn,
       friendlyName: this.guessName(usn, location),
@@ -357,7 +409,7 @@ export class DlnaClient {
       });
       const code: number = response.responseCode;
       const resultText: string = typeof response.result === 'string' ? response.result : '';
-      if (code < 200 || code >= 300) {
+      if (code < 200 || code >= 300 || /<\w*:?Fault[\s>]/i.test(resultText)) {
         console.error(`${DlnaClient.TAG} SOAP ${action} HTTP ${code}: ${resultText.substring(0, 200)}`);
         throw new Error(`投屏指令失败 (${action}, HTTP ${code})`);
       }
@@ -368,9 +420,9 @@ export class DlnaClient {
     }
   }
 
-  private buildSetUriBody(mediaUrl: string, title: string): string {
+  private buildSetUriBody(mediaUrl: string, title: string, durationSec: number = 0): string {
     const safeUrl: string = this.xmlEscape(mediaUrl);
-    const meta: string = this.xmlEscape(this.buildDidl(mediaUrl, title));
+    const meta: string = this.xmlEscape(this.buildDidl(mediaUrl, title, durationSec));
     return `<u:SetAVTransportURI xmlns:u="${DlnaClient.AVT}">` +
       '<InstanceID>0</InstanceID>' +
       `<CurrentURI>${safeUrl}</CurrentURI>` +
@@ -383,14 +435,18 @@ export class DlnaClient {
       '<InstanceID>0</InstanceID><Speed>1</Speed></u:Play>';
   }
 
+  private buildPauseBody(): string {
+    return `<u:Pause xmlns:u="${DlnaClient.AVT}"><InstanceID>0</InstanceID></u:Pause>`;
+  }
+
   private buildStopBody(): string {
     return `<u:Stop xmlns:u="${DlnaClient.AVT}"><InstanceID>0</InstanceID></u:Stop>`;
   }
 
-  private buildSeekBody(target: string): string {
+  private buildSeekBody(target: string, unit: string = 'REL_TIME'): string {
     return `<u:Seek xmlns:u="${DlnaClient.AVT}">` +
       '<InstanceID>0</InstanceID>' +
-      '<Unit>REL_TIME</Unit>' +
+      `<Unit>${unit}</Unit>` +
       `<Target>${this.xmlEscape(target)}</Target>` +
       '</u:Seek>';
   }
@@ -416,16 +472,18 @@ export class DlnaClient {
       `<DesiredVolume>${volume}</DesiredVolume></u:SetVolume>`;
   }
 
-  private buildDidl(mediaUrl: string, title: string): string {
+  private buildDidl(mediaUrl: string, title: string, durationSec: number = 0): string {
     const safeTitle: string = this.xmlEscape(title || 'EcoHub');
     const safeUrl: string = this.xmlEscape(mediaUrl);
+    const durAttr: string = durationSec > 1 ?
+      ` duration="${DlnaClient.formatRelTime(durationSec)}"` : '';
     return '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ' +
       'xmlns:dc="http://purl.org/dc/elements/1.1/" ' +
       'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">' +
       '<item id="0" parentID="-1" restricted="1">' +
       `<dc:title>${safeTitle}</dc:title>` +
       '<upnp:class>object.item.videoItem</upnp:class>' +
-      `<res protocolInfo="http-get:*:*:*">${safeUrl}</res>` +
+      `<res protocolInfo="http-get:*:*:*"${durAttr}>${safeUrl}</res>` +
       '</item></DIDL-Lite>';
   }
 
@@ -460,12 +518,37 @@ export class DlnaClient {
   }
 
   private extractTag(xml: string, tag: string): string {
-    const re: RegExp = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i');
-    const m: RegExpMatchArray | null = xml.match(re);
-    if (!m || !m[1]) {
-      return '';
+    const plain: RegExp = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i');
+    const pm: RegExpMatchArray | null = xml.match(plain);
+    if (pm && pm[1]) {
+      return this.stripCdata(pm[1]);
     }
-    return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+    const ns: RegExp = new RegExp(
+      `<([A-Za-z_][\\w.-]*):${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</\\1:${tag}>`, 'i');
+    const nm: RegExpMatchArray | null = xml.match(ns);
+    if (nm && nm[2]) {
+      return this.stripCdata(nm[2]);
+    }
+    return '';
+  }
+
+  private stripCdata(raw: string): string {
+    return raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+  }
+
+  /** Unescaped or entity-escaped XML attribute, e.g. DIDL res duration. */
+  private extractAttr(xml: string, name: string): string {
+    const q: RegExp = new RegExp(`${name}="([^"]+)"`, 'i');
+    const m1: RegExpMatchArray | null = xml.match(q);
+    if (m1 && m1[1]) {
+      return m1[1].trim();
+    }
+    const e: RegExp = new RegExp(`${name}=&quot;([^&]+)&quot;`, 'i');
+    const m2: RegExpMatchArray | null = xml.match(e);
+    if (m2 && m2[1]) {
+      return m2[1].trim();
+    }
+    return '';
   }
 
   private resolveUrl(location: string, path: string): string {
@@ -544,6 +627,26 @@ export class DlnaClient {
       list.push(d);
     });
     return list;
+  }
+
+  /** uuid:xxx::urn:... → uuid:xxx，同一物理设备只留一条。 */
+  private deviceId(usn: string, location: string): string {
+    if (usn.indexOf('uuid:') === 0) {
+      const cut: number = usn.indexOf('::');
+      return cut >= 0 ? usn.substring(0, cut) : usn;
+    }
+    return location;
+  }
+
+  private hasLocation(location: string): boolean {
+    const loc: string = location.trim();
+    let found: boolean = false;
+    this.devices.forEach((d: DlnaDevice) => {
+      if (d.location === loc) {
+        found = true;
+      }
+    });
+    return found;
   }
 
   private sleep(ms: number): Promise<void> {

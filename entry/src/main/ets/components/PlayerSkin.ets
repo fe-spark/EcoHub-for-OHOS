@@ -34,6 +34,7 @@ export struct PlayerSkin {
   @Prop edgeHud: boolean = false;
   @Prop ready: boolean = false;
   @Prop stalled: boolean = false;
+  @Prop castDeviceName: string = '';
   onBack?: () => void;
   onPlay?: () => void;
   onFull?: () => void;
@@ -57,12 +58,16 @@ export struct PlayerSkin {
   onPanEnd?: () => void;
   onPanCancel?: () => void;
   onCast?: () => void;
+  onStopCast?: () => void;
 
   private continuing(): boolean {
     return this.playRequested && !this.completed && !this.errorText;
   }
 
   private loading(): boolean {
+    if (this.castDeviceName) {
+      return false;
+    }
     if (this.errorText) {
       return false;
     }
@@ -86,10 +91,16 @@ export struct PlayerSkin {
   }
 
   private showCenterPlay(): boolean {
+    if (this.castDeviceName) {
+      return false;
+    }
     return this.showHud && this.ready && !this.loading() && !this.errorText && !this.continuing();
   }
 
   private showBottom(): boolean {
+    if (this.castDeviceName) {
+      return false;
+    }
     return this.showHud && this.ready && !this.errorText;
   }
 
@@ -110,6 +121,9 @@ export struct PlayerSkin {
   }
 
   private handleCast(): void {
+    if (this.isFull) {
+      return;
+    }
     if (this.onCast) {
       this.onCast();
       return;
@@ -176,12 +190,6 @@ export struct PlayerSkin {
           .layoutWeight(1)
           .margin({ left: 4, right: 8 })
         this.skipBtns()
-        PlayerIconBtn({
-          src: $r('sys.symbol.wireless_projection'),
-          iconSize: 20,
-          boxSize: 40,
-          onTap: () => this.handleCast()
-        })
       }
       .width('100%')
       .padding({
@@ -206,6 +214,30 @@ export struct PlayerSkin {
       boxSize: 44,
       onTap: this.onPlay
     })
+  }
+
+  @Builder
+  castEntry() {
+    if (this.castDeviceName) {
+      PlayerIconBtn({
+        src: $r('sys.symbol.power'),
+        iconSize: 18,
+        boxSize: 40,
+        iconColor: AppTheme.DANGER,
+        onTap: () => {
+          if (this.onStopCast) {
+            this.onStopCast();
+          }
+        }
+      })
+    } else {
+      PlayerIconBtn({
+        src: $r('sys.symbol.wireless_projection'),
+        iconSize: 20,
+        boxSize: 40,
+        onTap: () => this.handleCast()
+      })
+    }
   }
 
   @Builder
@@ -248,13 +280,15 @@ export struct PlayerSkin {
               boxSize: 44,
               onTap: this.onMute
             })
-            PlayerIconBtn({
-              src: this.isFull ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') :
-                $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-              iconSize: 18,
-              boxSize: 44,
-              onTap: this.onFull
-            })
+            if (!this.castDeviceName) {
+              PlayerIconBtn({
+                src: this.isFull ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') :
+                  $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
+                iconSize: 18,
+                boxSize: 44,
+                onTap: this.onFull
+              })
+            }
           }
           .width('100%')
           .height(44)
@@ -284,12 +318,14 @@ export struct PlayerSkin {
             .fontColor('rgba(255,255,255,0.88)')
             .maxLines(1)
           PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
-          PlayerIconBtn({
-            src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-            iconSize: 18,
-            boxSize: 44,
-            onTap: this.onFull
-          })
+          if (!this.castDeviceName) {
+            PlayerIconBtn({
+              src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
+              iconSize: 18,
+              boxSize: 44,
+              onTap: this.onFull
+            })
+          }
         }
         .width('100%')
         .height(44)
@@ -359,6 +395,7 @@ export struct PlayerSkin {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       PlayerGestureLayer({
+        ignoreHit: !!this.castDeviceName,
         onPlay: this.onPlay,
         onToggleHud: this.onToggleHud,
         onLongPress: this.onLongPress,
@@ -379,7 +416,7 @@ export struct PlayerSkin {
           .hitTestBehavior(HitTestMode.None)
       }
 
-      if (this.errorText) {
+      if (this.errorText && !this.castDeviceName) {
         PlayerErrorPad({
           onRetry: () => {
             if (this.onRetry) {
@@ -421,14 +458,11 @@ export struct PlayerSkin {
             PlayerBackBtn({ onTap: this.onBack })
           }
           Blank().hitTestBehavior(HitTestMode.None)
-          PlayerIconBtn({
-            src: $r('sys.symbol.wireless_projection'),
-            iconSize: 20,
-            boxSize: 40,
-            onTap: () => this.handleCast()
-          })
+          this.castEntry()
         }
         .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+        .alignItems(VerticalAlign.Center)
         .padding({
           left: this.edge(4, this.leftInset),
           right: this.edge(4, this.rightInset),
@@ -441,5 +475,6 @@ export struct PlayerSkin {
     .width('100%')
     .height('100%')
     .clip(true)
+    .hitTestBehavior(HitTestMode.Transparent)
   }
 }

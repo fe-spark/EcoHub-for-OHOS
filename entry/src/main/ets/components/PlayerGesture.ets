@@ -1,5 +1,6 @@
 @Component
 export struct PlayerGestureLayer {
+  @Prop ignoreHit: boolean = false;
   onPlay?: () => void;
   onToggleHud?: () => void;
   onLongPress?: () => void;
@@ -14,7 +15,7 @@ export struct PlayerGestureLayer {
       .width('100%')
       .height('100%')
       .backgroundColor(Color.Transparent)
-      .hitTestBehavior(HitTestMode.Default)
+      .hitTestBehavior(this.ignoreHit ? HitTestMode.None : HitTestMode.Default)
       .gesture(
         GestureGroup(GestureMode.Exclusive,
           TapGesture({ count: 2 })

@@ -38,7 +38,7 @@ export class PlayerVideoObserver {
     this.host.state.opening = false;
     this.host.state.errorText = '';
     const resumeAt = this.host.state.resumeTime(this.host.initialTime);
-    if (resumeAt >= 2) {
+    if (resumeAt >= PlayerPlaybackState.MIN_RESUME_THRESHOLD_SEC) {
       this.host.state.seek(resumeAt, this.host.playerAv);
       this.host.armSeekWatch();
     }
