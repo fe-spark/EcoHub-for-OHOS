@@ -187,7 +187,9 @@ export class CastSessionPoll {
   }
 
   private judgeLaunching(s: CastPollHost, upper: string): void {
-    const relOk: boolean = !s.relTimeUnavailable && s.positionSec > 0;
+    // RelTime side-signal only after pending resume seek is cleared — never treat
+    // positionSec=pendingStartSec as device RelTime evidence (would false-confirm).
+    const relOk: boolean = !s.relTimeUnavailable && s.pendingStartSec < 2 && s.positionSec > 0;
     const playLike: boolean = upper === 'PLAYING' || upper === 'PAUSED_PLAYBACK';
     if (playLike || relOk) {
       s.setPhase(upper === 'PAUSED_PLAYBACK' ? CastPhase.PAUSED : CastPhase.PLAYING);
