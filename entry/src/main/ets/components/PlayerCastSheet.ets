@@ -1,6 +1,7 @@
 import { AppTheme } from '../common/constants/AppTheme';
 import { DlnaClient } from '../common/utils/DlnaClient';
-import { DlnaDevice, DlnaScanState } from '../common/utils/DlnaTypes';
+import { DlnaDevice, DlnaPositionInfo, DlnaScanState } from '../common/utils/DlnaTypes';
+import { FormatUtil } from '../common/utils/FormatUtil';
 
 @CustomDialog
 struct PlayerCastDialog {
@@ -17,8 +18,43 @@ struct PlayerCastDialog {
   onRescan: () => void = () => {};
   private client: DlnaClient = new DlnaClient();
 
+  @State private castPosition: number = 0;
+  @State private castDuration: number = 0;
+  @State private castVolume: number = 50;
+  @State private volumeSupported: boolean = false;
+  @State private transportState: string = '';
+  @State private scrubbing: boolean = false;
+  @State private volumeBusy: boolean = false;
+
+  private pollToken: number = 0;
+  private pollTimer: number = -1;
+  private seekWarned: boolean = false;
+  private volumeWarned: boolean = false;
+  private positionFailCount: number = 0;
+
+  aboutToAppear(): void {
+    if (this.connectedUsn) {
+      this.startPoll();
+      const device: DlnaDevice | null = this.connectedDevice();
+      if (device) {
+        this.loadVolume(device);
+      }
+    }
+  }
+
+  aboutToDisappear(): void {
+    this.stopPoll();
+  }
+
   private statusText(): string {
     if (this.casting) {
+      return '正在投屏…';
+    }
+    if (this.connectedUsn) {
+      const stateHint: string = this.transportLabel();
+      if (stateHint) {
+        return `正在投屏 · ${stateHint}`;
+      }
       return '正在投屏…';
     }
     if (this.scanState === DlnaScanState.SCANNING) {
@@ -33,6 +69,26 @@ struct PlayerCastDialog {
     return `发现 ${this.devices.length} 台设备，点选即可投屏`;
   }
 
+  private transportLabel(): string {
+    const s: string = this.transportState;
+    if (!s) {
+      return '';
+    }
+    if (s === 'PLAYING') {
+      return '播放中';
+    }
+    if (s === 'PAUSED_PLAYBACK') {
+      return '已暂停';
+    }
+    if (s === 'STOPPED') {
+      return '已停止';
+    }
+    if (s === 'TRANSITIONING') {
+      return '缓冲中';
+    }
+    return s;
+  }
+
   private connectedDevice(): DlnaDevice | null {
     if (!this.connectedUsn) {
       return null;
@@ -45,7 +101,6 @@ struct PlayerCastDialog {
     return null;
   }
 
-
   private connectedName(): string {
     const d: DlnaDevice | null = this.connectedDevice();
     return d ? d.friendlyName : '已连接设备';
@@ -56,31 +111,126 @@ struct PlayerCastDialog {
     return d ? d.host : '';
   }
 
+  private castTimeText(): string {
+    return `${FormatUtil.duration(this.castPosition)} / ${FormatUtil.duration(this.castDuration)}`;
+  }
+
+  private toast(msg: string): void {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: msg });
+    } catch (_e) {
+    }
+  }
+
+  private resetCastUi(): void {
+    this.castPosition = 0;
+    this.castDuration = 0;
+    this.castVolume = 50;
+    this.volumeSupported = false;
+    this.transportState = '';
+    this.scrubbing = false;
+    this.volumeBusy = false;
+    this.seekWarned = false;
+    this.volumeWarned = false;
+    this.positionFailCount = 0;
+  }
+
+  private startPoll(): void {
+    this.stopPoll();
+    this.pollToken += 1;
+    const token: number = this.pollToken;
+    this.tickOnce(token);
+    this.pollTimer = setInterval(() => {
+      this.tickOnce(token);
+    }, 1000) as number;
+  }
+
+  private stopPoll(): void {
+    this.pollToken += 1;
+    if (this.pollTimer >= 0) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = -1;
+    }
+  }
+
+  private async tickOnce(token: number): Promise<void> {
+    if (token !== this.pollToken) {
+      return;
+    }
+    const device: DlnaDevice | null = this.connectedDevice();
+    if (!device || !device.controlURL) {
+      return;
+    }
+    try {
+      const info: DlnaPositionInfo = await this.client.getPositionInfo(device);
+      if (token !== this.pollToken) {
+        return;
+      }
+      this.positionFailCount = 0;
+      if (!this.scrubbing) {
+        this.castPosition = info.positionSec;
+        if (info.durationSec > 0) {
+          this.castDuration = info.durationSec;
+        }
+      }
+    } catch (err) {
+      this.positionFailCount += 1;
+      console.error(`[PlayerCastSheet] GetPositionInfo fail: ${JSON.stringify(err)}`);
+      if (this.positionFailCount === 3) {
+        this.toast('设备不支持进度同步');
+      }
+    }
+
+    try {
+      const state: string = await this.client.getTransportInfo(device);
+      if (token !== this.pollToken) {
+        return;
+      }
+      this.transportState = state;
+    } catch (_e) {
+      // Optional; many renderers support it but not required.
+    }
+  }
+
+  private async loadVolume(device: DlnaDevice): Promise<void> {
+    if (!device.renderingControlURL) {
+      this.volumeSupported = false;
+      return;
+    }
+    try {
+      const vol: number = await this.client.getVolume(device);
+      this.castVolume = vol;
+      this.volumeSupported = true;
+    } catch (err) {
+      console.error(`[PlayerCastSheet] GetVolume fail: ${JSON.stringify(err)}`);
+      this.volumeSupported = false;
+      if (!this.volumeWarned) {
+        this.volumeWarned = true;
+        this.toast('设备不支持音量控制');
+      }
+    }
+  }
+
   private async castTo(device: DlnaDevice): Promise<void> {
     if (!this.mediaUrl) {
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: '当前没有可投屏的视频地址' });
-      } catch (_e) {
-      }
+      this.toast('当前没有可投屏的视频地址');
       return;
     }
     this.casting = true;
     this.errorText = '';
+    this.stopPoll();
     try {
       await this.client.cast(device, this.mediaUrl, this.mediaTitle || 'EcoHub');
+      this.resetCastUi();
       this.connectedUsn = device.usn;
       this.onCasted(device);
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: `已投屏到 ${device.friendlyName}` });
-      } catch (_e) {
-      }
+      this.toast(`已投屏到 ${device.friendlyName}`);
+      this.startPoll();
+      this.loadVolume(device);
     } catch (err) {
       const msg: string = err instanceof Error ? err.message : '投屏失败';
       this.errorText = msg;
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: msg });
-      } catch (_e) {
-      }
+      this.toast(msg);
     } finally {
       this.casting = false;
     }
@@ -89,6 +239,7 @@ struct PlayerCastDialog {
   private async stopCast(): Promise<void> {
     const device: DlnaDevice | null = this.connectedDevice();
     this.casting = true;
+    this.stopPoll();
     try {
       if (device) {
         await this.client.stop(device);
@@ -98,12 +249,191 @@ struct PlayerCastDialog {
     } finally {
       this.casting = false;
       this.connectedUsn = '';
+      this.resetCastUi();
       this.onStopped();
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: '已停止投屏' });
-      } catch (_e) {
+      this.toast('已停止投屏');
+    }
+  }
+
+  private async seekTo(sec: number): Promise<void> {
+    const device: DlnaDevice | null = this.connectedDevice();
+    if (!device) {
+      return;
+    }
+    const target: number = Math.max(0, this.castDuration > 0 ? Math.min(sec, this.castDuration) : sec);
+    try {
+      await this.client.seek(device, target);
+      this.castPosition = target;
+    } catch (err) {
+      console.error(`[PlayerCastSheet] Seek fail: ${JSON.stringify(err)}`);
+      if (!this.seekWarned) {
+        this.seekWarned = true;
+        this.toast('设备不支持进度拖动');
       }
     }
+  }
+
+  private async applyVolume(vol: number): Promise<void> {
+    const device: DlnaDevice | null = this.connectedDevice();
+    if (!device || !this.volumeSupported || this.volumeBusy) {
+      return;
+    }
+    const clamped: number = Math.max(0, Math.min(100, Math.round(vol)));
+    this.castVolume = clamped;
+    this.volumeBusy = true;
+    try {
+      await this.client.setVolume(device, clamped);
+    } catch (err) {
+      console.error(`[PlayerCastSheet] SetVolume fail: ${JSON.stringify(err)}`);
+      if (!this.volumeWarned) {
+        this.volumeWarned = true;
+        this.toast('设备不支持音量控制');
+      }
+      this.volumeSupported = false;
+    } finally {
+      this.volumeBusy = false;
+    }
+  }
+
+  private nudgeVolume(delta: number): void {
+    this.applyVolume(this.castVolume + delta);
+  }
+
+  @Builder
+  connectedControls() {
+    Column() {
+      Row() {
+        Column() {
+          Text(this.connectedName())
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.connectedHost())
+            .fontSize(11)
+            .fontColor(AppTheme.TEXT_MUTED)
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text('停止投屏')
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF')
+          .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+          .backgroundColor(AppTheme.DANGER)
+          .borderRadius(10)
+          .onClick(() => {
+            this.stopCast();
+          })
+      }
+      .width('100%')
+
+      // Progress + scrubber
+      Column() {
+        Text(this.castTimeText())
+          .fontSize(12)
+          .fontColor(AppTheme.TEXT_SECONDARY)
+          .width('100%')
+          .margin({ bottom: 4 })
+        Slider({
+          value: this.castPosition,
+          min: 0,
+          max: this.castDuration > 0 ? this.castDuration : 1,
+          step: 1,
+          style: SliderStyle.OutSet
+        })
+          .width('100%')
+          .height(20)
+          .trackThickness(2)
+          .blockSize({ width: 12, height: 12 })
+          .blockColor('#FFFFFF')
+          .trackColor('rgba(255,255,255,0.28)')
+          .selectedColor(AppTheme.ACCENT)
+          .enabled(this.castDuration > 0 && !this.casting)
+          .onChange((value: number, mode: SliderChangeMode) => {
+            this.castPosition = value;
+            if (mode === SliderChangeMode.Begin || mode === SliderChangeMode.Moving) {
+              this.scrubbing = true;
+            } else if (mode === SliderChangeMode.End) {
+              this.scrubbing = false;
+              this.seekTo(value);
+            } else if (mode === SliderChangeMode.Click) {
+              this.scrubbing = false;
+              this.seekTo(value);
+            }
+          })
+      }
+      .width('100%')
+      .margin({ top: 12 })
+
+      // Volume
+      if (this.volumeSupported) {
+        Row() {
+          Text('音量')
+            .fontSize(12)
+            .fontColor(AppTheme.TEXT_SECONDARY)
+            .width(36)
+          Text('−')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+            .width(32)
+            .height(32)
+            .textAlign(TextAlign.Center)
+            .backgroundColor('rgba(255,255,255,0.08)')
+            .borderRadius(8)
+            .onClick(() => this.nudgeVolume(-5))
+          Slider({
+            value: this.castVolume,
+            min: 0,
+            max: 100,
+            step: 1,
+            style: SliderStyle.OutSet
+          })
+            .layoutWeight(1)
+            .height(20)
+            .trackThickness(2)
+            .blockSize({ width: 12, height: 12 })
+            .blockColor('#FFFFFF')
+            .trackColor('rgba(255,255,255,0.28)')
+            .selectedColor(AppTheme.ACCENT)
+            .margin({ left: 6, right: 6 })
+            .enabled(!this.casting && !this.volumeBusy)
+            .onChange((value: number, mode: SliderChangeMode) => {
+              this.castVolume = value;
+              if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {
+                this.applyVolume(value);
+              }
+            })
+          Text('+')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+            .width(32)
+            .height(32)
+            .textAlign(TextAlign.Center)
+            .backgroundColor('rgba(255,255,255,0.08)')
+            .borderRadius(8)
+            .onClick(() => this.nudgeVolume(5))
+          Text(`${Math.round(this.castVolume)}`)
+            .fontSize(12)
+            .fontColor(AppTheme.TEXT_MUTED)
+            .width(28)
+            .textAlign(TextAlign.End)
+            .margin({ left: 4 })
+        }
+        .width('100%')
+        .margin({ top: 10 })
+        .alignItems(VerticalAlign.Center)
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .margin({ bottom: 10 })
+    .backgroundColor(AppTheme.ACCENT_SOFT)
+    .borderRadius(12)
   }
 
   build() {
@@ -134,37 +464,7 @@ struct PlayerCastDialog {
         .width('100%')
 
       if (this.connectedUsn) {
-        Row() {
-          Column() {
-            Text(this.connectedName())
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#FFFFFF')
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(this.connectedHost())
-              .fontSize(11)
-              .fontColor(AppTheme.TEXT_MUTED)
-              .margin({ top: 2 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-          Text('停止投屏')
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-            .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-            .backgroundColor(AppTheme.DANGER)
-            .borderRadius(10)
-            .onClick(() => {
-              this.stopCast();
-            })
-        }
-        .width('100%')
-        .padding(12)
-        .margin({ bottom: 10 })
-        .backgroundColor(AppTheme.ACCENT_SOFT)
-        .borderRadius(12)
+        this.connectedControls()
       }
 
       if (this.scanState === DlnaScanState.SCANNING && this.devices.length === 0) {
@@ -361,7 +661,6 @@ export struct PlayerCastSheet {
     });
     this.devices = merged;
   }
-
 
   build() {
     Column()
