@@ -88,6 +88,10 @@ struct CustomPlayerPage {
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
+  private hasPlayUrl(): boolean {
+    return this.playUrl.trim().length > 0;
+  }
+
   private play(): void {
     try {
       this.inputController.stopEditing();
@@ -104,112 +108,158 @@ struct CustomPlayerPage {
     this.playUrl = url;
   }
 
-  build() {
-    Column() {
-      Column() {
-        PageHeader({ title: '自定义播放' })
-
-        Row() {
-          Row() {
-            AppIcon({ src: $r('sys.symbol.link'), iconSize: 16, color: AppTheme.TEXT_MUTED })
-            TextInput({ text: this.inputUrl, placeholder: '输入 mp4 或 m3u8 播放地址', controller: this.inputController })
-              .layoutWeight(1)
-              .height(44)
-              .fontSize(13)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .placeholderColor(AppTheme.TEXT_MUTED)
-              .caretColor(AppTheme.ACCENT)
-              .backgroundColor(Color.Transparent)
-              .padding({ left: 8, right: 8 })
-              .enterKeyType(EnterKeyType.Go)
-              .onChange((val: string) => {
-                this.inputUrl = val;
-              })
-              .onSubmit(() => this.play())
-          }
+  @Builder
+  urlBar() {
+    Row() {
+      Row() {
+        AppIcon({ src: $r('sys.symbol.link'), iconSize: 16, color: AppTheme.TEXT_MUTED })
+        TextInput({ text: this.inputUrl, placeholder: '输入 mp4 或 m3u8 播放地址', controller: this.inputController })
           .layoutWeight(1)
           .height(44)
-          .padding({ left: 12, right: 8 })
+          .fontSize(13)
+          .fontColor(AppTheme.TEXT_PRIMARY)
+          .placeholderColor(AppTheme.TEXT_MUTED)
+          .caretColor(AppTheme.ACCENT)
+          .backgroundColor(Color.Transparent)
+          .padding({ left: 8, right: 8 })
+          .enterKeyType(EnterKeyType.Go)
+          .onChange((val: string) => {
+            this.inputUrl = val;
+          })
+          .onSubmit(() => this.play())
+      }
+      .layoutWeight(1)
+      .height(44)
+      .padding({ left: 12, right: 8 })
+      .backgroundColor(AppTheme.BG_CARD)
+      .borderRadius(AppTheme.RADIUS_MD)
+
+      Row() {
+        PasteButton()
+          .height(44)
+          .padding({ left: 14, right: 14 })
           .backgroundColor(AppTheme.BG_CARD)
           .borderRadius(AppTheme.RADIUS_MD)
-
-          Row() {
-            PasteButton()
-              .height(44)
-              .padding({ left: 14, right: 14 })
-              .backgroundColor(AppTheme.BG_CARD)
-              .borderRadius(AppTheme.RADIUS_MD)
-              .onClick(async (_event: ClickEvent, result: PasteButtonOnClickResult) => {
-                if (result === PasteButtonOnClickResult.SUCCESS) {
-                  const res = await ClipboardSniffer.sniff();
-                  if (res.url) {
-                    ClipboardSniffer.markHandled(res.raw);
-                    this.inputUrl = res.url;
-                    this.playUrl = res.url;
-                    try {
-                      this.getUIContext().getPromptAction().showToast({ message: '已提取剪贴板链接并开始播放' });
-                    } catch (_e) {
-                    }
-                  } else if (res.raw) {
-                    ClipboardSniffer.markHandled(res.raw);
-                    this.inputUrl = res.raw;
-                    this.play();
-                  } else {
-                    try {
-                      this.getUIContext().getPromptAction().showToast({ message: '未在剪贴板中检测到有效链接' });
-                    } catch (_e) {
-                    }
-                  }
+          .onClick(async (_event: ClickEvent, result: PasteButtonOnClickResult) => {
+            if (result === PasteButtonOnClickResult.SUCCESS) {
+              const res = await ClipboardSniffer.sniff();
+              if (res.url) {
+                ClipboardSniffer.markHandled(res.raw);
+                this.inputUrl = res.url;
+                this.playUrl = res.url;
+                try {
+                  this.getUIContext().getPromptAction().showToast({ message: '已提取剪贴板链接并开始播放' });
+                } catch (_e) {
                 }
-              })
-          }
-          .margin({ left: 8 })
+              } else if (res.raw) {
+                ClipboardSniffer.markHandled(res.raw);
+                this.inputUrl = res.raw;
+                this.play();
+              } else {
+                try {
+                  this.getUIContext().getPromptAction().showToast({ message: '未在剪贴板中检测到有效链接' });
+                } catch (_e) {
+                }
+              }
+            }
+          })
+      }
+      .margin({ left: 8 })
 
-          Row() {
-            AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 16, color: AppTheme.TEXT_PRIMARY })
-            Text('播放')
-              .fontSize(14)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-              .margin({ left: 4 })
-          }
-          .height(44)
-          .padding({ left: 14, right: 16 })
-          .backgroundColor(AppTheme.ACCENT)
-          .borderRadius(AppTheme.RADIUS_MD)
-          .margin({ left: 8 })
-          .onClick(() => this.play())
+      Row() {
+        AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 16, color: AppTheme.TEXT_PRIMARY })
+        Text('播放')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.TEXT_PRIMARY)
+          .margin({ left: 4 })
+      }
+      .height(44)
+      .padding({ left: 14, right: 16 })
+      .backgroundColor(AppTheme.ACCENT)
+      .borderRadius(AppTheme.RADIUS_MD)
+      .margin({ left: 8 })
+      .onClick(() => this.play())
+    }
+    .width('100%')
+    .padding(AppTheme.SPACE_LG)
+  }
+
+  @Builder
+  idlePane() {
+    Column() {
+      Stack({ alignContent: Alignment.Center }) {
+        Column()
+          .width(76)
+          .height(76)
+          .borderRadius(38)
+          .backgroundColor(AppTheme.ACCENT_SOFT)
+        AppIcon({
+          src: $r('sys.symbol.play_circle_fill'),
+          iconSize: 36,
+          color: AppTheme.ACCENT
+        })
+      }
+      .margin({ bottom: 16 })
+
+      Text('粘贴直链即可播放')
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppTheme.TEXT_PRIMARY)
+
+      Text('仅支持 mp4 / m3u8，不会写入观看历史')
+        .fontSize(13)
+        .lineHeight(20)
+        .fontColor(AppTheme.TEXT_MUTED)
+        .textAlign(TextAlign.Center)
+        .margin({ top: 8 })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .padding({ left: 32, right: 32, bottom: 24 })
+  }
+
+  build() {
+    Column() {
+      if (!this.playerFull) {
+        Column() {
+          PageHeader({ title: '自定义播放' })
+          this.urlBar()
         }
         .width('100%')
-        .padding(16)
       }
-      .width('100%')
-      .visibility(this.playerFull ? Visibility.None : Visibility.Visible)
 
-      VideoPlayer({
-        videoUrl: this.playUrl,
-        title: '自定义播放',
-        showBack: this.playerFull,
-        isFull: this.playerFull,
-        pageActive: this.playerActive,
-        topInset: this.playerFull ? this.topInset : 0,
-        leftInset: this.playerFull ? this.leftInset : 0,
-        rightInset: this.playerFull ? this.rightInset : 0,
-        bottomInset: this.playerFull ? this.bottomInset : 0,
-        onBack: () => this.setPlayerFull(false),
-        onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait)
-      })
-        .width('100%')
-        .height(this.playerFull ? '100%' : undefined)
-        .aspectRatio(this.playerFull ? undefined : 16 / 9)
-        .layoutWeight(this.playerFull || Breakpoint.isWide(this.widthBp) ? 1 : 0)
+      if (this.hasPlayUrl()) {
+        VideoPlayer({
+          videoUrl: this.playUrl,
+          title: '自定义播放',
+          showBack: this.playerFull,
+          isFull: this.playerFull,
+          pageActive: this.playerActive,
+          topInset: this.playerFull ? this.topInset : 0,
+          leftInset: this.playerFull ? this.leftInset : 0,
+          rightInset: this.playerFull ? this.rightInset : 0,
+          bottomInset: this.playerFull ? this.bottomInset : 0,
+          onBack: () => this.setPlayerFull(false),
+          onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait)
+        })
+          .width('100%')
+          .height(this.playerFull ? '100%' : undefined)
+          .aspectRatio(this.playerFull ? undefined : 16 / 9)
+          .layoutWeight(this.playerFull || Breakpoint.isWide(this.widthBp) ? 1 : 0)
 
-      Text('仅支持直链 mp4 / m3u8，不会写入观看历史。')
-        .fontSize(12)
-        .fontColor(AppTheme.TEXT_MUTED)
-        .margin({ top: 16 })
-        .padding({ left: 16, right: 16 })
-        .visibility(this.playerFull ? Visibility.None : Visibility.Visible)
+        if (!this.playerFull) {
+          Text('仅支持直链 mp4 / m3u8，不会写入观看历史。')
+            .fontSize(12)
+            .fontColor(AppTheme.TEXT_MUTED)
+            .margin({ top: AppTheme.SPACE_LG })
+            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+        }
+      } else {
+        this.idlePane()
+      }
     }
     .width('100%')
     .height('100%')

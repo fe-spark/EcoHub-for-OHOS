@@ -644,6 +644,7 @@ export struct VideoPlayer {
         feedback: this.feedback, feedbackKind: this.feedbackKind,
         topInset: this.topInset, leftInset: this.leftInset, rightInset: this.rightInset, bottomInset: this.bottomInset,
         edgeHud: this.edgeHud, ready: this.ready, castDeviceName: this.castDeviceName,
+        canCast: this.videoUrl.trim().length > 0,
         events: this.skinEvents()
       })
         .width('100%')

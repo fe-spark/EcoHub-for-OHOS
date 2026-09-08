@@ -57,6 +57,7 @@ export struct PlayerSkinView {
   @Prop edgeHud: boolean = false;
   @Prop ready: boolean = false;
   @Prop castDeviceName: string = '';
+  @Prop canCast: boolean = false;
 
   events?: PlayerSkinEvents;
 
@@ -90,6 +91,7 @@ export struct PlayerSkinView {
       edgeHud: this.edgeHud,
       ready: this.ready,
       castDeviceName: this.castDeviceName,
+      canCast: this.canCast,
       onBack: () => { if (this.events) this.events.onBack(); },
       onPlay: () => { if (this.events) this.events.onPlay(); },
       onFull: () => { if (this.events) this.events.onFull(); },

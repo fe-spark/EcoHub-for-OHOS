@@ -160,7 +160,15 @@ struct SplashPage {
         }
         .margin({ top: 24 })
       }
+      .width('100%')
+      .height('100%')
       .justifyContent(FlexAlign.Center)
+      .padding({
+        top: this.topInset,
+        bottom: this.bottomInset,
+        left: this.leftInset,
+        right: this.rightInset
+      })
 
       if (this.showUpdateDialog) {
         VersionUpdateDialog({
@@ -173,12 +181,8 @@ struct SplashPage {
     }
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.topInset,
-      bottom: this.bottomInset,
-      left: this.leftInset,
-      right: this.rightInset
-    })
     .backgroundColor(AppTheme.BG)
+    .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
+      [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }
 }

@@ -74,7 +74,7 @@ export class PlayerCastController {
 
   openCastDialog(): void {
     const host: PlayerCastHost | null = this.host;
-    if (!host || host.fullNow()) {
+    if (!host || host.fullNow() || !host.videoUrl || !host.videoUrl.trim()) {
       return;
     }
     host.closeSpeedDialog();

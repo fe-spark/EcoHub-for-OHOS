@@ -35,6 +35,7 @@ export struct PlayerSkin {
   @Prop ready: boolean = false;
   @Prop stalled: boolean = false;
   @Prop castDeviceName: string = '';
+  @Prop canCast: boolean = false;
   onBack?: () => void;
   onPlay?: () => void;
   onFull?: () => void;
@@ -120,8 +121,12 @@ export struct PlayerSkin {
     return Math.max(base, inset);
   }
 
+  private hasCastAction(): boolean {
+    return !!this.castDeviceName || this.canCast;
+  }
+
   private handleCast(): void {
-    if (this.isFull) {
+    if (this.isFull || !this.canCast) {
       return;
     }
     if (this.onCast) {
@@ -230,7 +235,7 @@ export struct PlayerSkin {
           }
         }
       })
-    } else {
+    } else if (this.canCast) {
       PlayerIconBtn({
         src: $r('sys.symbol.wireless_projection'),
         iconSize: 20,
@@ -452,7 +457,7 @@ export struct PlayerSkin {
       .hitTestBehavior(HitTestMode.Transparent)
       .zIndex(11)
 
-      if (!this.isFull) {
+      if (!this.isFull && (this.showBack || this.hasCastAction())) {
         Row() {
           if (this.showBack) {
             PlayerBackBtn({ onTap: this.onBack })

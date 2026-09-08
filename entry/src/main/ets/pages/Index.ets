@@ -11,9 +11,10 @@ import { AppIcon } from '../components/AppIcon';
 import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
-import { AppVersionUtil } from '../common/utils/AppVersionUtil';
+import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
 import { HttpClient } from '../common/network/HttpClient';
 import { NoticeDialog } from '../components/NoticeDialog';
+import { VersionUpdateDialog } from '../components/VersionUpdateDialog';
 
 @Entry
 @Component
@@ -27,6 +28,11 @@ struct Index {
   @State noticeTitle: string = '站点公告';
   @State noticeContent: string = '';
   @StorageLink('HAS_APP_UPDATE') private hasAppUpdate: boolean = false;
+  @StorageLink('SHOW_APP_UPDATE_DIALOG') private showUpdateDialog: boolean = false;
+  @StorageLink('APP_UPDATE_INFO') private updateInfo: AppUpdateInfo = {
+    currentVersion: '', latestVersion: '', hasUpdate: false,
+    releaseName: '', releaseNotes: '', releaseUrl: '', downloadUrl: ''
+  };
   private hasDismissedNotice: boolean = false;
   @State private tabReady: boolean[] = [true, false, false];
   @State private topInset: number = 0;
@@ -309,7 +315,8 @@ struct Index {
       .width('100%')
       .height('100%')
       .backgroundColor(AppTheme.BG)
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
+        [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
 
       if (this.showNotice && this.ready && this.siteOpen) {
         NoticeDialog({
@@ -322,9 +329,19 @@ struct Index {
           }
         })
       }
+
+      if (this.showUpdateDialog) {
+        VersionUpdateDialog({
+          updateInfo: this.updateInfo,
+          onClose: () => {
+            this.showUpdateDialog = false;
+          }
+        })
+      }
     }
     .width('100%')
     .height('100%')
-    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
+      [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }
 }

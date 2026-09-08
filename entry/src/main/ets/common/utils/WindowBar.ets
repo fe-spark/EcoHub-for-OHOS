@@ -11,6 +11,7 @@ export class WindowBar {
   private static onInsets?: (top: number, bottom: number, left: number, right: number) => void;
   private static onDisplay?: (left: number, right: number, width: number, height: number) => void;
   private static avoidTimer: number = -1;
+  private static overlayCount: number = 0;
 
   static apply(context?: common.UIAbilityContext,
     onInsets?: (top: number, bottom: number, left: number, right: number) => void,
@@ -29,12 +30,7 @@ export class WindowBar {
       }
       win.setWindowSystemBarEnable(['status', 'navigation']);
       win.setWindowLayoutFullScreen(true);
-      win.setWindowSystemBarProperties({
-        statusBarColor: '#00000000',
-        statusBarContentColor: '#FFFFFF',
-        navigationBarColor: AppTheme.BG_ELEVATED,
-        navigationBarContentColor: '#FFFFFF'
-      });
+      WindowBar.applyBarColors(win);
       WindowBar.bindListener(win);
       WindowBar.notifyInsets(win);
       WindowBar.notifySize(win);
@@ -144,6 +140,33 @@ export class WindowBar {
       }
     } catch (err) {
       console.error('notifySize failed:', JSON.stringify(err));
+    }
+  }
+
+  // 全屏弹窗期间把系统导航栏背景透明掉，避免和遮罩叠成「两层蒙版 / 底部安全区色条」
+  static setImmersiveOverlay(active: boolean): void {
+    if (active) {
+      WindowBar.overlayCount++;
+    } else {
+      WindowBar.overlayCount = Math.max(0, WindowBar.overlayCount - 1);
+    }
+    WindowBar.applyBarColors();
+  }
+
+  private static applyBarColors(win?: window.Window): void {
+    const target = win || WindowBar.listenedWin;
+    if (!target) {
+      return;
+    }
+    try {
+      target.setWindowSystemBarProperties({
+        statusBarColor: '#00000000',
+        statusBarContentColor: '#FFFFFF',
+        navigationBarColor: WindowBar.overlayCount > 0 ? '#00000000' : AppTheme.BG_ELEVATED,
+        navigationBarContentColor: '#FFFFFF'
+      });
+    } catch (err) {
+      console.error('applyBarColors failed:', JSON.stringify(err));
     }
   }
 

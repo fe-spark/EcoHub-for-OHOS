@@ -6,7 +6,6 @@ import { NavUtil } from '../common/utils/NavUtil';
 import { AppIcon } from '../components/AppIcon';
 import { SourceGuard } from '../common/utils/SourceGuard';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
-import { VersionUpdateDialog } from '../components/VersionUpdateDialog';
 
 @Component
 export struct ProfileTab {
@@ -18,7 +17,7 @@ export struct ProfileTab {
   @State private sourceUrl: string = '';
   @State private appVersion: string = '1.0.0';
   @State private isCheckingVersion: boolean = false;
-  @State private showUpdateDialog: boolean = false;
+  @StorageLink('SHOW_APP_UPDATE_DIALOG') private showUpdateDialog: boolean = false;
   @State private isConfigLoading: boolean = true;
   @State private isLogoLoading: boolean = false;
   @State private logoLoadFailed: boolean = false;
@@ -229,8 +228,7 @@ export struct ProfileTab {
   }
 
   build() {
-    Stack({ alignContent: Alignment.Center }) {
-      Scroll() {
+    Scroll() {
         Column() {
           Row() {
             AppIcon({ src: $r('sys.symbol.person_fill'), iconSize: 20, color: AppTheme.ACCENT })
@@ -456,17 +454,5 @@ export struct ProfileTab {
     .edgeEffect(EdgeEffect.Spring)
     .align(Alignment.Top)
     .backgroundColor(AppTheme.BG)
-
-      if (this.showUpdateDialog) {
-        VersionUpdateDialog({
-          updateInfo: this.updateInfo,
-          onClose: () => {
-            this.showUpdateDialog = false;
-          }
-        })
-      }
-    }
-    .width('100%')
-    .height('100%')
   }
 }
