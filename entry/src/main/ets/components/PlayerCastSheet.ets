@@ -32,8 +32,22 @@ struct PlayerCastDialog {
   private volumeWarned: boolean = false;
   private positionFailCount: number = 0;
 
+  // Seeded from VideoPlayer CastSession so reopen after screen-off shows fresh progress.
+  seedPosition: number = 0;
+  seedDuration: number = 0;
+  seedVolume: number = 50;
+  seedVolumeSupported: boolean = false;
+
   aboutToAppear(): void {
     if (this.connectedUsn) {
+      if (this.seedDuration > 0 || this.seedPosition > 0) {
+        this.castPosition = this.seedPosition;
+        this.castDuration = this.seedDuration;
+      }
+      if (this.seedVolumeSupported) {
+        this.castVolume = this.seedVolume;
+        this.volumeSupported = true;
+      }
       this.startPoll();
       const device: DlnaDevice | null = this.connectedDevice();
       if (device) {
@@ -553,6 +567,13 @@ export struct PlayerCastSheet {
   @Prop @Watch('onOpenChange') openSeq: number = 0;
   @Prop mediaUrl: string = '';
   @Prop mediaTitle: string = '';
+  /** Linked from VideoPlayer so connection survives dialog close / screen-off. */
+  @Link connectedUsn: string;
+  @Prop @Watch('onSeedDeviceChange') seedDevice: DlnaDevice | null = null;
+  @Prop seedPosition: number = 0;
+  @Prop seedDuration: number = 0;
+  @Prop seedVolume: number = 50;
+  @Prop seedVolumeSupported: boolean = false;
   onCasted: (device: DlnaDevice) => void = (_device: DlnaDevice) => {};
   onStopped: () => void = () => {};
   onClosed: () => void = () => {};
@@ -560,23 +581,40 @@ export struct PlayerCastSheet {
   @State private devices: DlnaDevice[] = [];
   @State private scanState: number = DlnaScanState.IDLE;
   @State private errorText: string = '';
-  @State private connectedUsn: string = '';
   @State private casting: boolean = false;
 
   private dialog: CustomDialogController | null = null;
   private client: DlnaClient = new DlnaClient();
   private connectedDeviceCache: DlnaDevice | null = null;
 
+  aboutToAppear(): void {
+    this.syncSeedDevice();
+  }
+
   aboutToDisappear(): void {
     this.client.cancelDiscover();
     this.close();
   }
 
+  onSeedDeviceChange(): void {
+    this.syncSeedDevice();
+  }
+
+  private syncSeedDevice(): void {
+    if (this.seedDevice) {
+      this.connectedDeviceCache = this.seedDevice;
+    } else if (!this.connectedUsn) {
+      this.connectedDeviceCache = null;
+    }
+  }
+
   onOpenChange(): void {
     this.close();
     if (this.openSeq <= 0) {
+      // Dialog dismissed / page hide — do NOT clear connectedUsn or Stop TV.
       return;
     }
+    this.syncSeedDevice();
     this.open();
     this.startScan();
   }
@@ -591,6 +629,10 @@ export struct PlayerCastSheet {
         casting: $casting,
         mediaUrl: this.mediaUrl,
         mediaTitle: this.mediaTitle,
+        seedPosition: this.seedPosition,
+        seedDuration: this.seedDuration,
+        seedVolume: this.seedVolume,
+        seedVolumeSupported: this.seedVolumeSupported,
         onCasted: (device: DlnaDevice) => {
           this.connectedDeviceCache = device;
           this.onCasted(device);
@@ -609,6 +651,7 @@ export struct PlayerCastSheet {
       cancel: () => {
         this.dialog = null;
         this.client.cancelDiscover();
+        // UI only — connectedUsn / TV session stay alive for screen-off reopen.
         this.onClosed();
       }
     });
