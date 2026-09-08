@@ -1,6 +1,6 @@
 import { http, socket } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { DlnaDevice } from './DlnaTypes';
+import { DlnaDevice, DlnaPositionInfo } from './DlnaTypes';
 
 interface SsdpMessageInfo {
   message: ArrayBuffer;
@@ -8,7 +8,8 @@ interface SsdpMessageInfo {
 }
 
 /**
- * Minimal DLNA MediaRenderer client: SSDP discovery + AVTransport SetURI/Play/Stop.
+ * DLNA MediaRenderer client: SSDP discovery + AVTransport + RenderingControl.
+ * Supports SetURI/Play/Stop/Seek/GetPositionInfo and Master volume Get/Set.
  */
 export class DlnaClient {
   private static readonly TAG: string = '[DlnaClient]';
@@ -16,6 +17,7 @@ export class DlnaClient {
   private static readonly SSDP_PORT: number = 1900;
   private static readonly SCAN_MS: number = 4000;
   private static readonly AVT: string = 'urn:schemas-upnp-org:service:AVTransport:1';
+  private static readonly RCS: string = 'urn:schemas-upnp-org:service:RenderingControl:1';
   private static readonly RENDERER: string = 'urn:schemas-upnp-org:device:MediaRenderer:1';
 
   private udp: socket.UDPSocket | null = null;
@@ -69,13 +71,105 @@ export class DlnaClient {
       throw new Error('当前没有可投屏的地址');
     }
     console.info(`${DlnaClient.TAG} cast -> ${device.friendlyName} ${device.controlURL}`);
-    await this.soapAction(device.controlURL, 'SetAVTransportURI', this.buildSetUriBody(mediaUrl, title));
-    await this.soapAction(device.controlURL, 'Play', this.buildPlayBody());
+    await this.soapAction(device.controlURL, DlnaClient.AVT, 'SetAVTransportURI',
+      this.buildSetUriBody(mediaUrl, title));
+    await this.soapAction(device.controlURL, DlnaClient.AVT, 'Play', this.buildPlayBody());
   }
 
   public async stop(device: DlnaDevice): Promise<void> {
     console.info(`${DlnaClient.TAG} stop -> ${device.friendlyName}`);
-    await this.soapAction(device.controlURL, 'Stop', this.buildStopBody());
+    await this.soapAction(device.controlURL, DlnaClient.AVT, 'Stop', this.buildStopBody());
+  }
+
+  public async seek(device: DlnaDevice, positionSec: number): Promise<void> {
+    const target: string = DlnaClient.formatRelTime(positionSec);
+    console.info(`${DlnaClient.TAG} seek -> ${device.friendlyName} ${target}`);
+    await this.soapAction(device.controlURL, DlnaClient.AVT, 'Seek', this.buildSeekBody(target));
+  }
+
+  public async getPositionInfo(device: DlnaDevice): Promise<DlnaPositionInfo> {
+    const xml: string = await this.soapAction(device.controlURL, DlnaClient.AVT, 'GetPositionInfo',
+      this.buildGetPositionInfoBody());
+    const relTime: string = this.extractTag(xml, 'RelTime');
+    const trackDuration: string = this.extractTag(xml, 'TrackDuration');
+    return {
+      positionSec: DlnaClient.parseRelTime(relTime),
+      durationSec: DlnaClient.parseRelTime(trackDuration),
+      relTime: relTime,
+      trackDuration: trackDuration
+    };
+  }
+
+  /** Optional transport state: PLAYING / PAUSED_PLAYBACK / STOPPED / … */
+  public async getTransportInfo(device: DlnaDevice): Promise<string> {
+    const xml: string = await this.soapAction(device.controlURL, DlnaClient.AVT, 'GetTransportInfo',
+      this.buildGetTransportInfoBody());
+    return this.extractTag(xml, 'CurrentTransportState');
+  }
+
+  public async getVolume(device: DlnaDevice): Promise<number> {
+    if (!device.renderingControlURL) {
+      throw new Error('设备不支持音量控制');
+    }
+    const xml: string = await this.soapAction(device.renderingControlURL, DlnaClient.RCS, 'GetVolume',
+      this.buildGetVolumeBody());
+    const raw: string = this.extractTag(xml, 'CurrentVolume');
+    const vol: number = parseInt(raw, 10);
+    if (isNaN(vol)) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, vol));
+  }
+
+  public async setVolume(device: DlnaDevice, volume: number): Promise<void> {
+    if (!device.renderingControlURL) {
+      throw new Error('设备不支持音量控制');
+    }
+    const clamped: number = Math.max(0, Math.min(100, Math.round(volume)));
+    await this.soapAction(device.renderingControlURL, DlnaClient.RCS, 'SetVolume',
+      this.buildSetVolumeBody(clamped));
+  }
+
+  /** Parse UPnP RelTime / TrackDuration (H:MM:SS or HH:MM:SS). */
+  public static parseRelTime(value: string): number {
+    if (!value) {
+      return 0;
+    }
+    const trimmed: string = value.trim();
+    if (!trimmed || trimmed === 'NOT_IMPLEMENTED' || trimmed.indexOf(':') < 0) {
+      return 0;
+    }
+    const parts: string[] = trimmed.split(':');
+    if (parts.length < 2) {
+      return 0;
+    }
+    let hours: number = 0;
+    let minutes: number = 0;
+    let seconds: number = 0;
+    if (parts.length === 2) {
+      minutes = parseInt(parts[0], 10);
+      seconds = parseInt(parts[1], 10);
+    } else {
+      hours = parseInt(parts[0], 10);
+      minutes = parseInt(parts[1], 10);
+      seconds = parseInt(parts[2], 10);
+    }
+    if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+      return 0;
+    }
+    return Math.max(0, hours * 3600 + minutes * 60 + seconds);
+  }
+
+  /** Format seconds as H:MM:SS for Seek REL_TIME. */
+  public static formatRelTime(totalSec: number): string {
+    let sec: number = Math.max(0, Math.floor(totalSec));
+    const hours: number = Math.floor(sec / 3600);
+    sec = sec % 3600;
+    const minutes: number = Math.floor(sec / 60);
+    const seconds: number = sec % 60;
+    const mm: string = minutes < 10 ? `0${minutes}` : `${minutes}`;
+    const ss: string = seconds < 10 ? `0${seconds}` : `${seconds}`;
+    return `${hours}:${mm}:${ss}`;
   }
 
   private async startUdpListener(token: number, onUpdate?: (list: DlnaDevice[]) => void): Promise<void> {
@@ -173,6 +267,7 @@ export class DlnaClient {
       manufacturer: '',
       location: location,
       controlURL: '',
+      renderingControlURL: '',
       host: this.hostOf(location)
     });
     this.fetchDescription(usn, location, token, onUpdate);
@@ -188,7 +283,7 @@ export class DlnaClient {
       if (token !== this.scanToken) {
         return;
       }
-      const controlURL: string = this.findAvTransportControlUrl(xml, location);
+      const controlURL: string = this.findServiceControlUrl(xml, location, 'AVTransport');
       if (!controlURL) {
         console.info(`${DlnaClient.TAG} no AVTransport at ${location}`);
         this.devices.delete(usn);
@@ -197,16 +292,19 @@ export class DlnaClient {
         }
         return;
       }
+      const rcsURL: string = this.findServiceControlUrl(xml, location, 'RenderingControl');
       const device: DlnaDevice = {
         usn: usn,
         friendlyName: this.extractTag(xml, 'friendlyName') || this.guessName(usn, location),
         manufacturer: this.extractTag(xml, 'manufacturer'),
         location: location,
         controlURL: controlURL,
+        renderingControlURL: rcsURL,
         host: this.hostOf(location)
       };
       this.devices.set(usn, device);
-      console.info(`${DlnaClient.TAG} found ${device.friendlyName} @ ${device.host}`);
+      console.info(`${DlnaClient.TAG} found ${device.friendlyName} @ ${device.host}` +
+        ` rcs=${rcsURL ? 'yes' : 'no'}`);
       if (onUpdate) {
         onUpdate(this.listDevices().filter((d: DlnaDevice) => !!d.controlURL));
       }
@@ -216,13 +314,13 @@ export class DlnaClient {
     });
   }
 
-  private findAvTransportControlUrl(xml: string, baseLocation: string): string {
+  private findServiceControlUrl(xml: string, baseLocation: string, serviceName: string): string {
     const serviceRe: RegExp = /<service\b[\s\S]*?<\/service>/gi;
     let match: RegExpExecArray | null = serviceRe.exec(xml);
     while (match) {
       const block: string = match[0];
       const serviceType: string = this.extractTag(block, 'serviceType');
-      if (serviceType.indexOf('AVTransport') >= 0) {
+      if (serviceType.indexOf(serviceName) >= 0) {
         const control: string = this.extractTag(block, 'controlURL');
         if (control) {
           return this.resolveUrl(baseLocation, control);
@@ -233,7 +331,12 @@ export class DlnaClient {
     return '';
   }
 
-  private async soapAction(controlURL: string, action: string, bodyInner: string): Promise<void> {
+  private async soapAction(
+    controlURL: string,
+    serviceType: string,
+    action: string,
+    bodyInner: string
+  ): Promise<string> {
     const envelope: string =
       '<?xml version="1.0" encoding="utf-8"?>' +
       '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" ' +
@@ -245,7 +348,7 @@ export class DlnaClient {
         method: http.RequestMethod.POST,
         header: {
           'Content-Type': 'text/xml; charset="utf-8"',
-          'SOAPAction': `"${DlnaClient.AVT}#${action}"`
+          'SOAPAction': `"${serviceType}#${action}"`
         },
         extraData: envelope,
         expectDataType: http.HttpDataType.STRING,
@@ -253,12 +356,13 @@ export class DlnaClient {
         readTimeout: 8000
       });
       const code: number = response.responseCode;
+      const resultText: string = typeof response.result === 'string' ? response.result : '';
       if (code < 200 || code >= 300) {
-        const resultText: string = typeof response.result === 'string' ? response.result : '';
         console.error(`${DlnaClient.TAG} SOAP ${action} HTTP ${code}: ${resultText.substring(0, 200)}`);
         throw new Error(`投屏指令失败 (${action}, HTTP ${code})`);
       }
       console.info(`${DlnaClient.TAG} SOAP ${action} ok`);
+      return resultText;
     } finally {
       httpRequest.destroy();
     }
@@ -281,6 +385,35 @@ export class DlnaClient {
 
   private buildStopBody(): string {
     return `<u:Stop xmlns:u="${DlnaClient.AVT}"><InstanceID>0</InstanceID></u:Stop>`;
+  }
+
+  private buildSeekBody(target: string): string {
+    return `<u:Seek xmlns:u="${DlnaClient.AVT}">` +
+      '<InstanceID>0</InstanceID>' +
+      '<Unit>REL_TIME</Unit>' +
+      `<Target>${this.xmlEscape(target)}</Target>` +
+      '</u:Seek>';
+  }
+
+  private buildGetPositionInfoBody(): string {
+    return `<u:GetPositionInfo xmlns:u="${DlnaClient.AVT}">` +
+      '<InstanceID>0</InstanceID></u:GetPositionInfo>';
+  }
+
+  private buildGetTransportInfoBody(): string {
+    return `<u:GetTransportInfo xmlns:u="${DlnaClient.AVT}">` +
+      '<InstanceID>0</InstanceID></u:GetTransportInfo>';
+  }
+
+  private buildGetVolumeBody(): string {
+    return `<u:GetVolume xmlns:u="${DlnaClient.RCS}">` +
+      '<InstanceID>0</InstanceID><Channel>Master</Channel></u:GetVolume>';
+  }
+
+  private buildSetVolumeBody(volume: number): string {
+    return `<u:SetVolume xmlns:u="${DlnaClient.RCS}">` +
+      '<InstanceID>0</InstanceID><Channel>Master</Channel>' +
+      `<DesiredVolume>${volume}</DesiredVolume></u:SetVolume>`;
   }
 
   private buildDidl(mediaUrl: string, title: string): string {
