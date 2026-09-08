@@ -1,4 +1,5 @@
 import { AppTheme } from '../common/constants/AppTheme';
+import { CastSession } from '../common/utils/CastSession';
 import { DlnaClient } from '../common/utils/DlnaClient';
 import { DlnaDevice, DlnaPositionInfo, DlnaScanState } from '../common/utils/DlnaTypes';
 import { FormatUtil } from '../common/utils/FormatUtil';
@@ -37,6 +38,8 @@ struct PlayerCastDialog {
   seedDuration: number = 0;
   seedVolume: number = 50;
   seedVolumeSupported: boolean = false;
+  /** Shared with VideoPlayer so sheet poll shares remote-disconnect detection. */
+  castSession: CastSession | null = null;
 
   aboutToAppear(): void {
     if (this.connectedUsn) {
@@ -175,12 +178,22 @@ struct PlayerCastDialog {
     if (!device || !device.controlURL) {
       return;
     }
+    let positionOk: boolean = false;
+    let transportOk: boolean = false;
     try {
       const info: DlnaPositionInfo = await this.client.getPositionInfo(device);
       if (token !== this.pollToken) {
         return;
       }
+      positionOk = true;
       this.positionFailCount = 0;
+      if (this.castSession) {
+        this.castSession.notePollSuccess();
+        this.castSession.positionSec = info.positionSec;
+        if (info.durationSec > 0) {
+          this.castSession.durationSec = info.durationSec;
+        }
+      }
       if (!this.scrubbing) {
         this.castPosition = info.positionSec;
         if (info.durationSec > 0) {
@@ -190,9 +203,6 @@ struct PlayerCastDialog {
     } catch (err) {
       this.positionFailCount += 1;
       console.error(`[PlayerCastSheet] GetPositionInfo fail: ${JSON.stringify(err)}`);
-      if (this.positionFailCount === 3) {
-        this.toast('设备不支持进度同步');
-      }
     }
 
     try {
@@ -200,9 +210,30 @@ struct PlayerCastDialog {
       if (token !== this.pollToken) {
         return;
       }
+      transportOk = true;
       this.transportState = state;
+      if (this.castSession && this.castSession.noteTransportState(state)) {
+        // Remote disconnect: CastSession already clearLocal + UI callback (no Stop SOAP).
+        this.stopPoll();
+        this.resetCastUi();
+        return;
+      }
     } catch (_e) {
       // Optional; many renderers support it but not required.
+    }
+
+    if (token !== this.pollToken) {
+      return;
+    }
+    if (!positionOk && !transportOk && this.castSession) {
+      if (this.castSession.notePollFailure()) {
+        this.stopPoll();
+        this.resetCastUi();
+        return;
+      }
+    } else if (!positionOk && transportOk && this.positionFailCount === 3) {
+      // Transport still alive — renderer likely lacks position sync, not a disconnect.
+      this.toast('设备不支持进度同步');
     }
   }
 
@@ -574,6 +605,8 @@ export struct PlayerCastSheet {
   @Prop seedDuration: number = 0;
   @Prop seedVolume: number = 50;
   @Prop seedVolumeSupported: boolean = false;
+  /** Shared CastSession for remote-disconnect detection while sheet poll owns the timer. */
+  castSession: CastSession | null = null;
   onCasted: (device: DlnaDevice) => void = (_device: DlnaDevice) => {};
   onStopped: () => void = () => {};
   onClosed: () => void = () => {};
@@ -633,6 +666,7 @@ export struct PlayerCastSheet {
         seedDuration: this.seedDuration,
         seedVolume: this.seedVolume,
         seedVolumeSupported: this.seedVolumeSupported,
+        castSession: this.castSession,
         onCasted: (device: DlnaDevice) => {
           this.connectedDeviceCache = device;
           this.onCasted(device);
