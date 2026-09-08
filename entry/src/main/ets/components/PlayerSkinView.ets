@@ -23,6 +23,7 @@ export interface PlayerSkinEvents {
   onPanMove: (event: GestureEvent) => void;
   onPanEnd: () => void;
   onPanCancel: () => void;
+  onCast: () => void;
 }
 
 @Component
@@ -107,7 +108,8 @@ export struct PlayerSkinView {
       onPanStart: (e: GestureEvent) => { if (this.events) this.events.onPanStart(e); },
       onPanMove: (e: GestureEvent) => { if (this.events) this.events.onPanMove(e); },
       onPanEnd: () => { if (this.events) this.events.onPanEnd(); },
-      onPanCancel: () => { if (this.events) this.events.onPanCancel(); }
+      onPanCancel: () => { if (this.events) this.events.onPanCancel(); },
+      onCast: () => { if (this.events) this.events.onCast(); }
     })
       .width('100%')
       .height('100%')
