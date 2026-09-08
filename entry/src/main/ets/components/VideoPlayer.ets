@@ -96,6 +96,9 @@ export struct VideoPlayer {
   private castSession: CastSession = new CastSession();
 
   aboutToAppear() {
+    this.castSession.onRemoteDisconnected = () => {
+      this.handleRemoteCastDisconnect();
+    };
     this.observer = new PlayerVideoObserver(this.observerHost());
     this.setupPlayerAvListener();
     this.nonce = 1;
@@ -417,6 +420,16 @@ export struct VideoPlayer {
     this.castConnectedUsn = '';
     this.castSession.clearLocal();
   }
+  /** TV stopped / powered off / network drop — local clear only, no Stop SOAP. */
+  private handleRemoteCastDisconnect(): void {
+    this.clearCastLocal();
+    this.closeCastDialog();
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: '电视已停止投屏' });
+    } catch (_e) {
+    }
+    this.pulseHud();
+  }
   private stopCastSession(): void {
     const device: DlnaDevice | null = this.castDevice || this.castSession.device;
     this.clearCastLocal();
@@ -562,6 +575,7 @@ export struct VideoPlayer {
         seedDuration: this.castSession.durationSec,
         seedVolume: this.castSession.volume,
         seedVolumeSupported: this.castSession.volumeSupported,
+        castSession: this.castSession,
         onCasted: (device: DlnaDevice) => {
           this.bindCastDevice(device);
           this.pauseForCast();
