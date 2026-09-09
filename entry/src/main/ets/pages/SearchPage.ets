@@ -1,19 +1,19 @@
 import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
-import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
+import { MovieBasicInfo, PageInfo } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { NavUtil } from '../common/utils/NavUtil';
 import { WindowBar } from '../common/utils/WindowBar';
-import { EmptyState } from '../components/EmptyState';
-import { LoadingView } from '../components/LoadingView';
-import { AppIcon } from '../components/AppIcon';
-import { BackIcon } from '../components/BackIcon';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { EmptyState } from '../components/common/EmptyState';
+import { LoadingView } from '../components/common/LoadingView';
+import { AppIcon } from '../components/common/AppIcon';
+import { BackIcon } from '../components/common/BackIcon';
+import { SourceGuard } from '../services/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
-import { SearchHistoryManager } from '../common/utils/SearchHistoryManager';
+import { SearchHistoryManager } from '../services/SearchHistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
-import { SearchResultItem } from '../components/SearchResultItem';
-import { SearchSuggestPane } from '../components/SearchSuggestPane';
+import { SearchResultItem } from '../components/film/SearchResultItem';
+import { SearchSuggestPane } from '../components/film/SearchSuggestPane';
 import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry

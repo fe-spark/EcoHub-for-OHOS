@@ -1,21 +1,21 @@
 import { FilmApi } from '../api/FilmApi';
-import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../model/FilmModels';
+import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
-import { HistoryManager } from '../common/utils/HistoryManager';
+import { HistoryManager } from '../services/HistoryManager';
 import { NavUtil } from '../common/utils/NavUtil';
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
-import { PlayerWindow } from '../common/utils/PlayerWindow';
+import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { common } from '@kit.AbilityKit';
-import { VideoPlayer } from '../components/VideoPlayer';
-import { PlayDetailPanel } from '../components/PlayDetailPanel';
-import { FilmGrid } from '../components/FilmGrid';
-import { LoadingView } from '../components/LoadingView';
-import { EmptyState } from '../components/EmptyState';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { VideoPlayer } from '../modules/player/VideoPlayer';
+import { PlayDetailPanel } from '../components/film/PlayDetailPanel';
+import { FilmGrid } from '../components/film/FilmGrid';
+import { LoadingView } from '../components/common/LoadingView';
+import { EmptyState } from '../components/common/EmptyState';
+import { SourceGuard } from '../services/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
-import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
+import { SiteHeartbeat } from '../services/SiteHeartbeat';
 import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry

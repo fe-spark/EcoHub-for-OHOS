@@ -1,14 +1,14 @@
 import { FilmApi } from '../api/FilmApi';
-import { BannerItem, HomeSection } from '../model/FilmModels';
+import { BannerItem, HomeSection } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { NavUtil } from '../common/utils/NavUtil';
-import { FilmRow } from '../components/FilmRow';
-import { LoadingView } from '../components/LoadingView';
-import { EmptyState } from '../components/EmptyState';
-import { AppIcon } from '../components/AppIcon';
-import { HomeBanner } from '../components/HomeBanner';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { FilmRow } from '../components/film/FilmRow';
+import { LoadingView } from '../components/common/LoadingView';
+import { EmptyState } from '../components/common/EmptyState';
+import { AppIcon } from '../components/common/AppIcon';
+import { HomeBanner } from '../components/film/HomeBanner';
+import { SourceGuard } from '../services/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
 

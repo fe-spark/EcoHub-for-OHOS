@@ -1,10 +1,10 @@
 import { FilmApi } from '../api/FilmApi';
-import { BasicConfig } from '../model/FilmModels';
+import { BasicConfig } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
 import { NavUtil } from '../common/utils/NavUtil';
-import { AppIcon } from '../components/AppIcon';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { AppIcon } from '../components/common/AppIcon';
+import { SourceGuard } from '../services/SourceGuard';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
 
 @Component

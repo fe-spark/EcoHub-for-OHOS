@@ -1,10 +1,10 @@
 import { FilmApi } from '../api/FilmApi';
-import { DailyUpdateCategory, MovieBasicInfo, PageInfo } from '../model/FilmModels';
+import { DailyUpdateCategory, MovieBasicInfo, PageInfo } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { AppIcon } from '../components/AppIcon';
-import { LoadingView } from '../components/LoadingView';
-import { EmptyState } from '../components/EmptyState';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { AppIcon } from '../components/common/AppIcon';
+import { LoadingView } from '../components/common/LoadingView';
+import { EmptyState } from '../components/common/EmptyState';
+import { SourceGuard } from '../services/SourceGuard';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { DailyUpdatePane } from './DailyUpdatePane';
 import { Breakpoint } from '../common/utils/Breakpoint';

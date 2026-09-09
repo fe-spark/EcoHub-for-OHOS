@@ -1,8 +1,8 @@
 import { http } from '@kit.NetworkKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
-import { ServerConfigManager } from '../utils/ServerConfigManager';
+import { ServerConfigManager } from '../../services/ServerConfigManager';
 import { QueryParams } from '../utils/QueryParams';
-import { SourceGuard } from '../utils/SourceGuard';
+import { SourceGuard } from '../../services/SourceGuard';
 import { AppVersionUtil } from '../utils/AppVersionUtil';
 
 export interface ApiResponse {

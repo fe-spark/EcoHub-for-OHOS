@@ -1,15 +1,15 @@
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { FilmApi } from '../api/FilmApi';
 import { AppTheme } from '../common/constants/AppTheme';
 import { WindowBar } from '../common/utils/WindowBar';
 import { NavUtil } from '../common/utils/NavUtil';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { SourceGuard } from '../services/SourceGuard';
 import { common } from '@kit.AbilityKit';
 import { KeyboardAvoidMode } from '@kit.ArkUI';
-import { AppIcon } from '../components/AppIcon';
-import { BackIcon } from '../components/BackIcon';
-import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
+import { AppIcon } from '../components/common/AppIcon';
+import { BackIcon } from '../components/common/BackIcon';
+import { SiteHeartbeat } from '../services/SiteHeartbeat';
 
 @Entry
 @Component
