@@ -6,7 +6,6 @@ import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { Breakpoint } from '../common/utils/Breakpoint';
-import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { common } from '@kit.AbilityKit';
 
 @Entry
@@ -133,38 +132,6 @@ struct CustomPlayerPage {
       .padding({ left: 12, right: 8 })
       .backgroundColor(AppTheme.BG_CARD)
       .borderRadius(AppTheme.RADIUS_MD)
-
-      Row() {
-        PasteButton()
-          .height(44)
-          .padding({ left: 14, right: 14 })
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(AppTheme.RADIUS_MD)
-          .onClick(async (_event: ClickEvent, result: PasteButtonOnClickResult) => {
-            if (result === PasteButtonOnClickResult.SUCCESS) {
-              const res = await ClipboardSniffer.sniff();
-              if (res.url) {
-                ClipboardSniffer.markHandled(res.raw);
-                this.inputUrl = res.url;
-                this.playUrl = res.url;
-                try {
-                  this.getUIContext().getPromptAction().showToast({ message: '已提取剪贴板链接并开始播放' });
-                } catch (_e) {
-                }
-              } else if (res.raw) {
-                ClipboardSniffer.markHandled(res.raw);
-                this.inputUrl = res.raw;
-                this.play();
-              } else {
-                try {
-                  this.getUIContext().getPromptAction().showToast({ message: '未在剪贴板中检测到有效链接' });
-                } catch (_e) {
-                }
-              }
-            }
-          })
-      }
-      .margin({ left: 8 })
 
       Row() {
         AppIcon({ src: $r('sys.symbol.play_fill'), iconSize: 16, color: AppTheme.TEXT_PRIMARY })

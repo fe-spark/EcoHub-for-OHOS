@@ -54,6 +54,16 @@ export class NavUtil {
     }
   }
 
+  static openSettings(uiContext?: UIContext): void {
+    try {
+      const r = NavUtil.getRouter(uiContext);
+      if (r) {
+        r.pushUrl({ url: 'pages/SettingsPage' });
+      }
+    } catch (_e) {
+    }
+  }
+
   static openPlay(id: string | number, sourceId: string = '', episodeIndex?: number,
     currentTime?: number, uiContext?: UIContext): void {
     if (!id && id !== 0) {

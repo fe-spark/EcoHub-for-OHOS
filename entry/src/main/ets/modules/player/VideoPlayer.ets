@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { AVVolumePanel } from '@kit.AudioKit';
+import { PiPWindow } from '@kit.ArkUI';
 import { AppTheme } from '../../common/constants/AppTheme';
 import { PlayerWindow } from './PlayerWindow';
 import { PlayerTipKind } from './PlayerPan';
@@ -32,8 +33,8 @@ export struct VideoPlayer {
   @Prop initialTime: number = 0;
   @Prop showBack: boolean = false;
   @Prop isFull: boolean = false;
-  @Prop hasPrev: boolean = false;
-  @Prop hasNext: boolean = false;
+  @Prop @Watch('syncPipControls') hasPrev: boolean = false;
+  @Prop @Watch('syncPipControls') hasNext: boolean = false;
   @Prop topInset: number = 0;
   @Prop leftInset: number = 0;
   @Prop rightInset: number = 0;
@@ -85,6 +86,7 @@ export struct VideoPlayer {
   @State private castPhase: string = '';
   @State private castTransport: string = '';
   @State private isPipActive: boolean = false;
+  @StorageLink('SETTING_PIP_AUTO_START') @Watch('onSettingPipAutoStartChange') private settingPipAutoStart: boolean = true;
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -101,6 +103,24 @@ export struct VideoPlayer {
   private castCtrl: PlayerCastController = new PlayerCastController();
   private xComponentController: XComponentController = new XComponentController();
   private pip: PlayerPip = new PlayerPip();
+  private isRestoring: boolean = false;
+  private pendingHidePauseTimer: number = -1;
+
+  private clearPendingHidePause(): void {
+    if (this.pendingHidePauseTimer >= 0) {
+      clearTimeout(this.pendingHidePauseTimer);
+      this.pendingHidePauseTimer = -1;
+    }
+  }
+
+  private syncPipAutoStart(): void {
+    const canAuto = this.settingPipAutoStart &&
+      !this.isCasting() &&
+      !!this.videoUrl &&
+      !this.state.errorText &&
+      (!this.state.completed || this.hasNext);
+    this.pip.setAutoStart(canAuto);
+  }
 
   aboutToAppear() {
     this.castCtrl.updateHost(this.castHost());
@@ -108,7 +128,8 @@ export struct VideoPlayer {
     this.observer = new PlayerVideoObserver(this.observerHost());
     this.setupPlayerAvListener();
     this.setupPip();
-    this.pip.setAutoStart(true);
+    this.syncPipAutoStart();
+    this.syncPipControls();
     this.nonce = 1;
     this.state.bootGen = 1;
     this.state.mountGen = 1;
@@ -138,21 +159,28 @@ export struct VideoPlayer {
     });
   }
 
+  private onSettingPipAutoStartChange(): void {
+    this.syncPipAutoStart();
+  }
+
   private setupPlayerAvListener(): void {
-    this.playerAv.listener.onPrepared = (dur: number) => { if (this.observer) this.observer.handlePrepared(dur); };
+    this.playerAv.listener.onPrepared = (dur: number) => {
+      this.syncPipAutoStart();
+      if (this.observer) this.observer.handlePrepared(dur);
+    };
     this.playerAv.listener.onStart = () => {
-      this.pip.setAutoStart(!this.isCasting());
+      this.syncPipAutoStart();
       this.pip.syncPlayStatus(true);
       if (this.observer) this.observer.handleStart();
     };
     this.playerAv.listener.onPause = () => {
-      this.pip.setAutoStart(false);
+      this.syncPipAutoStart();
       this.pip.syncPlayStatus(false);
       if (this.observer) this.observer.handlePause();
     };
     this.playerAv.listener.onTime = (time: number) => { if (this.observer) this.observer.handleTime(time); };
     this.playerAv.listener.onFinish = () => {
-      this.pip.setAutoStart(false);
+      this.syncPipAutoStart();
       this.pip.syncPlayStatus(false);
       if (this.observer) this.observer.handleFinish();
     };
@@ -172,6 +200,10 @@ export struct VideoPlayer {
   }
 
   aboutToDisappear() {
+    this.clearPendingHidePause();
+    if (this.pip.active) {
+      this.pip.stop().catch((_e: Object) => {});
+    }
     this.pip.destroy();
     if (this.volumeSub) {
       this.volumeSub();
@@ -199,6 +231,10 @@ export struct VideoPlayer {
   onReloadTokenChange(): void { this.handleSourceChange(); }
 
   private handleSourceChange(): void {
+    if (this.pageActive && this.pip.active) {
+      console.info('[VideoPlayer] 页面内切换片源，停止画中画恢复原位');
+      this.pip.stop().catch((_e: Object) => {});
+    }
     if (this.ctrl().handleSourceChange()) {
       this.syncCastUi();
       return;
@@ -247,12 +283,17 @@ export struct VideoPlayer {
 
   onPageActiveChange(): void {
     if (this.pageActive) {
+      this.clearPendingHidePause();
       this.audioBridge.sync((vol, _max, isMuted) => {
         this.volumeIndex = vol;
         this.muted = isMuted;
         this.playerAv.setMuted(isMuted);
         this.gestures.pan.primeVolume(this.audioBridge.max > 0 ? vol / this.audioBridge.max : 0);
       });
+      if (this.pip.active) {
+        console.info('[VideoPlayer] 页面重新激活，自动停止画中画恢复原位播放');
+        this.pip.stop().catch((_e: Object) => {});
+      }
       // Wake / page show while still casting: resume progress sync only; do not re-cast
       // and do not resume local AVPlayer (TV is the playback surface).
       if (this.ctrl().isCasting() || this.castConnectedUsn) {
@@ -277,11 +318,29 @@ export struct VideoPlayer {
       this.ctrl().syncCastProgressToState();
       this.syncFromState();
       if (this.state.currentTime > 0) this.state.emitProgress(this.onProgress, true);
+
       if (this.pip.active) {
-        console.info('[VideoPlayer] 画中画处于活跃状态，保持后台播放');
         return;
       }
-      if (this.state.isPlaying) this.playerAv.pause();
+
+      const willAutoPip = this.settingPipAutoStart && this.pip.autoStart && !this.ctrl().isCasting();
+      if (willAutoPip) {
+        this.clearPendingHidePause();
+        this.pendingHidePauseTimer = setTimeout(() => {
+          this.pendingHidePauseTimer = -1;
+          if (!this.pageActive && !this.pip.active) {
+            console.info('[VideoPlayer] 页面隐藏且未拉起画中画（应用内跳转），执行兜底暂停');
+            if (this.state.isPlaying) {
+              this.playerAv.pause();
+            }
+          }
+        }, 200);
+        return;
+      }
+
+      if (this.state.isPlaying) {
+        this.playerAv.pause();
+      }
     }
   }
 
@@ -537,6 +596,11 @@ export struct VideoPlayer {
       {
         onPlayStateChanged: (play: boolean) => {
           if (play) {
+            if (this.state.completed) {
+              this.state.completed = false;
+              this.state.currentTime = 0;
+              this.seekTo(0);
+            }
             this.state.playRequested = true;
             this.playerAv.play();
           } else {
@@ -569,12 +633,15 @@ export struct VideoPlayer {
           }
         },
         onRestore: () => {
+          this.isRestoring = true;
           this.isPipActive = false;
           this.pulseHud();
         },
         onClosed: () => {
           this.isPipActive = false;
-          if (!this.pageActive) {
+          const wasRestoring = this.isRestoring;
+          this.isRestoring = false;
+          if (!this.pageActive && !wasRestoring) {
             this.state.playRequested = false;
             this.playerAv.pause();
             this.syncFromState();
@@ -585,6 +652,11 @@ export struct VideoPlayer {
         }
       }
     );
+  }
+
+  private syncPipControls(): void {
+    this.pip.updateControlEnabled(PiPWindow.PiPControlType.VIDEO_PREVIOUS, this.hasPrev);
+    this.pip.updateControlEnabled(PiPWindow.PiPControlType.VIDEO_NEXT, this.hasNext);
   }
 
   private syncCastUi(): void {

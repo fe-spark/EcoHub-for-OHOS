@@ -15,6 +15,7 @@ import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
 import { HttpClient } from '../common/network/HttpClient';
 import { NoticeDialog } from '../components/dialogs/NoticeDialog';
 import { VersionUpdateDialog } from '../components/dialogs/VersionUpdateDialog';
+import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 
 @Entry
 @Component
@@ -35,6 +36,9 @@ struct Index {
   };
   private hasDismissedNotice: boolean = false;
   @State private tabReady: boolean[] = [true, false, false];
+  @State private showClipBanner: boolean = false;
+  @StorageLink('APP_FOREGROUND_TICK') @Watch('onForegroundTick') private fgTick: number = 0;
+  @StorageLink('CLIPBOARD_UPDATE_TICK') @Watch('onClipboardUpdateTick') private clipUpdateTick: number = 0;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
   @State private leftInset: number = 0;
@@ -103,6 +107,38 @@ struct Index {
       this.loadSite(false);
     };
     SourceGuard.onReconnect(this.reconnectCb);
+    this.checkClipboardSniffer();
+  }
+
+  private onForegroundTick(): void {
+    this.checkClipboardSniffer();
+  }
+
+  private onClipboardUpdateTick(): void {
+    this.checkClipboardSniffer();
+  }
+
+  private checkClipboardSniffer(): void {
+    if (!ClipboardSniffer.shouldShowBanner()) {
+      this.showClipBanner = false;
+      return;
+    }
+    // 优先静默提取（应用内复制或特定已获权场景）
+    ClipboardSniffer.sniff().then((res) => {
+      if (res.url && !ClipboardSniffer.isHandled(res.raw)) {
+        ClipboardSniffer.markHandled(res.raw);
+        this.showClipBanner = false;
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: '检测到播放链接，正在跳转...' });
+          NavUtil.openCustomPlayer(res.url, this.getUIContext());
+        } catch (_e) {
+        }
+        return;
+      }
+      this.showClipBanner = ClipboardSniffer.shouldShowBanner();
+    }).catch(() => {
+      this.showClipBanner = ClipboardSniffer.shouldShowBanner();
+    });
   }
 
   onPageShow(): void {
@@ -111,6 +147,7 @@ struct Index {
       this.loadSite(false);
     }
     SiteHeartbeat.getInstance().start();
+    this.checkClipboardSniffer();
   }
 
   onPageHide(): void {
@@ -293,6 +330,90 @@ struct Index {
           }
           .width('100%')
           .layoutWeight(1)
+
+          if (this.showClipBanner && this.ready && this.siteOpen) {
+            Row() {
+              Row({ space: 8 }) {
+                AppIcon({ src: $r('sys.symbol.link'), iconSize: 16, color: AppTheme.ACCENT })
+                Text('检测到剪贴板内容')
+                  .fontSize(13)
+                  .fontColor(AppTheme.TEXT_PRIMARY)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              .layoutWeight(1)
+
+              PasteButton({
+                icon: PasteIconStyle.LINES,
+                text: PasteDescription.PASTE,
+                buttonType: ButtonType.Capsule
+              })
+                .height(36)
+                .padding({ left: 14, right: 14 })
+                .backgroundColor(AppTheme.ACCENT)
+                .fontColor(Color.White)
+                .iconColor(Color.White)
+                .onClick(async (_event: ClickEvent, result: PasteButtonOnClickResult) => {
+                  console.info(`[Index] PasteButton clicked, result=${result}`);
+                  if (result === PasteButtonOnClickResult.SUCCESS) {
+                    const res = await ClipboardSniffer.sniff();
+                    console.info(`[Index] sniff res: url=${res.url}, raw=${res.raw}`);
+                    this.showClipBanner = false;
+                    ClipboardSniffer.markHandled(res.raw);
+                    if (res.url) {
+                      try {
+                        this.getUIContext().getPromptAction().showToast({ message: '已提取播放链接并跳转' });
+                        NavUtil.openCustomPlayer(res.url, this.getUIContext());
+                      } catch (_e) {
+                      }
+                    } else if (res.raw) {
+                      try {
+                        this.getUIContext().getPromptAction().showToast({ message: '已提取剪贴板并跳转' });
+                        NavUtil.openCustomPlayer(res.raw, this.getUIContext());
+                      } catch (_e) {
+                      }
+                    } else {
+                      try {
+                        this.getUIContext().getPromptAction().showToast({ message: '剪贴板暂无内容' });
+                      } catch (_e) {
+                      }
+                    }
+                  } else {
+                    console.warn(`[Index] PasteButton auth result: ${result}`);
+                    try {
+                      const res = await ClipboardSniffer.sniff();
+                      if (res.url || res.raw) {
+                        this.showClipBanner = false;
+                        ClipboardSniffer.markHandled(res.raw);
+                        NavUtil.openCustomPlayer(res.url || res.raw, this.getUIContext());
+                        return;
+                      }
+                    } catch (_e) {}
+                    this.showClipBanner = false;
+                    ClipboardSniffer.markDismissed();
+                  }
+                })
+
+              Row() {
+                AppIcon({ src: $r('sys.symbol.xmark'), iconSize: 16, color: AppTheme.TEXT_MUTED })
+              }
+              .padding(8)
+              .margin({ left: 6 })
+              .onClick(() => {
+                this.showClipBanner = false;
+                ClipboardSniffer.markDismissed();
+              })
+            }
+            .width('92%')
+            .constraintSize({ maxWidth: 480 })
+            .height(48)
+            .padding({ left: 14, right: 8 })
+            .backgroundColor('#252733')
+            .borderRadius(AppTheme.RADIUS_PILL)
+            .shadow({ radius: 10, color: 'rgba(0,0,0,0.3)', offsetY: 2 })
+            .border({ width: 0.5, color: 'rgba(255,255,255,0.12)' })
+            .margin({ top: 4, bottom: 8 })
+          }
 
           Column() {
             Row() {

@@ -3,6 +3,8 @@ import { window } from '@kit.ArkUI';
 import { Breakpoint } from '../common/utils/Breakpoint';
 import { HistoryManager } from '../services/HistoryManager';
 import { ServerConfigManager } from '../services/ServerConfigManager';
+import { AppSettingsManager } from '../services/AppSettingsManager';
+import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
 
 
@@ -21,6 +23,7 @@ export default class EntryAbility extends UIAbility {
     if (ServerConfigManager.getInstance().getCachedServerUrl()) {
       SiteHeartbeat.getInstance().start();
     }
+    AppStorage.setOrCreate<number>('APP_FOREGROUND_TICK', Date.now());
   }
 
   onBackground(): void {
@@ -32,7 +35,11 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
-    ServerConfigManager.getInstance().init(this.context).then(() => {
+    Promise.all([
+      ServerConfigManager.getInstance().init(this.context),
+      AppSettingsManager.getInstance().init(this.context),
+      ClipboardSniffer.init(this.context)
+    ]).then(() => {
       return HistoryManager.migrateLegacy();
     }).then(() => {
       windowStage.loadContent('pages/SplashPage', (err) => {

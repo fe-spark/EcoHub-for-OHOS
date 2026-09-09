@@ -197,16 +197,16 @@ struct ServerConfigPage {
               // Left: Logo & Branding
               Column() {
                 Image($r('app.media.startIcon'))
-                  .width(56)
-                  .height(56)
-                  .borderRadius(AppTheme.RADIUS_LG)
+                  .width(72)
+                  .height(72)
+                  .borderRadius(16)
                   .clip(true)
 
                 Text('EcoHub')
                   .fontSize(22)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(AppTheme.TEXT_PRIMARY)
-                  .margin({ top: 8 })
+                  .margin({ top: 10 })
 
                 Text(this.reconnect ? '软件源连接失败\n请重新接入' : '配置软件源后观影')
                   .fontSize(11)
@@ -214,7 +214,7 @@ struct ServerConfigPage {
                   .textAlign(TextAlign.Center)
                   .margin({ top: 4 })
               }
-              .width(160)
+              .width(170)
               .alignItems(HorizontalAlign.Center)
               .justifyContent(FlexAlign.Center)
 
@@ -327,23 +327,23 @@ struct ServerConfigPage {
             Column() {
               Column() {
                 Image($r('app.media.startIcon'))
-                  .width(56)
-                  .height(56)
-                  .borderRadius(AppTheme.RADIUS_LG)
+                  .width(88)
+                  .height(88)
+                  .borderRadius(20)
                   .clip(true)
 
                 Text('EcoHub')
-                  .fontSize(24)
+                  .fontSize(26)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(AppTheme.TEXT_PRIMARY)
-                  .margin({ top: 10 })
+                  .margin({ top: 14 })
 
                 Text(this.reconnect ? '软件源连接失败，请检查后重新接入' : '配置软件源后即可观影')
                   .fontSize(13)
                   .fontColor(AppTheme.TEXT_SECONDARY)
                   .margin({ top: 6 })
               }
-              .margin({ top: 20, bottom: 28 })
+              .margin({ top: 24, bottom: 28 })
 
               Column() {
                 Row() {

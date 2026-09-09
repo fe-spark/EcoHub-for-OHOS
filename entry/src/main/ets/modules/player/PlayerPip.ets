@@ -21,6 +21,9 @@ export class PlayerPip {
   private context: common.UIAbilityContext | null = null;
   private continuousTaskActive: boolean = false;
   private desiredAutoStart: boolean = false;
+  private desiredWidth: number = 0;
+  private desiredHeight: number = 0;
+  private desiredPlayStatus: boolean = false;
 
   constructor() {
     this.isSupported = PiPWindow.isPiPEnabled();
@@ -33,6 +36,10 @@ export class PlayerPip {
 
   get active(): boolean {
     return this.isPipActive;
+  }
+
+  get autoStart(): boolean {
+    return this.desiredAutoStart;
   }
 
   /**
@@ -51,6 +58,10 @@ export class PlayerPip {
     }
     this.context = context;
     this.delegate = delegate;
+    if (width > 0 && height > 0) {
+      this.desiredWidth = width;
+      this.desiredHeight = height;
+    }
 
     console.info(`[PlayerPip] setup: context=${!!context} (${context}), ctrl=${!!xComponentController}, w=${width}, h=${height}`);
     const config: PiPWindow.PiPConfiguration = {
@@ -69,6 +80,10 @@ export class PlayerPip {
       if (this.desiredAutoStart) {
         this.pipController.setAutoStartEnabled(true);
       }
+      if (this.desiredWidth > 0 && this.desiredHeight > 0) {
+        this.pipController.updateContentSize(this.desiredWidth, this.desiredHeight);
+      }
+      this.syncPlayStatus(this.desiredPlayStatus);
       return true;
     } catch (err) {
       const bErr = err as Record<string, Object>;
@@ -98,6 +113,10 @@ export class PlayerPip {
    * 动态刷新画中画小窗宽高比
    */
   updateSize(width: number, height: number): void {
+    if (width > 0 && height > 0) {
+      this.desiredWidth = width;
+      this.desiredHeight = height;
+    }
     if (!this.pipController || width <= 0 || height <= 0) {
       return;
     }
@@ -112,6 +131,7 @@ export class PlayerPip {
    * 同步播放状态到小窗控件图标
    */
   syncPlayStatus(isPlaying: boolean): void {
+    this.desiredPlayStatus = isPlaying;
     if (!this.pipController) {
       return;
     }
@@ -121,6 +141,18 @@ export class PlayerPip {
     } catch (err) {
       console.error(`[PlayerPip] syncPlayStatus 失败: ${JSON.stringify(err)}`);
     }
+  }
+
+  /**
+   * 动态控制系统控制栏指定按钮的可用状态
+   */
+  updateControlEnabled(controlType: PiPWindow.PiPControlType, enabled: boolean): void {
+    if (!this.pipController) {
+      return;
+    }
+    try {
+      this.pipController.setPiPControlEnabled(controlType, enabled);
+    } catch (_e) {}
   }
 
   /**
@@ -164,7 +196,9 @@ export class PlayerPip {
       switch (state) {
         case PiPWindow.PiPState.ABOUT_TO_START:
           this.isPipActive = true;
-          this.startContinuousTask();
+          if (this.desiredPlayStatus) {
+            this.startContinuousTask();
+          }
           this.delegate?.onPipActiveChanged?.(true);
           break;
         case PiPWindow.PiPState.STARTED:
@@ -196,6 +230,9 @@ export class PlayerPip {
       switch (event) {
         case 'playbackStateChanged':
           const willPlay = status === 1;
+          if (willPlay) {
+            this.startContinuousTask();
+          }
           this.delegate?.onPlayStateChanged(willPlay);
           this.syncPlayStatus(willPlay);
           break;
@@ -220,9 +257,10 @@ export class PlayerPip {
       return;
     }
     try {
+      const bundleName = this.context.abilityInfo?.bundleName || this.context.applicationInfo?.name || 'com.ecohub.spark';
       const wantAgentInfo: wantAgent.WantAgentInfo = {
         wants: [{
-          bundleName: this.context.applicationInfo.name,
+          bundleName: bundleName,
           abilityName: 'EntryAbility'
         }],
         actionType: wantAgent.OperationType.START_ABILITY,
@@ -259,6 +297,9 @@ export class PlayerPip {
     this.setAutoStart(false);
     if (this.pipController) {
       try {
+        if (this.isPipActive) {
+          this.pipController.stopPiP().catch((_e: Object) => {});
+        }
         this.pipController.off('stateChange');
         this.pipController.off('controlPanelActionEvent');
       } catch (_e) {}
