@@ -49,63 +49,19 @@ jobs:
           npm config set registry https://repo.huaweicloud.com/repository/npm/
           npm config set "@ohos:registry" https://repo.harmonyos.com/npm/
 
-      - name: Prepare signing
-        env:
-          HOS_SIGN_P12: ${{ secrets.HOS_SIGN_P12 }}
-          HOS_SIGN_CERT: ${{ secrets.HOS_SIGN_CERT }}
-          HOS_SIGN_PROFILE: ${{ secrets.HOS_SIGN_PROFILE }}
-          HOS_SIGN_KEY_ALIAS: ${{ secrets.HOS_SIGN_KEY_ALIAS }}
-          HOS_SIGN_KEY_PASSWORD: ${{ secrets.HOS_SIGN_KEY_PASSWORD }}
-          HOS_SIGN_STORE_PASSWORD: ${{ secrets.HOS_SIGN_STORE_PASSWORD }}
+      - name: Configure unsigned build
         run: |
           python3 <<'PY'
-          import base64
           import json
-          import os
           from pathlib import Path
 
           profile = Path("build-profile.json5")
           data = json.loads(profile.read_text())
-          p12 = os.environ.get("HOS_SIGN_P12", "")
-          cert = os.environ.get("HOS_SIGN_CERT", "")
-          p7b = os.environ.get("HOS_SIGN_PROFILE", "")
-          signed = bool(p12 and cert and p7b)
-
-          if signed:
-              sign_dir = Path.home() / "hos-sign"
-              sign_dir.mkdir(parents=True, exist_ok=True)
-
-              def write_b64(name: str, raw: str) -> str:
-                  path = sign_dir / name
-                  path.write_bytes(base64.b64decode(raw))
-                  return str(path)
-
-              material = {
-                  "certpath": write_b64("debug.cer", cert),
-                  "keyAlias": os.environ.get("HOS_SIGN_KEY_ALIAS") or "debugKey",
-                  "keyPassword": os.environ.get("HOS_SIGN_KEY_PASSWORD") or "",
-                  "profile": write_b64("debug.p7b", p7b),
-                  "signAlg": "SHA256withECDSA",
-                  "storeFile": write_b64("debug.p12", p12),
-                  "storePassword": os.environ.get("HOS_SIGN_STORE_PASSWORD") or "",
-              }
-              if not material["keyPassword"] or not material["storePassword"]:
-                  raise SystemExit("HOS_SIGN_KEY_PASSWORD and HOS_SIGN_STORE_PASSWORD are required when signing")
-              data["app"]["signingConfigs"] = [{
-                  "name": "default",
-                  "type": "HarmonyOS",
-                  "material": material,
-              }]
-              for product in data["app"].get("products", []):
-                  product["signingConfig"] = "default"
-              print("Signing materials injected")
-          else:
-              data["app"]["signingConfigs"] = []
-              for product in data["app"].get("products", []):
-                  product.pop("signingConfig", None)
-              print("No signing secrets; building unsigned HAP")
-
+          data["app"]["signingConfigs"] = []
+          for product in data["app"].get("products", []):
+              product.pop("signingConfig", None)
           profile.write_text(json.dumps(data, indent=2) + "\n")
+          print("Cleared signingConfigs; configured for unsigned HAP build")
           PY
 
       - name: Install ohpm dependencies
@@ -125,19 +81,17 @@ jobs:
           found=0
           for src in entry/build/default/outputs/default/*.hap; do
             [ -f "$src" ] || continue
-            found=1
             base=$(basename "$src")
-            if [[ "$base" == *signed.hap ]]; then
-              kind=signed
-            else
-              kind=unsigned
+            # 严格区分未签名与签名包，避免 *signed.hap 误匹配 *unsigned.hap
+            if [[ "$base" == *unsigned.hap ]]; then
+              dest="dist/EcoHub-${version}-${short_sha}-unsigned.hap"
+              cp "$src" "$dest"
+              echo "Copied $src -> $dest"
+              found=1
             fi
-            dest="dist/EcoHub-${version}-${short_sha}-${kind}.hap"
-            cp "$src" "$dest"
-            echo "Copied $src -> $dest"
           done
           if [ "$found" -eq 0 ]; then
-            echo "No HAP produced under entry/build/default/outputs/default/" >&2
+            echo "No unsigned HAP produced under entry/build/default/outputs/default/" >&2
             ls -la entry/build/default/outputs/default/ || true
             exit 1
           fi
