@@ -22,6 +22,9 @@
         "startWindowBackground": "$color:start_window_background",
         "orientation": "auto_rotation_restricted",
         "exported": true,
+        "backgroundModes": [
+          "audioPlayback"
+        ],
         "skills": [
           {
             "entities": [
@@ -43,6 +46,9 @@
       },
       {
         "name": "ohos.permission.GET_WIFI_INFO"
+      },
+      {
+        "name": "ohos.permission.KEEP_BACKGROUND_RUNNING"
       }
     ],
     "metadata": [

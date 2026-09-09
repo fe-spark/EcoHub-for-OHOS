@@ -1,6 +1,6 @@
 import { AppTheme } from '../common/constants/AppTheme';
 import { HttpClient } from '../common/network/HttpClient';
-import { VideoPlayer } from '../components/VideoPlayer';
+import { VideoPlayer } from '../modules/player/VideoPlayer';
 import { PageHeader } from '../components/PageHeader';
 import { AppIcon } from '../components/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';

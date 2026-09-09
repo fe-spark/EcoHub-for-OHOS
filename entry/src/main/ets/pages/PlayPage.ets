@@ -8,7 +8,7 @@ import { ServerConfigManager } from '../common/utils/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { PlayerWindow } from '../common/utils/PlayerWindow';
 import { common } from '@kit.AbilityKit';
-import { VideoPlayer } from '../components/VideoPlayer';
+import { VideoPlayer } from '../modules/player/VideoPlayer';
 import { PlayDetailPanel } from '../components/PlayDetailPanel';
 import { FilmGrid } from '../components/FilmGrid';
 import { LoadingView } from '../components/LoadingView';
