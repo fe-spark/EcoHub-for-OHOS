@@ -1,11 +1,11 @@
 import { common } from '@kit.AbilityKit';
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
 import { FilmApi } from '../api/FilmApi';
 import { AppTheme } from '../common/constants/AppTheme';
 import { WindowBar } from '../common/utils/WindowBar';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
-import { VersionUpdateDialog } from '../components/VersionUpdateDialog';
-import { BasicConfig } from '../model/FilmModels';
+import { VersionUpdateDialog } from '../components/dialogs/VersionUpdateDialog';
+import { BasicConfig } from '../types/FilmModels';
 
 const MIN_SPLASH_TIME = 800;
 const PROBE_ATTEMPTS = 3;

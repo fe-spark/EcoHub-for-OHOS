@@ -1,6 +1,6 @@
 import { HttpClient } from '../common/network/HttpClient';
 import { QueryParams } from '../common/utils/QueryParams';
-import { ApiParser } from '../model/ApiParser';
+import { ApiParser } from './ApiParser';
 import {
   BasicConfig,
   CategoryItem,
@@ -11,7 +11,7 @@ import {
   MovieBasicInfo,
   PlayInfo,
   SearchResult
-} from '../model/FilmModels';
+} from '../types/FilmModels';
 
 export class FilmApi {
   private static siteConfig: BasicConfig | null = null;

@@ -1,10 +1,10 @@
 import { FilmApi } from '../api/FilmApi';
-import { MovieBasicInfo, PageInfo } from '../model/FilmModels';
+import { MovieBasicInfo, PageInfo } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { FilmCard } from '../components/FilmCard';
-import { ScrollFab } from '../components/ScrollFab';
-import { LoadingView } from '../components/LoadingView';
-import { EmptyState } from '../components/EmptyState';
+import { FilmCard } from '../components/film/FilmCard';
+import { ScrollFab } from '../components/common/ScrollFab';
+import { LoadingView } from '../components/common/LoadingView';
+import { EmptyState } from '../components/common/EmptyState';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
 

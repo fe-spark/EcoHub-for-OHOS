@@ -1,16 +1,16 @@
-import { HistoryItem } from '../model/FilmModels';
+import { HistoryItem } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
-import { HistoryManager } from '../common/utils/HistoryManager';
+import { HistoryManager } from '../services/HistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { NavUtil } from '../common/utils/NavUtil';
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { ServerConfigManager } from '../services/ServerConfigManager';
+import { SourceGuard } from '../services/SourceGuard';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
-import { PageHeader } from '../components/PageHeader';
-import { EmptyState } from '../components/EmptyState';
-import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/common/PageHeader';
+import { EmptyState } from '../components/common/EmptyState';
+import { AppIcon } from '../components/common/AppIcon';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
 

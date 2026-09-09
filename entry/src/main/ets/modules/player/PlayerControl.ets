@@ -1,4 +1,4 @@
-import { BackIcon } from '../../components/BackIcon';
+import { BackIcon } from '../../components/common/BackIcon';
 
 @Component
 export struct PlayerIconBtn {

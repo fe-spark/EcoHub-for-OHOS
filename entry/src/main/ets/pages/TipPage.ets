@@ -1,14 +1,14 @@
 import { FilmApi } from '../api/FilmApi';
 import { HttpClient } from '../common/network/HttpClient';
-import { BasicConfig, TipChannel } from '../model/FilmModels';
+import { BasicConfig, TipChannel } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
-import { PageHeader } from '../components/PageHeader';
-import { EmptyState } from '../components/EmptyState';
-import { LoadingView } from '../components/LoadingView';
-import { SourceGuard } from '../common/utils/SourceGuard';
+import { PageHeader } from '../components/common/PageHeader';
+import { EmptyState } from '../components/common/EmptyState';
+import { LoadingView } from '../components/common/LoadingView';
+import { SourceGuard } from '../services/SourceGuard';
 
 @Component
 struct TipQrImage {

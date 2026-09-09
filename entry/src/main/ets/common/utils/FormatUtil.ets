@@ -1,5 +1,5 @@
-import { BannerItem, MovieBasicInfo } from '../../model/FilmModels';
-import { ServerConfigManager } from './ServerConfigManager';
+import { BannerItem, MovieBasicInfo } from '../../types/FilmModels';
+import { ServerConfigManager } from '../../services/ServerConfigManager';
 
 export class FormatUtil {
   static text(value: string | number | undefined | null, fallback: string = ''): string {

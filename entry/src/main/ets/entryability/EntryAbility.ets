@@ -1,9 +1,9 @@
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { Breakpoint } from '../common/utils/Breakpoint';
-import { HistoryManager } from '../common/utils/HistoryManager';
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
-import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
+import { HistoryManager } from '../services/HistoryManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
+import { SiteHeartbeat } from '../services/SiteHeartbeat';
 
 
 const CUSTOM_FONT_FAMILY: string = 'CalligraphyFont';

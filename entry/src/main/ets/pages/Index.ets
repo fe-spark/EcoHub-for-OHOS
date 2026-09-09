@@ -1,20 +1,20 @@
-import { ServerConfigManager } from '../common/utils/ServerConfigManager';
+import { ServerConfigManager } from '../services/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
-import { BasicConfig } from '../model/FilmModels';
+import { BasicConfig } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { RecommendTab } from './RecommendTab';
 import { DailyUpdatesTab } from './DailyUpdatesTab';
 import { ProfileTab } from './ProfileTab';
-import { AppIcon } from '../components/AppIcon';
+import { AppIcon } from '../components/common/AppIcon';
 import { NavUtil } from '../common/utils/NavUtil';
-import { SourceGuard } from '../common/utils/SourceGuard';
-import { SiteHeartbeat } from '../common/utils/SiteHeartbeat';
+import { SourceGuard } from '../services/SourceGuard';
+import { SiteHeartbeat } from '../services/SiteHeartbeat';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
 import { HttpClient } from '../common/network/HttpClient';
-import { NoticeDialog } from '../components/NoticeDialog';
-import { VersionUpdateDialog } from '../components/VersionUpdateDialog';
+import { NoticeDialog } from '../components/dialogs/NoticeDialog';
+import { VersionUpdateDialog } from '../components/dialogs/VersionUpdateDialog';
 
 @Entry
 @Component

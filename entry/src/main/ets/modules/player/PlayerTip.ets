@@ -1,6 +1,6 @@
 import { AppTheme } from '../../common/constants/AppTheme';
 import { PlayerSpeed } from './PlayerSpeed';
-import { AppIcon } from '../../components/AppIcon';
+import { AppIcon } from '../../components/common/AppIcon';
 import { PlayerTipKind } from './PlayerPan';
 import { PlayerScale, PlayerScaleItem, PlayerScaleMode } from './PlayerScale';
 

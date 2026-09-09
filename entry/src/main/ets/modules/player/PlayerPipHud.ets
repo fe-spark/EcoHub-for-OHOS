@@ -1,4 +1,4 @@
-import { AppIcon } from '../../components/AppIcon';
+import { AppIcon } from '../../components/common/AppIcon';
 import { PlayerBackBtn } from './PlayerControl';
 
 @Component

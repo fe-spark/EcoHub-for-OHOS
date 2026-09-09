@@ -1,10 +1,10 @@
 import { AppTheme } from '../common/constants/AppTheme';
 import { HttpClient } from '../common/network/HttpClient';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
-import { PageHeader } from '../components/PageHeader';
-import { AppIcon } from '../components/AppIcon';
+import { PageHeader } from '../components/common/PageHeader';
+import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
-import { PlayerWindow } from '../common/utils/PlayerWindow';
+import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { Breakpoint } from '../common/utils/Breakpoint';
 import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { common } from '@kit.AbilityKit';
