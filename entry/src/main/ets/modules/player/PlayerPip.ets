@@ -237,6 +237,7 @@ export class PlayerPip {
           this.isPipActive = false;
           this.stopContinuousTask();
           this.delegate?.onPipActiveChanged?.(false);
+          this.delegate?.onClosed?.();
           break;
       }
     });
