@@ -114,7 +114,8 @@ export struct VideoPlayer {
   }
 
   private syncPipAutoStart(): void {
-    const canAuto = this.settingPipAutoStart &&
+    const canAuto = this.pip.isReady &&
+      this.settingPipAutoStart &&
       !this.isCasting() &&
       !!this.videoUrl &&
       !this.state.errorText &&
@@ -165,24 +166,24 @@ export struct VideoPlayer {
 
   private setupPlayerAvListener(): void {
     this.playerAv.listener.onPrepared = (dur: number) => {
-      this.syncPipAutoStart();
       if (this.observer) this.observer.handlePrepared(dur);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onStart = () => {
-      this.syncPipAutoStart();
-      this.pip.syncPlayStatus(true);
       if (this.observer) this.observer.handleStart();
+      this.pip.syncPlayStatus(true);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onPause = () => {
-      this.syncPipAutoStart();
-      this.pip.syncPlayStatus(false);
       if (this.observer) this.observer.handlePause();
+      this.pip.syncPlayStatus(false);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onTime = (time: number) => { if (this.observer) this.observer.handleTime(time); };
     this.playerAv.listener.onFinish = () => {
-      this.syncPipAutoStart();
-      this.pip.syncPlayStatus(false);
       if (this.observer) this.observer.handleFinish();
+      this.pip.syncPlayStatus(false);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onError = (detail?: string) => {
       this.pip.setAutoStart(false);
@@ -201,6 +202,7 @@ export struct VideoPlayer {
 
   aboutToDisappear() {
     this.clearPendingHidePause();
+    this.pip.setAutoStart(false);
     if (this.pip.active) {
       this.pip.stop().catch((_e: Object) => {});
     }
@@ -651,7 +653,12 @@ export struct VideoPlayer {
           }
         }
       }
-    );
+    ).then((success: boolean) => {
+      if (success) {
+        this.pip.syncPlayStatus(this.state.isPlaying || this.isPlaying);
+        this.syncPipAutoStart();
+      }
+    });
   }
 
   private syncPipControls(): void {

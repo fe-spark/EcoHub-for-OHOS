@@ -146,7 +146,7 @@ export struct SearchSuggestPane {
       .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
     }
     .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
+    .edgeEffect(EdgeEffect.None)
     .align(Alignment.Top)
     .layoutWeight(1)
   }

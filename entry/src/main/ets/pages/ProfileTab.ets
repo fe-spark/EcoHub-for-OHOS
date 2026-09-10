@@ -458,7 +458,7 @@ export struct ProfileTab {
     .width('100%')
     .height('100%')
     .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
+    .edgeEffect(EdgeEffect.None)
     .align(Alignment.Top)
     .backgroundColor(AppTheme.BG)
   }

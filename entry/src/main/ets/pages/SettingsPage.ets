@@ -179,6 +179,7 @@ struct SettingsPage {
             this.sectionTitle('通用')
 
             Column() {
+              /*
               // 2.1 剪贴板识别
               Row() {
                 Column({ space: 4 }) {
@@ -206,6 +207,7 @@ struct SettingsPage {
               .alignItems(VerticalAlign.Center)
 
               this.cardDivider()
+              */
 
               // 2.2 清理缓存
               Row() {
@@ -253,7 +255,7 @@ struct SettingsPage {
       .layoutWeight(1)
       .width('100%')
       .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
+      .edgeEffect(EdgeEffect.None)
       .align(Alignment.Top)
     }
     .width('100%')

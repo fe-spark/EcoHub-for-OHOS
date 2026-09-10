@@ -252,6 +252,7 @@ struct PlayerCastPicker {
         .width('100%')
         .constraintSize({ maxHeight: this.isLandscape() ? 140 : 280 })
         .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
       }
     }
     .width('100%')

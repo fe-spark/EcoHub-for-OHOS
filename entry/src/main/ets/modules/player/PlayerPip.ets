@@ -24,6 +24,7 @@ export class PlayerPip {
   private desiredWidth: number = 0;
   private desiredHeight: number = 0;
   private desiredPlayStatus: boolean = false;
+  private isDestroyed: boolean = false;
 
   constructor() {
     this.isSupported = PiPWindow.isPiPEnabled();
@@ -40,6 +41,10 @@ export class PlayerPip {
 
   get autoStart(): boolean {
     return this.desiredAutoStart;
+  }
+
+  get isReady(): boolean {
+    return this.pipController !== null && !this.isDestroyed;
   }
 
   /**
@@ -74,7 +79,16 @@ export class PlayerPip {
 
     try {
       console.info(`[PlayerPip] 调用 PiPWindow.create 开始...`);
-      this.pipController = await PiPWindow.create(config);
+      const controller = await PiPWindow.create(config);
+      if (this.isDestroyed) {
+        console.info('[PlayerPip] PiPController 创建完成前实例已被销毁，立即关闭并释放');
+        try {
+          controller.setAutoStartEnabled(false);
+          controller.stopPiP().catch((_e: Object) => {});
+        } catch (_e) {}
+        return false;
+      }
+      this.pipController = controller;
       this.bindEvents();
       console.info(`[PlayerPip] PiPController 创建成功, desiredAutoStart: ${this.desiredAutoStart}`);
       if (this.desiredAutoStart) {
@@ -96,6 +110,9 @@ export class PlayerPip {
    * 开启或关闭退后台自动切画中画
    */
   setAutoStart(enable: boolean): void {
+    if (this.desiredAutoStart === enable && this.pipController !== null) {
+      return;
+    }
     this.desiredAutoStart = enable;
     if (!this.pipController) {
       console.info(`[PlayerPip] setAutoStart 暂存状态: ${enable} (pipController 正在创建中)`);
@@ -294,6 +311,7 @@ export class PlayerPip {
   }
 
   destroy(): void {
+    this.isDestroyed = true;
     this.setAutoStart(false);
     if (this.pipController) {
       try {

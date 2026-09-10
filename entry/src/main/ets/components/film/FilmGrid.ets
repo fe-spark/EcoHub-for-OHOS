@@ -41,7 +41,7 @@ export struct FilmGrid {
     .rowsGap(12)
     .width('100%')
     .scrollBar(BarState.Off)
-    .edgeEffect(this.embedInScroll || this.nestedRefresh ? EdgeEffect.None : EdgeEffect.Spring)
+    .edgeEffect(EdgeEffect.None)
     .nestedScroll({
       scrollForward: NestedScrollMode.SELF_FIRST,
       scrollBackward: NestedScrollMode.SELF_FIRST

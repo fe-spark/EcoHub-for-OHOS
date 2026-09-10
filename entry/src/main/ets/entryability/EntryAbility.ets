@@ -38,7 +38,7 @@ export default class EntryAbility extends UIAbility {
     Promise.all([
       ServerConfigManager.getInstance().init(this.context),
       AppSettingsManager.getInstance().init(this.context),
-      ClipboardSniffer.init(this.context)
+      // ClipboardSniffer.init(this.context)
     ]).then(() => {
       return HistoryManager.migrateLegacy();
     }).then(() => {
