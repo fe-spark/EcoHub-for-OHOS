@@ -133,7 +133,7 @@ export struct NoticeDialog {
           }
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Auto)
-          .edgeEffect(EdgeEffect.Spring)
+          .edgeEffect(EdgeEffect.None)
           .constraintSize({ maxHeight: this.contentMaxHeight() })
           .width('100%')
           .padding(AppTheme.SPACE_MD)

@@ -31,12 +31,13 @@ struct Index {
   @StorageLink('HAS_APP_UPDATE') private hasAppUpdate: boolean = false;
   @StorageLink('SHOW_APP_UPDATE_DIALOG') private showUpdateDialog: boolean = false;
   @StorageLink('APP_UPDATE_INFO') private updateInfo: AppUpdateInfo = {
-    currentVersion: '', latestVersion: '', hasUpdate: false,
-    releaseName: '', releaseNotes: '', releaseUrl: '', downloadUrl: ''
+    currentVersion: '', latestVersion: '', hasUpdate: false, releaseName: '', releaseNotes: '', releaseUrl: '', downloadUrl: ''
   };
   private hasDismissedNotice: boolean = false;
   @State private tabReady: boolean[] = [true, false, false];
   @State private showClipBanner: boolean = false;
+  private isPageActive: boolean = false;
+  private clipBannerTimer: number = -1;
   @StorageLink('APP_FOREGROUND_TICK') @Watch('onForegroundTick') private fgTick: number = 0;
   @StorageLink('CLIPBOARD_UPDATE_TICK') @Watch('onClipboardUpdateTick') private clipUpdateTick: number = 0;
   @State private topInset: number = 0;
@@ -96,64 +97,124 @@ struct Index {
     if (!url) {
       try {
         this.getUIContext().getRouter().replaceUrl({ url: 'pages/ServerConfigPage' });
-      } catch (_e) {
-      }
+      } catch (_e) {}
       return;
     }
     await this.loadSite(false);
     HttpClient.getInstance().trackView('browse', '', 'IndexPage');
     SiteHeartbeat.getInstance().start();
-    this.reconnectCb = () => {
-      this.loadSite(false);
-    };
+    this.reconnectCb = () => this.loadSite(false);
     SourceGuard.onReconnect(this.reconnectCb);
-    this.checkClipboardSniffer();
+    // this.checkClipboardSniffer();
+  }
+
+  private clearClipBannerTimer(): void {
+    if (this.clipBannerTimer !== -1) {
+      clearTimeout(this.clipBannerTimer);
+      this.clipBannerTimer = -1;
+    }
+  }
+
+  private dismissClipBanner(markDismissed: boolean = false): void {
+    this.clearClipBannerTimer();
+    this.showClipBanner = false;
+    if (markDismissed) {
+      ClipboardSniffer.markDismissed();
+    }
+  }
+
+  private showClipBannerWithTimeout(): void {
+    this.clearClipBannerTimer();
+    this.showClipBanner = true;
+    this.clipBannerTimer = setTimeout(() => {
+      if (this.showClipBanner) {
+        this.dismissClipBanner(true);
+      }
+    }, 6000);
+  }
+
+  private async handlePasteClick(result: PasteButtonOnClickResult): Promise<void> {
+    this.dismissClipBanner(true);
+    const res = await ClipboardSniffer.sniff();
+    const target = res.url || res.raw;
+    if (target) {
+      ClipboardSniffer.markHandled(res.raw);
+      try {
+        this.getUIContext().getPromptAction().showToast({
+          message: res.url ? '已提取播放链接并跳转' : '已提取剪贴板并跳转'
+        });
+        NavUtil.openCustomPlayer(target, this.getUIContext());
+      } catch (_e) {}
+    } else if (result === PasteButtonOnClickResult.SUCCESS) {
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '剪贴板暂无内容' });
+      } catch (_e) {}
+    }
   }
 
   private onForegroundTick(): void {
-    this.checkClipboardSniffer();
+    // if (this.isPageActive) this.checkClipboardSniffer(true);
   }
 
   private onClipboardUpdateTick(): void {
-    this.checkClipboardSniffer();
+    // if (this.isPageActive) this.checkClipboardSniffer(false);
   }
 
-  private checkClipboardSniffer(): void {
-    if (!ClipboardSniffer.shouldShowBanner()) {
-      this.showClipBanner = false;
+  private syncBannerState(isForegroundEvent: boolean = false): void {
+    if (this.isPageActive && ClipboardSniffer.shouldShowBanner(isForegroundEvent)) {
+      this.showClipBannerWithTimeout();
+    } else {
+      this.dismissClipBanner(false);
+    }
+  }
+
+  private checkClipboardSniffer(isForegroundEvent: boolean = false): void {
+    if (!this.isPageActive || AppStorage.get<boolean>('SETTING_CLIPBOARD_SNIFFER') === false) {
+      this.dismissClipBanner(false);
       return;
     }
-    // 优先静默提取（应用内复制或特定已获权场景）
+    if (!ClipboardSniffer.shouldShowBanner(isForegroundEvent)) {
+      this.dismissClipBanner(false);
+      return;
+    }
     ClipboardSniffer.sniff().then((res) => {
+      if (!this.isPageActive) return;
       if (res.url && !ClipboardSniffer.isHandled(res.raw)) {
         ClipboardSniffer.markHandled(res.raw);
-        this.showClipBanner = false;
+        this.dismissClipBanner(false);
         try {
           this.getUIContext().getPromptAction().showToast({ message: '检测到播放链接，正在跳转...' });
           NavUtil.openCustomPlayer(res.url, this.getUIContext());
-        } catch (_e) {
-        }
+        } catch (_e) {}
         return;
       }
-      this.showClipBanner = ClipboardSniffer.shouldShowBanner();
+      if (res.raw && ClipboardSniffer.isHandled(res.raw)) {
+        this.dismissClipBanner(false);
+        return;
+      }
+      this.syncBannerState(isForegroundEvent);
     }).catch(() => {
-      this.showClipBanner = ClipboardSniffer.shouldShowBanner();
+      this.syncBannerState(isForegroundEvent);
     });
   }
 
   onPageShow(): void {
+    this.isPageActive = true;
     this.applyWindowBar();
     if (this.ready) {
       this.loadSite(false);
     }
     SiteHeartbeat.getInstance().start();
-    this.checkClipboardSniffer();
   }
 
   onPageHide(): void {
+    this.isPageActive = false;
+    this.dismissClipBanner(false);
   }
 
   aboutToDisappear(): void {
+    this.isPageActive = false;
+    this.clearClipBannerTimer();
     FilmApi.offConfigChange(this.configCb);
     SourceGuard.offReconnect(this.reconnectCb);
   }
@@ -297,8 +358,7 @@ struct Index {
               .onClick(() => {
                 try {
                   this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
-                } catch (_e) {
-                }
+                } catch (_e) {}
               })
             }
             .width('100%')
@@ -331,6 +391,7 @@ struct Index {
           .width('100%')
           .layoutWeight(1)
 
+          /*
           if (this.showClipBanner && this.ready && this.siteOpen) {
             Row() {
               Row({ space: 8 }) {
@@ -353,45 +414,8 @@ struct Index {
                 .backgroundColor(AppTheme.ACCENT)
                 .fontColor(Color.White)
                 .iconColor(Color.White)
-                .onClick(async (_event: ClickEvent, result: PasteButtonOnClickResult) => {
-                  console.info(`[Index] PasteButton clicked, result=${result}`);
-                  if (result === PasteButtonOnClickResult.SUCCESS) {
-                    const res = await ClipboardSniffer.sniff();
-                    console.info(`[Index] sniff res: url=${res.url}, raw=${res.raw}`);
-                    this.showClipBanner = false;
-                    ClipboardSniffer.markHandled(res.raw);
-                    if (res.url) {
-                      try {
-                        this.getUIContext().getPromptAction().showToast({ message: '已提取播放链接并跳转' });
-                        NavUtil.openCustomPlayer(res.url, this.getUIContext());
-                      } catch (_e) {
-                      }
-                    } else if (res.raw) {
-                      try {
-                        this.getUIContext().getPromptAction().showToast({ message: '已提取剪贴板并跳转' });
-                        NavUtil.openCustomPlayer(res.raw, this.getUIContext());
-                      } catch (_e) {
-                      }
-                    } else {
-                      try {
-                        this.getUIContext().getPromptAction().showToast({ message: '剪贴板暂无内容' });
-                      } catch (_e) {
-                      }
-                    }
-                  } else {
-                    console.warn(`[Index] PasteButton auth result: ${result}`);
-                    try {
-                      const res = await ClipboardSniffer.sniff();
-                      if (res.url || res.raw) {
-                        this.showClipBanner = false;
-                        ClipboardSniffer.markHandled(res.raw);
-                        NavUtil.openCustomPlayer(res.url || res.raw, this.getUIContext());
-                        return;
-                      }
-                    } catch (_e) {}
-                    this.showClipBanner = false;
-                    ClipboardSniffer.markDismissed();
-                  }
+                .onClick((_event: ClickEvent, result: PasteButtonOnClickResult) => {
+                  this.handlePasteClick(result);
                 })
 
               Row() {
@@ -400,8 +424,7 @@ struct Index {
               .padding(8)
               .margin({ left: 6 })
               .onClick(() => {
-                this.showClipBanner = false;
-                ClipboardSniffer.markDismissed();
+                this.dismissClipBanner(true);
               })
             }
             .width('92%')
@@ -414,6 +437,7 @@ struct Index {
             .border({ width: 0.5, color: 'rgba(255,255,255,0.12)' })
             .margin({ top: 4, bottom: 8 })
           }
+          */
 
           Column() {
             Row() {

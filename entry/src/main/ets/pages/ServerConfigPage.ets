@@ -453,7 +453,7 @@ struct ServerConfigPage {
         .layoutWeight(1)
         .width('100%')
         .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring)
+        .edgeEffect(EdgeEffect.None)
         .onClick(() => {
           try {
             this.inputController.stopEditing();
@@ -615,7 +615,7 @@ struct ServerConfigPage {
               .width('100%')
               .constraintSize({ maxHeight: 220 })
               .scrollBar(BarState.Auto)
-              .edgeEffect(EdgeEffect.Spring)
+              .edgeEffect(EdgeEffect.None)
               .padding({ left: 16, right: 16, bottom: 12 })
             }
 

@@ -15,6 +15,8 @@ import { SourceGuard } from '../services/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
+import { FloatingRefreshIndicator } from '../components/common/FloatingRefreshIndicator';
+import { FilterNavHeader, FilterSelectedTag } from '../components/film/FilterNavHeader';
 
 @Entry
 @Component
@@ -29,6 +31,10 @@ struct FilterPage {
   @State private listLoading: boolean = false;
   @State private loadingMore: boolean = false;
   @State private refreshing: boolean = false;
+  @State private pullDistance: number = 0;
+  @State private isPulling: boolean = false;
+  private touchStartY: number = 0;
+  private touchStartX: number = 0;
   @State private errorText: string = '';
   @State private sortList: string[] = [];
   @State private titleKeys: string[] = [];
@@ -84,9 +90,8 @@ struct FilterPage {
   }
 
   private isChipOn(key: string, value: string): boolean {
-    let current = this.selectedOf(key);
-    if (key === 'Sort' && !current) current = 'update_stamp';
-    return current === value;
+    const current = this.selectedOf(key);
+    return (key === 'Sort' && !current ? 'update_stamp' : current) === value;
   }
 
   private setSelected(key: string, value: string): void {
@@ -104,9 +109,7 @@ struct FilterPage {
   }
 
   private pick(key: string, value: string): void {
-    if (this.isChipOn(key, value) || this.fetchLock) {
-      return;
-    }
+    if (this.isChipOn(key, value) || this.fetchLock) return;
     this.setSelected(key, value);
     this.loadData(true, false);
     this.scrollToTop();
@@ -169,6 +172,7 @@ struct FilterPage {
       this.loading = false;
       this.listLoading = false;
       this.refreshing = false;
+      this.pullDistance = 0;
       return;
     }
     const page = reset ? 1 : this.current + 1;
@@ -188,8 +192,10 @@ struct FilterPage {
       this.loadingMore = true;
     }
     let ok = false;
+    const minDelay = fromPull ? new Promise<void>((resolve) => setTimeout(resolve, 450)) : Promise.resolve();
     try {
       const result = await FilmApi.getFilter(this.buildQuery(page));
+      if (fromPull) await minDelay;
       this.applyResult(result, reset);
       this.errorText = this.titleName ? '' : '当前分类已失效';
       ok = !this.errorText;
@@ -202,7 +208,12 @@ struct FilterPage {
       this.loading = false;
       this.listLoading = false;
       this.loadingMore = false;
-      this.refreshing = false;
+      this.getUIContext()?.animateTo({ duration: 240, curve: Curve.EaseIn }, () => {
+        this.pullDistance = 0;
+      });
+      setTimeout(() => {
+        this.refreshing = false;
+      }, 240);
       if (fromPull && ok) {
         RefreshHint.succeed();
       }
@@ -225,26 +236,22 @@ struct FilterPage {
   }
 
   private labelOf(key: string, value: string): string {
-    if (!value) {
-      return '';
-    }
+    if (!value) return '';
     const values = this.valuesOf(key);
     const names = this.namesOf(key);
     for (let i = 0; i < values.length; i++) {
-      if (values[i] === value) {
-        return names[i] || value;
-      }
+      if (values[i] === value) return names[i] || value;
     }
     return value;
   }
 
-  private selectedTagKeys(): string[] {
-    const keys: string[] = [];
+  private selectedTags(): FilterSelectedTag[] {
+    const keys: FilterSelectedTag[] = [];
     for (let i = 0; i < this.sortList.length; i++) {
       const key = this.sortList[i];
       const label = this.labelOf(key, this.selectedFor(key));
       if (label && label !== '全部') {
-        keys.push(key);
+        keys.push({ key: key, label: label });
       }
     }
     return keys;
@@ -266,6 +273,64 @@ struct FilterPage {
     }
   }
 
+  private handleTouch(event: TouchEvent): void {
+    if (this.refreshing || this.fetchLock || this.loading) {
+      return;
+    }
+    if (event.type === TouchType.Down) {
+      this.touchStartY = event.touches[0].y;
+      this.touchStartX = event.touches[0].x;
+      this.isPulling = false;
+    } else if (event.type === TouchType.Move) {
+      let scrollY: number = 0;
+      try {
+        scrollY = this.scroller.currentOffset().yOffset;
+      } catch (_e) {
+        scrollY = 0;
+      }
+
+      const currentY = event.touches[0].y;
+      const currentX = event.touches[0].x;
+
+      if (scrollY > 0) {
+        this.touchStartY = currentY;
+        this.touchStartX = currentX;
+        if (this.isPulling) {
+          this.isPulling = false;
+          this.pullDistance = 0;
+        }
+        return;
+      }
+
+      const deltaY = currentY - this.touchStartY;
+      const deltaX = Math.abs(currentX - this.touchStartX);
+
+      if (scrollY <= 0 && deltaY > 0 && deltaY > deltaX) {
+        this.isPulling = true;
+        const damping = 0.42;
+        this.pullDistance = Math.min(68, deltaY * damping);
+      } else if (this.isPulling && deltaY <= 0) {
+        this.isPulling = false;
+        this.pullDistance = 0;
+      }
+    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      if (this.isPulling) {
+        this.isPulling = false;
+        if (this.pullDistance >= 46 && !this.fetchLock) {
+          this.refreshing = true;
+          this.getUIContext()?.animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+            this.pullDistance = 46;
+          });
+          this.loadData(true, true);
+        } else {
+          this.getUIContext()?.animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+            this.pullDistance = 0;
+          });
+        }
+      }
+    }
+  }
+
   @Builder
   filmCell(index: number) {
     if (index < this.films.length) {
@@ -273,9 +338,7 @@ struct FilterPage {
         .layoutWeight(1)
         .constraintSize({ minWidth: 0 })
     } else {
-      Column()
-        .layoutWeight(1)
-        .constraintSize({ minWidth: 0 })
+      Column().layoutWeight(1).constraintSize({ minWidth: 0 })
     }
   }
 
@@ -288,183 +351,115 @@ struct FilterPage {
     }
     .width('100%')
     .alignItems(VerticalAlign.Top)
-    .padding({
-      left: AppTheme.SPACE_MD,
-      right: AppTheme.SPACE_MD,
-      bottom: AppTheme.SPACE_MD
-    })
+    .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD, bottom: AppTheme.SPACE_MD })
   }
 
   @Builder
   navHeader() {
-    Row() {
-      Row() {
-        BackIcon({ color: AppTheme.TEXT_PRIMARY, iconSize: 24 })
-      }
-      .width(32)
-      .height(32)
-      .justifyContent(FlexAlign.Center)
-      .onClick(() => {
+    FilterNavHeader({
+      total: this.total,
+      tags: this.selectedTags(),
+      onBack: () => {
         try {
           this.getUIContext().getRouter().back();
-        } catch (_e) {
-        }
-      })
-
-      List({ space: AppTheme.SPACE_SM }) {
-        ForEach(this.selectedTagKeys(), (key: string) => {
-          ListItem() {
-            Text(this.labelOf(key, this.selectedFor(key)))
-              .fontSize(12)
-              .fontColor(AppTheme.ACCENT)
-              .height(28)
-              .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD })
-              .backgroundColor(Color.Transparent)
-              .border({ width: 1, color: AppTheme.ACCENT })
-              .borderRadius(AppTheme.RADIUS_PILL)
-          }
-        }, (key: string) => `nav_tag_${key}`)
+        } catch (_e) {}
       }
-      .listDirection(Axis.Horizontal)
-      .layoutWeight(1)
-      .constraintSize({ minWidth: 0 })
-      .height(28)
-      .contentEndOffset(AppTheme.SPACE_SM)
-      .scrollBar(BarState.Off)
-      .nestedScroll({
-        scrollForward: NestedScrollMode.SELF_FIRST,
-        scrollBackward: NestedScrollMode.SELF_FIRST
-      })
-      .alignListItem(ListItemAlign.Center)
-      .margin({ left: AppTheme.SPACE_XS })
-
-      if (this.total > 0) {
-        Text(`共 ${this.total} 部`)
-          .fontSize(12)
-          .fontColor(AppTheme.TEXT_MUTED)
-          .margin({ left: AppTheme.SPACE_SM })
-      }
-    }
-    .width('100%')
-    .height(48)
-    .padding({ left: AppTheme.SPACE_SM, right: AppTheme.SPACE_LG })
-    .alignItems(VerticalAlign.Center)
-    .backgroundColor(AppTheme.BG)
+    })
   }
 
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
         if (this.loading) {
-          Row() {
-            Row() {
-              BackIcon({ color: AppTheme.TEXT_PRIMARY, iconSize: 24 })
-            }
-            .width(32)
-            .height(32)
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => {
+          FilterNavHeader({
+            total: 0,
+            tags: [],
+            onBack: () => {
               try {
                 this.getUIContext().getRouter().back();
-              } catch (_e) {
-              }
-            })
-          }
-          .width('100%')
-          .height(48)
-          .padding({ left: AppTheme.SPACE_SM })
-          .alignItems(VerticalAlign.Center)
+              } catch (_e) {}
+            }
+          })
           LoadingView({ label: '加载中' })
         } else {
-          Refresh({ refreshing: $$this.refreshing }) {
-            List({ scroller: this.scroller }) {
-              ListItem() {
-                Column() {
-                  ForEach(this.sortList, (key: string) => {
-                    FilterTagRow({
-                      filterKey: key,
-                      title: this.titleOf(key),
-                      names: this.namesOf(key),
-                      values: this.valuesOf(key),
-                      selected: this.selectedFor(key),
-                      onPick: (k: string, v: string) => {
-                        this.pick(k, v);
-                      }
-                    })
-                  }, (key: string) => `row_${key}`)
-                }
-                .width('100%')
-                .alignItems(HorizontalAlign.Start)
-                .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_SM })
-                .backgroundColor(AppTheme.BG_ELEVATED)
-              }
-
-              ListItemGroup({ header: this.navHeader }) {
-                if (this.listLoading) {
-                  ListItem() {
-                    LoadingView({ label: '列表加载中' })
-                  }
-                } else if (this.errorText) {
-                  ListItem() {
-                    EmptyState({
-                      title: '加载失败',
-                      subtitle: this.errorText,
-                      icon: $r('sys.symbol.info_circle')
-                    })
-                  }
-                } else if (this.films.length === 0) {
-                  ListItem() {
-                    EmptyState({ title: '没有符合条件的影片', icon: $r('sys.symbol.film') })
-                  }
-                } else {
-                  ForEach(this.rowIds(), (row: number) => {
-                    ListItem() {
-                      this.filmRow(row)
+          List({ scroller: this.scroller }) {
+            ListItem() {
+              Column() {
+                ForEach(this.sortList, (key: string) => {
+                  FilterTagRow({
+                    filterKey: key,
+                    title: this.titleOf(key),
+                    names: this.namesOf(key),
+                    values: this.valuesOf(key),
+                    selected: this.selectedFor(key),
+                    onPick: (k: string, v: string) => {
+                      this.pick(k, v);
                     }
-                  }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
-                }
+                  })
+                }, (key: string) => `row_${key}`)
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Start)
+              .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_SM })
+              .backgroundColor(AppTheme.BG_ELEVATED)
+            }
 
+            ListItemGroup({ header: this.navHeader }) {
+              if (this.listLoading) {
                 ListItem() {
-                  Text(this.loadingMore ? '加载中...' : (this.current >= this.pageCount ? '没有更多了' : ''))
-                    .fontSize(12)
-                    .fontColor(AppTheme.TEXT_MUTED)
-                    .width('100%')
-                    .height(40)
-                    .textAlign(TextAlign.Center)
+                  LoadingView({ label: '列表加载中' })
                 }
+              } else if (this.errorText) {
+                ListItem() {
+                  EmptyState({
+                    title: '加载失败',
+                    subtitle: this.errorText,
+                    icon: $r('sys.symbol.info_circle')
+                  })
+                }
+              } else if (this.films.length === 0) {
+                ListItem() {
+                  EmptyState({ title: '没有符合条件的影片', icon: $r('sys.symbol.film') })
+                }
+              } else {
+                ForEach(this.rowIds(), (row: number) => {
+                  ListItem() {
+                    this.filmRow(row)
+                  }
+                }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
+              }
+
+              ListItem() {
+                Text(this.loadingMore ? '加载中...' : (this.current >= this.pageCount ? '没有更多了' : ''))
+                  .fontSize(12)
+                  .fontColor(AppTheme.TEXT_MUTED)
+                  .width('100%')
+                  .height(40)
+                  .textAlign(TextAlign.Center)
               }
             }
-            .sticky(StickyStyle.Header)
-            .width('100%')
-            .height('100%')
-            .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.None)
-            .nestedScroll({
-              scrollForward: NestedScrollMode.SELF_FIRST,
-              scrollBackward: NestedScrollMode.SELF_FIRST
-            })
-            .onAreaChange((_oldValue: Area, newValue: Area) => {
-              const h = Number(newValue.height);
-              if (h > 0) {
-                this.listHeight = h;
-              }
-            })
-            .onDidScroll((_offset: number, _state: ScrollState) => {
-              this.syncTopFab(this.scroller.currentOffset().yOffset);
-            })
-            .onReachEnd(() => {
-              this.loadData(false);
-            })
           }
-          .onRefreshing(() => {
-            if (this.fetchLock) {
-              this.refreshing = false;
-              return;
-            }
-            this.loadData(true, true);
-          })
-          .pullToRefresh(!this.fetchLock)
+          .sticky(StickyStyle.Header)
+          .width('100%')
           .layoutWeight(1)
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.None)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          })
+          .onAreaChange((_oldValue: Area, newValue: Area) => {
+            const h = Number(newValue.height);
+            if (h > 0) {
+              this.listHeight = h;
+            }
+          })
+          .onDidScroll((_offset: number, _state: ScrollState) => {
+            this.syncTopFab(this.scroller.currentOffset().yOffset);
+          })
+          .onReachEnd(() => {
+            this.loadData(false);
+          })
         }
       }
       .width('100%')
@@ -476,6 +471,12 @@ struct FilterPage {
         right: this.rightInset
       })
       .backgroundColor(AppTheme.BG)
+
+      FloatingRefreshIndicator({
+        pullDistance: this.pullDistance,
+        refreshing: this.refreshing,
+        topOffset: this.topInset + 16
+      })
 
       if (!this.loading) {
         ScrollFab({
@@ -491,5 +492,8 @@ struct FilterPage {
     }
     .width('100%')
     .height('100%')
+    .onTouch((event: TouchEvent) => {
+      this.handleTouch(event);
+    })
   }
 }

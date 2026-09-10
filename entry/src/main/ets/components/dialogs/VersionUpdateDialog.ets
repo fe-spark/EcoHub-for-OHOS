@@ -177,7 +177,7 @@ export struct VersionUpdateDialog {
           .layoutWeight(1)
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Auto)
-          .edgeEffect(EdgeEffect.Spring)
+          .edgeEffect(EdgeEffect.None)
           .constraintSize({ minHeight: 60, maxHeight: this.notesMaxHeight() })
           .width('100%')
           .padding(AppTheme.SPACE_MD)

@@ -114,10 +114,12 @@ export struct VideoPlayer {
   }
 
   private syncPipAutoStart(): void {
-    const canAuto = this.settingPipAutoStart &&
+    const canAuto = this.pip.isReady &&
+      this.settingPipAutoStart &&
       !this.isCasting() &&
       !!this.videoUrl &&
       !this.state.errorText &&
+      this.state.isPlaying &&
       (!this.state.completed || this.hasNext);
     this.pip.setAutoStart(canAuto);
   }
@@ -165,27 +167,32 @@ export struct VideoPlayer {
 
   private setupPlayerAvListener(): void {
     this.playerAv.listener.onPrepared = (dur: number) => {
-      this.syncPipAutoStart();
       if (this.observer) this.observer.handlePrepared(dur);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onStart = () => {
-      this.syncPipAutoStart();
-      this.pip.syncPlayStatus(true);
       if (this.observer) this.observer.handleStart();
+      this.pip.syncPlayStatus(true);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onPause = () => {
-      this.syncPipAutoStart();
-      this.pip.syncPlayStatus(false);
       if (this.observer) this.observer.handlePause();
+      this.pip.syncPlayStatus(false);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onTime = (time: number) => { if (this.observer) this.observer.handleTime(time); };
     this.playerAv.listener.onFinish = () => {
-      this.syncPipAutoStart();
-      this.pip.syncPlayStatus(false);
       if (this.observer) this.observer.handleFinish();
+      this.pip.syncPlayStatus(false);
+      this.syncPipAutoStart();
     };
     this.playerAv.listener.onError = (detail?: string) => {
       this.pip.setAutoStart(false);
+      if (this.pip.active) {
+        console.info('[VideoPlayer] 播放出错时画中画激活中，关闭画中画回页面展示错误');
+        this.pip.stop().catch((_e: Object) => {});
+        this.bringAppToFront();
+      }
       if (this.observer) this.observer.handleError(detail);
     };
     this.playerAv.listener.onSeeked = (timeSec: number, seq: number) => { if (this.observer) this.observer.handleSeeked(timeSec, seq); };
@@ -201,6 +208,7 @@ export struct VideoPlayer {
 
   aboutToDisappear() {
     this.clearPendingHidePause();
+    this.pip.setAutoStart(false);
     if (this.pip.active) {
       this.pip.stop().catch((_e: Object) => {});
     }
@@ -231,9 +239,11 @@ export struct VideoPlayer {
   onReloadTokenChange(): void { this.handleSourceChange(); }
 
   private handleSourceChange(): void {
-    if (this.pageActive && this.pip.active) {
-      console.info('[VideoPlayer] 页面内切换片源，停止画中画恢复原位');
+    if (this.pip.active) {
+      console.info('[VideoPlayer] 切换片源时画中画激活中，关闭画中画并回页面加载');
+      this.isRestoring = true;
       this.pip.stop().catch((_e: Object) => {});
+      this.bringAppToFront();
     }
     if (this.ctrl().handleSourceChange()) {
       this.syncCastUi();
@@ -241,6 +251,23 @@ export struct VideoPlayer {
     }
     this.resetPlayState();
     this.remountPlayer();
+  }
+
+  private bringAppToFront(): void {
+    const ctx = this.ctx();
+    if (!ctx) {
+      return;
+    }
+    const bundleName = ctx.abilityInfo?.bundleName || ctx.applicationInfo?.name || 'com.ecohub.spark';
+    if (!bundleName) {
+      return;
+    }
+    ctx.startAbility({
+      bundleName: bundleName,
+      abilityName: 'EntryAbility'
+    }).catch((err: Object) => {
+      console.warn(`[VideoPlayer] 拉起应用前台失败: ${JSON.stringify(err)}`);
+    });
   }
 
   private observerHost(): PlayerObserverHost {
@@ -481,6 +508,10 @@ export struct VideoPlayer {
       if (this.state.live() && this.state.opening && !this.state.ready && !this.state.errorText) {
         console.warn('[VideoPlayer] 视频打开超时(15s)，触发自动降级 failOpen 并释放播放器');
         this.watcher.clearSeekWatch();
+        if (this.pip.active) {
+          this.pip.stop().catch((_e: Object) => {});
+          this.bringAppToFront();
+        }
         this.state.failOpen(this.videoUrl, 'Timeout (15s)');
         this.playerAv.release();
         this.syncFromState();
@@ -651,7 +682,12 @@ export struct VideoPlayer {
           }
         }
       }
-    );
+    ).then((success: boolean) => {
+      if (success) {
+        this.pip.syncPlayStatus(this.state.isPlaying || this.isPlaying);
+        this.syncPipAutoStart();
+      }
+    });
   }
 
   private syncPipControls(): void {

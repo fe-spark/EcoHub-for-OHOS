@@ -491,7 +491,7 @@ export struct PlayDetailPanel {
     }
     .sticky(StickyStyle.Header)
     .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
+    .edgeEffect(EdgeEffect.None)
     .opacity(this.ready ? 1 : 0)
     .animation({ duration: 150, curve: Curve.EaseOut })
     .width('100%')

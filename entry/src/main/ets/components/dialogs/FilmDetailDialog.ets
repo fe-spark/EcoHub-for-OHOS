@@ -221,7 +221,7 @@ export struct FilmDetailDialog {
       .align(Alignment.Top)
       .scrollable(ScrollDirection.Vertical)
       .scrollBar(BarState.Auto)
-      .edgeEffect(EdgeEffect.Spring)
+      .edgeEffect(EdgeEffect.None)
       .width('100%')
       .constraintSize({ maxHeight: this.isLandscape() ? 150 : '50%' })
 

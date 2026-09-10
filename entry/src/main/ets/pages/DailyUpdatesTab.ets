@@ -22,6 +22,7 @@ export struct DailyUpdatesTab {
   @State private seedList: MovieBasicInfo[] = [];
   @State private seedPage: PageInfo = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
   @State private reloadToken: number = 0;
+  @State private siblingResetToken: number = 0;
   @State private refreshing: boolean = false;
   private swiperController: SwiperController = new SwiperController();
   private chipsScroller: Scroller = new Scroller();
@@ -108,6 +109,10 @@ export struct DailyUpdatesTab {
         RefreshHint.succeed();
       }
     }
+  }
+
+  private invalidateOtherPanes(): void {
+    this.siblingResetToken = this.siblingResetToken + 1;
   }
 
   private selectIndex(index: number): void {
@@ -318,11 +323,14 @@ export struct DailyUpdatesTab {
               seedList: this.seedList,
               seedPage: this.seedPage,
               reloadToken: this.reloadToken,
-              headerHeight: this.getHeaderHeight()
+              headerHeight: this.getHeaderHeight(),
+              onAllRefreshed: () => {
+                this.invalidateOtherPanes();
+              }
             })
               .width('100%')
               .height('100%')
-          }, (item: DailyUpdateCategory) => `pane_${item.pid}_${this.reloadToken}`)
+          }, (item: DailyUpdateCategory) => `pane_${item.pid}_${this.reloadToken}_${item.pid === this.seedPid ? 0 : this.siblingResetToken}`)
         }
         .index(this.currentIndex)
         .indicator(false)

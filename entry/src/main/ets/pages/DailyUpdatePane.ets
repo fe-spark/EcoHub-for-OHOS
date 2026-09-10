@@ -19,6 +19,7 @@ export struct DailyUpdatePane {
   @Prop seedPage: PageInfo = { pageSize: PAGE_SIZE, current: 1, pageCount: 1, total: 0 };
   @Prop @Watch('onReloadToken') reloadToken: number = 0;
   @Prop headerHeight: number = 0;
+  onAllRefreshed: () => void = () => {};
   @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
   @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
 
@@ -114,6 +115,9 @@ export struct DailyUpdatePane {
       this.films = reset ? result.list : this.films.concat(result.list);
       this.hasLoaded = true;
       ok = true;
+      if (fromPull && this.pid === this.seedPid) {
+        this.onAllRefreshed();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '每日更新加载失败';
       if (reset) {

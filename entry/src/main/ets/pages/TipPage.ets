@@ -171,6 +171,7 @@ struct TipPage {
         .constraintSize({ maxWidth: 640 })
         .layoutWeight(1)
         .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.None)
       }
     }
     .width('100%')
