@@ -437,6 +437,13 @@ export struct ProfileTab {
           .onClick(() => {
             this.handleCheckVersion();
           })
+          this.menuLine()
+          Column() {
+            this.menuRow($r('sys.symbol.gearshape'), '设置')
+          }
+          .onClick(() => {
+            NavUtil.openSettings(this.getUIContext());
+          })
         }
         .width('100%')
         .backgroundColor(AppTheme.BG_ELEVATED)

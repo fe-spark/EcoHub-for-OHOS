@@ -1,4 +1,5 @@
 import { media } from '@kit.MediaKit';
+import { audio } from '@kit.AudioKit';
 import { PlayerSpeed } from './PlayerSpeed';
 
 export class PlayerAvListener {
@@ -150,6 +151,13 @@ export class PlayerAv {
         return;
       }
       if (state === 'initialized') {
+        try {
+          player.audioRendererInfo = {
+            content: audio.ContentType.CONTENT_TYPE_MOVIE,
+            usage: audio.StreamUsage.STREAM_USAGE_MEDIA,
+            rendererFlags: 0
+          };
+        } catch (_e) {}
         if (this.surfaceId) {
           this.prepareWithSurface(player, this.surfaceId);
         } else {

@@ -9,6 +9,7 @@
     "pages/HistoryPage",
     "pages/FavoritePage",
     "pages/CustomPlayerPage",
-    "pages/TipPage"
+    "pages/TipPage",
+    "pages/SettingsPage"
   ]
 }

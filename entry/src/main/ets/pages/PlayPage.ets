@@ -52,6 +52,7 @@ struct PlayPage {
   @State private pageW: number = 0;
   @State private pageH: number = 0;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
+  @StorageLink('SETTING_AUTO_PLAY_NEXT') private settingAutoPlayNext: boolean = true;
   private sourceName: string = '';
   private reconnectCb: () => void = () => {};
   private loadToken: number = 0;
@@ -365,7 +366,7 @@ struct PlayPage {
         if (this.playerFull) this.setPlayerFull(false);
         else { try { this.getUIContext().getRouter().back(); } catch (_e) {} }
       },
-      onEnded: () => { if (this.hasNext()) this.playNext(); },
+      onEnded: () => { if (this.settingAutoPlayNext && this.hasNext()) this.playNext(); },
       onPrev: () => this.playPrev(),
       onNext: () => this.playNext(),
       onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
