@@ -382,67 +382,24 @@ export struct ProfileTab {
           }
           this.menuLine()
           Column() {
-            Row() {
-              Row() {
-                AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 18, color: AppTheme.ACCENT })
-              }
-              .width(36)
-              .height(36)
-              .justifyContent(FlexAlign.Center)
-              .backgroundColor(AppTheme.ACCENT_SOFT)
-              .borderRadius(18)
-
-              Row() {
-                Text('版本检查')
-                  .fontSize(15)
-                  .fontColor(AppTheme.TEXT_PRIMARY)
-
-                if (this.hasAppUpdate) {
-                  Row() {
-                    Text('NEW')
-                      .fontSize(10)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(AppTheme.TEXT_PRIMARY)
-                  }
-                  .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                  .backgroundColor(AppTheme.DANGER)
-                  .borderRadius(AppTheme.RADIUS_PILL)
-                  .margin({ left: AppTheme.SPACE_SM })
-                  .justifyContent(FlexAlign.Center)
-                }
-              }
-              .layoutWeight(1)
-              .margin({ left: AppTheme.SPACE_MD })
-              .alignItems(VerticalAlign.Center)
-
-              Text(this.isCheckingVersion
-                ? '检查中...'
-                : (this.hasAppUpdate ? `发现新版本 v${this.updateInfo.latestVersion}` : `v${this.appVersion}`))
-                .fontSize(13)
-                .fontColor(this.hasAppUpdate ? AppTheme.ACCENT : AppTheme.TEXT_MUTED)
-                .fontWeight(this.hasAppUpdate ? FontWeight.Medium : FontWeight.Normal)
-                .margin({ right: AppTheme.SPACE_SM })
-
-              AppIcon({
-                src: $r('sys.symbol.chevron_right'),
-                iconSize: 14,
-                color: AppTheme.TEXT_MUTED
-              })
-            }
-            .width('100%')
-            .height(56)
-            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
-            .alignItems(VerticalAlign.Center)
-          }
-          .onClick(() => {
-            this.handleCheckVersion();
-          })
-          this.menuLine()
-          Column() {
             this.menuRow($r('sys.symbol.gearshape'), '设置')
           }
           .onClick(() => {
             NavUtil.openSettings(this.getUIContext());
+          })
+          this.menuLine()
+          Column() {
+            this.menuRow(
+              $r('sys.symbol.info_circle'),
+              '关于',
+              this.hasAppUpdate ? `发现新版本 v${this.updateInfo.latestVersion}` : '',
+              this.hasAppUpdate,
+              'NEW',
+              this.hasAppUpdate
+            )
+          }
+          .onClick(() => {
+            NavUtil.openAbout(this.getUIContext());
           })
         }
         .width('100%')

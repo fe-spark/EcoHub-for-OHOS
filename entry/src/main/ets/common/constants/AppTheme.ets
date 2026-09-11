@@ -11,6 +11,7 @@ export class AppTheme {
   static readonly TEXT_SECONDARY = 'rgba(255, 255, 255, 0.65)';
   static readonly TEXT_MUTED = 'rgba(255, 255, 255, 0.40)';
   static readonly BORDER = 'rgba(255, 255, 255, 0.08)';
+  static readonly BORDER_SOLID = '#262832';
   static readonly OVERLAY = 'rgba(10, 11, 16, 0.55)';
 
   static readonly SPACE_XS = 4;

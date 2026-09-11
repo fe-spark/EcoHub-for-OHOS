@@ -24,7 +24,7 @@ export struct PlayDetailPanel {
   onSelectEpisode?: (sourceId: string, index: number) => void;
   @State private groupSourceIds: string[] = [];
   @State private groupIndexes: number[] = [];
-  @State private headerHeight: number = 148;
+  @State private headerHeight: number = 64;
   @State private ready: boolean = false;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   private listScroller: Scroller = new Scroller();
@@ -351,7 +351,11 @@ export struct PlayDetailPanel {
   @Builder
   groupBar() {
     Column() {
-      Divider().color(AppTheme.BORDER).width('100%')
+      // 实色不透明白线：保留视觉分区层次，同时 100% 阻断下层滚动内容透光
+      Row()
+        .width('100%')
+        .height(1)
+        .backgroundColor(AppTheme.BORDER_SOLID)
 
       if (this.sources.length > 0) {
         this.sourceRow()
@@ -496,6 +500,7 @@ export struct PlayDetailPanel {
     .animation({ duration: 150, curve: Curve.EaseOut })
     .width('100%')
     .height('100%')
+    .backgroundColor(AppTheme.BG)
     .onAppear(() => {
       this.scrollToFocusedEpisode(false);
       this.syncSourceBar(false);
