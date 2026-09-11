@@ -1,5 +1,6 @@
 import { AppTheme } from '../../common/constants/AppTheme';
 import { AppIcon } from '../common/AppIcon';
+import { FormatUtil } from '../../common/utils/FormatUtil';
 
 @CustomDialog
 export struct FilmDetailDialog {
@@ -69,12 +70,14 @@ export struct FilmDetailDialog {
 
       // 影片简要信息卡片
       Column() {
-        // 标题与评分行
+        // 标题与评分行（详情弹窗中片名完整展现，绝不省略）
         Row() {
           Text(this.name)
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.TEXT_PRIMARY)
+            .lineHeight(22)
+            .textOverflow({ overflow: TextOverflow.None })
             .layoutWeight(1)
 
           if (this.scoreText !== '') {
@@ -97,7 +100,7 @@ export struct FilmDetailDialog {
           }
         }
         .width('100%')
-        .alignItems(VerticalAlign.Center)
+        .alignItems(VerticalAlign.Top)
         .margin({ bottom: this.tags.length > 0 ? 8 : 0 })
 
         // 影视标签组（独立排版，自动折行）
@@ -199,7 +202,7 @@ export struct FilmDetailDialog {
               }
               .alignItems(VerticalAlign.Center)
 
-              Text(this.plot)
+              Text(FormatUtil.cleanPlot(this.plot))
                 .fontSize(13)
                 .fontColor(AppTheme.TEXT_SECONDARY)
                 .lineHeight(22)

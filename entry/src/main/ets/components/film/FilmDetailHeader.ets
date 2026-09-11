@@ -3,6 +3,7 @@ import { AppTheme } from '../../common/constants/AppTheme';
 import { AppIcon } from '../common/AppIcon';
 import { FilmDetailDialog } from '../dialogs/FilmDetailDialog';
 import { FavoriteManager } from '../../services/FavoriteManager';
+import { FormatUtil } from '../../common/utils/FormatUtil';
 
 @Component
 export struct FilmDetailHeader {
@@ -66,16 +67,7 @@ export struct FilmDetailHeader {
 
   private syncDerivedState(): void {
     const raw = this.plot || this.descriptor?.content || this.descriptor?.blurb || '';
-    this.cleanPlot = raw
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+    this.cleanPlot = FormatUtil.cleanPlot(raw);
 
     const s = this.descriptor?.dbScore ? this.descriptor.dbScore.trim() : '';
     this.scoreText = (!s || s === '0' || s === '0.0') ? '' : s;
@@ -85,17 +77,29 @@ export struct FilmDetailHeader {
     return this.directorText() !== '' || this.actorText() !== '' || this.cleanPlot !== '';
   }
 
-  private detailSnippetText(): string {
-    if (this.actorText() !== '') {
-      return `主演：${this.actorText()}`;
+  private briefMetaText(): string {
+    const parts: string[] = [];
+    if (this.descriptor?.year && this.descriptor.year.trim()) {
+      parts.push(this.descriptor.year.trim());
     }
-    if (this.directorText() !== '') {
-      return `导演：${this.directorText()}`;
+    const cat = this.descriptor?.classTag || this.descriptor?.cName;
+    if (cat && cat.trim()) {
+      const firstCat = cat.trim().split(/[,/，\s]+/)[0].trim();
+      if (firstCat) {
+        parts.push(firstCat);
+      }
     }
-    if (this.cleanPlot !== '') {
-      return `简介：${this.cleanPlot.replace(/\n+/g, ' ')}`;
+    const rawArea = this.descriptor?.area || this.descriptor?.language;
+    if (rawArea && rawArea.trim()) {
+      const firstArea = rawArea.trim().split(/[,/，\s]+/)[0].trim();
+      if (firstArea) {
+        parts.push(firstArea);
+      }
     }
-    return '查看简介 / 主演 / 导演';
+    if (parts.length === 0) {
+      return '';
+    }
+    return parts.join(' · ');
   }
 
   private metaTagsList(): string[] {
@@ -174,153 +178,102 @@ export struct FilmDetailHeader {
 
   build() {
     Column() {
-      // 1. 标题与收藏操作按钮行
+      // 1. 片名与收藏行（左侧片名最多2行后省略；右上角常驻唯一收藏胶囊，平衡短片名与长片名的视觉重心）
       Row() {
         Text(this.name)
-          .fontSize(19)
+          .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .lineHeight(24)
           .layoutWeight(1)
 
-        // 收藏按钮
-        Row() {
+        // 收藏按钮（右上角唯一的实体胶囊，26vp 精致尺寸，顶部对齐）
+        Row({ space: 3 }) {
           AppIcon({
             src: this.isFav ? $r('sys.symbol.star_fill') : $r('sys.symbol.star'),
             iconSize: 13,
-            color: this.isFav ? '#FA8C16' : AppTheme.TEXT_MUTED
+            color: this.isFav ? '#FA8C16' : AppTheme.TEXT_SECONDARY
           })
           Text(this.isFav ? '已收藏' : '收藏')
             .fontSize(12)
             .fontWeight(FontWeight.Medium)
-            .fontColor(this.isFav ? '#FA8C16' : AppTheme.TEXT_MUTED)
-            .margin({ left: 4 })
+            .fontColor(this.isFav ? '#FA8C16' : AppTheme.TEXT_SECONDARY)
         }
-        .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-        .backgroundColor(this.isFav ? 'rgba(250, 140, 22, 0.12)' : AppTheme.BG_CARD)
-        .borderRadius(13)
-        .border({ width: 0.5, color: this.isFav ? 'rgba(250, 140, 22, 0.3)' : AppTheme.BORDER })
+        .height(26)
+        .padding({ left: 9, right: 9 })
+        .backgroundColor(this.isFav ? 'rgba(250, 140, 22, 0.14)' : AppTheme.BG_CARD)
+        .borderRadius(AppTheme.RADIUS_PILL)
+        .border({ width: 0.5, color: this.isFav ? 'rgba(250, 140, 22, 0.35)' : AppTheme.BORDER })
         .margin({ left: 10 })
         .onClick(() => {
           this.handleToggleFavorite();
         })
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .padding({ left: 12, right: 12, top: 10 })
+      .alignItems(VerticalAlign.Top)
+      .padding({ left: 12, right: 12, top: 8, bottom: 4 })
 
-      // 2. 元数据行（左侧固定评分徽章，右侧标签支持横向滚动）
-      Row() {
-        // 左侧固定评分徽章
+      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，整行点击直达详情弹窗）
+      Row({ space: 6 }) {
+        // 评分微标（如有）
         if (this.scoreText !== '') {
-          Row({ space: 3 }) {
+          Row({ space: 2 }) {
             Text('★')
-              .fontSize(12)
+              .fontSize(10)
               .fontColor(AppTheme.ACCENT)
             Text(this.scoreText)
-              .fontSize(14)
+              .fontSize(12)
               .fontWeight(FontWeight.Bold)
               .fontColor(AppTheme.ACCENT)
             Text('分')
-              .fontSize(10)
+              .fontSize(9)
               .fontColor(AppTheme.ACCENT)
-              .margin({ top: 1 })
           }
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
           .backgroundColor(AppTheme.ACCENT_SOFT)
           .borderRadius(AppTheme.RADIUS_SM)
-          .margin({ right: 8 })
-        } else {
-          Row({ space: 3 }) {
-            Text('★')
-              .fontSize(11)
-              .fontColor(AppTheme.TEXT_MUTED)
-            Text('暂无评分')
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(AppTheme.TEXT_MUTED)
-          }
-          .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-          .backgroundColor(AppTheme.BG_CHIP)
-          .borderRadius(AppTheme.RADIUS_SM)
-          .margin({ right: 8 })
         }
 
-        // 右侧元数据小胶囊组（可横向滚动）
-        Scroll() {
-          Row({ space: 6 }) {
-            ForEach(this.metaTagsList(), (tag: string) => {
-              Text(tag)
-                .fontSize(11)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-                .backgroundColor(AppTheme.BG_CHIP)
-                .borderRadius(AppTheme.RADIUS_SM)
-            }, (tag: string) => tag)
-          }
+        // 核心信息摘要（年份 · 分类 · 地区）
+        if (this.briefMetaText() !== '') {
+          Text(this.briefMetaText())
+            .fontSize(12)
+            .fontColor(AppTheme.TEXT_SECONDARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize({ maxWidth: '65%' })
         }
-        .layoutWeight(1)
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .align(Alignment.Start)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .padding({ left: 12, right: 12, top: 8 })
 
-      // 3. 详细信息卡片导引条（独立整行大热区，带摘要与高亮详情入口）
-      if (this.hasDetailInfo()) {
-        Row() {
-          Row() {
-            Row({ space: 6 }) {
-              AppIcon({
-                src: $r('sys.symbol.doc_plaintext'),
-                iconSize: 14,
-                color: AppTheme.ACCENT
-              })
-              Text(this.detailSnippetText())
-                .fontSize(12)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-            }
-            .layoutWeight(1)
-            .alignItems(VerticalAlign.Center)
-
-            Row({ space: 2 }) {
-              Text('详情')
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.ACCENT)
-              AppIcon({
-                src: $r('sys.symbol.chevron_right'),
-                iconSize: 12,
-                color: AppTheme.ACCENT
-              })
-            }
-            .padding({ left: 6, right: 4, top: 3, bottom: 3 })
-            .backgroundColor(AppTheme.ACCENT_SOFT)
-            .borderRadius(AppTheme.RADIUS_SM)
-            .alignItems(VerticalAlign.Center)
-            .margin({ left: 8 })
+        // 紧贴左侧的纯文字更多入口（主题高亮色链接，无按钮底色）
+        Row({ space: 1 }) {
+          if (this.briefMetaText() !== '') {
+            Text('· ')
+              .fontSize(12)
+              .fontColor(AppTheme.TEXT_MUTED)
           }
-          .width('100%')
-          .padding({ left: 10, right: 8, top: 8, bottom: 8 })
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(AppTheme.RADIUS_MD)
-          .alignItems(VerticalAlign.Center)
-          .onClick(() => {
-            this.openDetailDialog();
+          Text('更多')
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppTheme.ACCENT)
+          AppIcon({
+            src: $r('sys.symbol.chevron_right'),
+            iconSize: 10,
+            color: AppTheme.ACCENT
           })
         }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 8 })
+        .alignItems(VerticalAlign.Center)
       }
+      .width('100%')
+      .justifyContent(FlexAlign.Start)
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 12, right: 12, top: 2, bottom: 8 })
+      .onClick(() => {
+        this.openDetailDialog();
+      })
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding({ bottom: 4 })
   }
 }
