@@ -38,7 +38,7 @@ export struct FilmDetailDialog {
             color: AppTheme.ACCENT
           })
           Text('详细信息')
-            .fontSize(17)
+            .fontSize(AppTheme.FONT_XL)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.TEXT_PRIMARY)
         }
@@ -73,7 +73,7 @@ export struct FilmDetailDialog {
         // 标题与评分行（详情弹窗中片名完整展现，绝不省略）
         Row() {
           Text(this.name)
-            .fontSize(16)
+            .fontSize(AppTheme.FONT_LG)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.TEXT_PRIMARY)
             .lineHeight(22)
@@ -83,14 +83,14 @@ export struct FilmDetailDialog {
           if (this.scoreText !== '') {
             Row({ space: 2 }) {
               Text('★')
-                .fontSize(10)
+                .fontSize(AppTheme.FONT_XS)
                 .fontColor(AppTheme.ACCENT)
               Text(this.scoreText)
-                .fontSize(12)
+                .fontSize(AppTheme.FONT_SM)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(AppTheme.ACCENT)
               Text('分')
-                .fontSize(9)
+                .fontSize(AppTheme.FONT_2XS)
                 .fontColor(AppTheme.ACCENT)
             }
             .padding({ left: 6, right: 6, top: 3, bottom: 3 })
@@ -108,7 +108,7 @@ export struct FilmDetailDialog {
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.tags, (tag: string) => {
               Text(tag)
-                .fontSize(11)
+                .fontSize(AppTheme.FONT_SM)
                 .fontColor(AppTheme.TEXT_SECONDARY)
                 .padding({ left: 6, right: 6, top: 3, bottom: 3 })
                 .backgroundColor(AppTheme.BG_CHIP)
@@ -138,14 +138,14 @@ export struct FilmDetailDialog {
                   .backgroundColor(AppTheme.ACCENT)
                   .borderRadius(1.5)
                 Text('导演')
-                  .fontSize(13)
+                  .fontSize(AppTheme.FONT_BASE)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(AppTheme.TEXT_PRIMARY)
               }
               .alignItems(VerticalAlign.Center)
 
               Text(this.director)
-                .fontSize(13)
+                .fontSize(AppTheme.FONT_BASE)
                 .fontColor(AppTheme.TEXT_PRIMARY)
                 .lineHeight(20)
                 .width('100%')
@@ -167,14 +167,14 @@ export struct FilmDetailDialog {
                   .backgroundColor(AppTheme.ACCENT)
                   .borderRadius(1.5)
                 Text('主演')
-                  .fontSize(13)
+                  .fontSize(AppTheme.FONT_BASE)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(AppTheme.TEXT_PRIMARY)
               }
               .alignItems(VerticalAlign.Center)
 
               Text(this.actor)
-                .fontSize(13)
+                .fontSize(AppTheme.FONT_BASE)
                 .fontColor(AppTheme.TEXT_PRIMARY)
                 .lineHeight(20)
                 .width('100%')
@@ -196,14 +196,14 @@ export struct FilmDetailDialog {
                   .backgroundColor(AppTheme.ACCENT)
                   .borderRadius(1.5)
                 Text('剧情简介')
-                  .fontSize(13)
+                  .fontSize(AppTheme.FONT_BASE)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(AppTheme.TEXT_PRIMARY)
               }
               .alignItems(VerticalAlign.Center)
 
               Text(FormatUtil.cleanPlot(this.plot))
-                .fontSize(13)
+                .fontSize(AppTheme.FONT_BASE)
                 .fontColor(AppTheme.TEXT_SECONDARY)
                 .lineHeight(22)
                 .width('100%')
@@ -232,7 +232,7 @@ export struct FilmDetailDialog {
       Button('我知道了')
         .width('100%')
         .height(this.isLandscape() ? 36 : 40)
-        .fontSize(14)
+        .fontSize(AppTheme.FONT_MD)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppTheme.TEXT_PRIMARY)
         .backgroundColor(AppTheme.ACCENT)

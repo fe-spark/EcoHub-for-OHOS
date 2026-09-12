@@ -29,4 +29,14 @@ export class AppTheme {
   static readonly POSTER_RATIO = 1.5;
   static readonly CONTENT_MAX_WIDTH = 1280;
   static readonly SAFE_EDGE = 16;
+
+  // 字号规范（针对 HarmonyOS Sans 95% 高字面率进行视觉等效对齐）
+  static readonly FONT_2XS = 9;
+  static readonly FONT_XS = 10;
+  static readonly FONT_SM = 11.5;   // 对齐 Flutter 12
+  static readonly FONT_BASE = 12.5; // 对齐 Flutter 13（正文、常规标签、选集标签）
+  static readonly FONT_MD = 13.5;   // 对齐 Flutter 14
+  static readonly FONT_LG = 15;     // 对齐 Flutter 16（小标题、主信息）
+  static readonly FONT_XL = 17;     // 对齐 Flutter 18（区块标题）
+  static readonly FONT_2XL = 20;    // 对齐 Flutter 20-22（大标题）
 }

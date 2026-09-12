@@ -181,7 +181,7 @@ export struct FilmDetailHeader {
       // 1. 片名与收藏行（左侧片名最多2行后省略；右上角常驻唯一收藏胶囊，平衡短片名与长片名的视觉重心）
       Row() {
         Text(this.name)
-          .fontSize(18)
+          .fontSize(AppTheme.FONT_XL)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
           .maxLines(2)
@@ -197,7 +197,7 @@ export struct FilmDetailHeader {
             color: this.isFav ? '#FA8C16' : AppTheme.TEXT_SECONDARY
           })
           Text(this.isFav ? '已收藏' : '收藏')
-            .fontSize(12)
+            .fontSize(AppTheme.FONT_SM)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.isFav ? '#FA8C16' : AppTheme.TEXT_SECONDARY)
         }
@@ -221,14 +221,14 @@ export struct FilmDetailHeader {
         if (this.scoreText !== '') {
           Row({ space: 2 }) {
             Text('★')
-              .fontSize(10)
+              .fontSize(AppTheme.FONT_XS)
               .fontColor(AppTheme.ACCENT)
             Text(this.scoreText)
-              .fontSize(12)
+              .fontSize(AppTheme.FONT_SM)
               .fontWeight(FontWeight.Bold)
               .fontColor(AppTheme.ACCENT)
             Text('分')
-              .fontSize(9)
+              .fontSize(AppTheme.FONT_2XS)
               .fontColor(AppTheme.ACCENT)
           }
           .padding({ left: 6, right: 6, top: 2, bottom: 2 })
@@ -239,7 +239,7 @@ export struct FilmDetailHeader {
         // 核心信息摘要（年份 · 分类 · 地区）
         if (this.briefMetaText() !== '') {
           Text(this.briefMetaText())
-            .fontSize(12)
+            .fontSize(AppTheme.FONT_SM)
             .fontColor(AppTheme.TEXT_SECONDARY)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -250,11 +250,11 @@ export struct FilmDetailHeader {
         Row({ space: 1 }) {
           if (this.briefMetaText() !== '') {
             Text('· ')
-              .fontSize(12)
+              .fontSize(AppTheme.FONT_SM)
               .fontColor(AppTheme.TEXT_MUTED)
           }
           Text('更多')
-            .fontSize(12)
+            .fontSize(AppTheme.FONT_SM)
             .fontWeight(FontWeight.Medium)
             .fontColor(AppTheme.ACCENT)
           AppIcon({

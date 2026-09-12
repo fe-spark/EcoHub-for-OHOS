@@ -345,7 +345,7 @@ export struct PlayDetailPanel {
     .height(32)
     .contentEndOffset(AppTheme.SPACE_LG)
     .padding({ left: 12, right: 16 })
-    .margin({ top: 8 })
+    .margin({ top: 10 })
   }
 
   @Builder
@@ -361,31 +361,26 @@ export struct PlayDetailPanel {
         this.sourceRow()
       }
       if (this.needsGrouping()) {
-        Column() {
-          List({ space: 4, scroller: this.groupScroller }) {
-            ForEach(this.groupIndexesOf(), (index: number) => {
-              ListItem() {
-                this.groupChip(index)
-              }
-            }, (index: number) => `group_${this.viewingSourceId}_${index}`)
-          }
-          .listDirection(Axis.Horizontal)
-          .alignListItem(ListItemAlign.Center)
-          .scrollBar(BarState.Off)
-          .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-          .width('100%')
-          .height(40)
-          .contentEndOffset(AppTheme.SPACE_LG)
-          .padding({ left: 8, right: 12, top: 4, bottom: 4 })
-          .backgroundColor(AppTheme.BG_ELEVATED)
-          .borderRadius(AppTheme.RADIUS_MD)
+        List({ space: 8, scroller: this.groupScroller }) {
+          ForEach(this.groupIndexesOf(), (index: number) => {
+            ListItem() {
+              this.groupChip(index)
+            }
+          }, (index: number) => `group_${this.viewingSourceId}_${index}`)
         }
+        .listDirection(Axis.Horizontal)
+        .alignListItem(ListItemAlign.Center)
+        .scrollBar(BarState.Off)
+        .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
         .width('100%')
-        .padding({ left: 12, right: 12, top: 8 })
+        .height(30)
+        .contentEndOffset(AppTheme.SPACE_LG)
+        .padding({ left: 12, right: 16 })
+        .margin({ top: 10 })
       }
     }
     .width('100%')
-    .padding({ bottom: 8 })
+    .padding({ bottom: this.needsGrouping() ? 12 : 10 })
     .backgroundColor(AppTheme.BG)
   }
 
@@ -417,14 +412,14 @@ export struct PlayDetailPanel {
   @Builder
   groupChip(index: number) {
     Text(this.groupLabel(index))
-      .fontSize(13)
-      .fontWeight(this.groupOf(this.viewingSourceId) === index ? FontWeight.Bold : FontWeight.Regular)
+      .fontSize(AppTheme.FONT_BASE)
+      .fontWeight(this.groupOf(this.viewingSourceId) === index ? FontWeight.Bold : FontWeight.Medium)
       .fontColor(this.groupOf(this.viewingSourceId) === index ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
-      .height(32)
-      .padding({ left: 16, right: 16 })
+      .height(30)
+      .padding({ left: 14, right: 14 })
       .textAlign(TextAlign.Center)
-      .backgroundColor(this.groupOf(this.viewingSourceId) === index ? AppTheme.ACCENT : Color.Transparent)
-      .borderRadius(6)
+      .backgroundColor(this.groupOf(this.viewingSourceId) === index ? AppTheme.ACCENT : AppTheme.BG_CHIP)
+      .borderRadius(AppTheme.RADIUS_PILL)
       .onClick(() => {
         this.setGroup(this.viewingSourceId, index, true);
         this.syncGroupBar(true);
@@ -434,7 +429,7 @@ export struct PlayDetailPanel {
   @Builder
   episodeTile(ep: MovieUrlInfo, index: number) {
     Text(ep.episode)
-      .fontSize(13)
+      .fontSize(AppTheme.FONT_BASE)
       .fontWeight(this.isEpisodeOn(index) ? FontWeight.Bold : FontWeight.Medium)
       .fontColor(this.isEpisodeOn(index) ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
       .width('100%')

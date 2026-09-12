@@ -31,7 +31,7 @@ export struct FilmCard {
   @Builder
   posterTag(text: string) {
     Text(text)
-      .fontSize(9)
+      .fontSize(AppTheme.FONT_2XS)
       .fontWeight(FontWeight.Medium)
       .fontColor('#FFFFFF')
       .maxLines(1)
@@ -92,7 +92,7 @@ export struct FilmCard {
         Text(this.film.name)
           .width('100%')
           .height(18)
-          .fontSize(13)
+          .fontSize(AppTheme.FONT_BASE)
           .fontWeight(FontWeight.Medium)
           .fontColor(AppTheme.TEXT_PRIMARY)
           .maxLines(1)
@@ -102,7 +102,7 @@ export struct FilmCard {
         Text(this.film.subTitle || FormatUtil.joinMeta([this.film.year, this.film.cName]))
           .width('100%')
           .height(15)
-          .fontSize(11)
+          .fontSize(AppTheme.FONT_SM)
           .fontColor(AppTheme.TEXT_MUTED)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
