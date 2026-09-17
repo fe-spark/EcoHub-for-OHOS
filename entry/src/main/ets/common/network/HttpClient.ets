@@ -147,9 +147,11 @@ export class HttpClient {
     if (!origin) {
       return false;
     }
+    const key = ServerConfigManager.extractProvideKey(baseUrl);
     SourceGuard.beginSkip();
     try {
-      const response = await this.send(`${origin}/api/health`, 5000);
+      const query = key ? `?key=${encodeURIComponent(key)}` : '';
+      const response = await this.send(`${origin}/api/health${query}`, 5000);
       return response.code === 0;
     } catch (err) {
       return false;
@@ -173,6 +175,10 @@ export class HttpClient {
     if (deviceId) {
       header['X-Device-Id'] = deviceId;
       header['Device-Id'] = deviceId;
+    }
+    const provideKey = ServerConfigManager.getInstance().getProvideKey();
+    if (provideKey) {
+      header['X-Provide-Key'] = provideKey;
     }
     try {
       const response = await httpRequest.request(url, {

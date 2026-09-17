@@ -256,8 +256,42 @@ export class ServerConfigManager {
     return cleanUrl;
   }
 
+  public getProvideKey(): string {
+    return ServerConfigManager.extractProvideKey(this.cachedUrl);
+  }
+
+  public static extractProvideKey(url: string): string {
+    if (!url) {
+      return '';
+    }
+    const queryIndex = url.indexOf('?');
+    if (queryIndex < 0) {
+      return '';
+    }
+    const queryStr = url.substring(queryIndex + 1);
+    const pairs = queryStr.split('&');
+    for (let i = 0; i < pairs.length; i++) {
+      const part = pairs[i];
+      const eq = part.indexOf('=');
+      if (eq > 0) {
+        const k = part.substring(0, eq).trim();
+        if (k === 'key') {
+          return decodeURIComponent(part.substring(eq + 1).trim());
+        }
+      }
+    }
+    return '';
+  }
+
   public static stripApiSuffix(url: string): string {
-    let base = url.trim().replace(/\/+$/g, '');
+    let base = url.trim();
+    const queryIndex = base.indexOf('?');
+    if (queryIndex >= 0) {
+      base = base.substring(0, queryIndex);
+    }
+    base = base.replace(/\/+$/g, '');
+    // 兼容剥离 /api/provide/app, /provide/app 或 /api 软件源端点，解析出 origin
+    base = base.replace(/\/(api\/)?provide\/app$/i, '').replace(/\/+$/g, '');
     while (/\/api$/i.test(base)) {
       base = base.replace(/\/api$/i, '').replace(/\/+$/g, '');
     }

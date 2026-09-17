@@ -33,14 +33,14 @@
 
 - **自建部署（推荐）**  
   按照 [EcoHub 部署指南](https://github.com/fe-spark/EcoHub/blob/main/docs/README-Deploy.md) 在你的服务器上部署 EcoHub 服务端。  
-  部署成功后，你的客户端接入源地址即为：
+  部署成功后，在管理后台「工作台」点击「订阅地址」即可获取客户端订阅源：
   ```
-  http://<你的服务器IP或域名>:3000/api
+  http://<你的服务器IP或域名>:3000/api/provide/app
   ```
-  *(若配置了 HTTPS 或反向代理，格式为 `https://<你的域名>/api`)*。在管理后台完成影视数据采集后，客户端即可直接同步。
+  *(若配置了 HTTPS 或反向代理，格式为 `https://<你的域名>/api/provide/app`，亦兼容原 `/api` 路径)*。在管理后台完成影视数据采集后，客户端即可直接同步。
 
 - **使用公共源 / 他人分享源**  
-  如果你有朋友已经部署了 EcoHub 站点，或使用社区公开的 EcoHub 节点，可以直接获取其 API 接口地址填入（例如官方演示源 `https://eco.fe-spark.cn/api`）。
+  如果你有朋友已经部署了 EcoHub 站点，或使用社区公开的 EcoHub 节点，可以直接获取其软件源地址填入（例如官方演示源 `https://eco.fe-spark.cn/api/provide/app`）。
 
 ### 2. 如何在 App 中配置？
 
