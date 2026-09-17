@@ -283,6 +283,39 @@ export class ServerConfigManager {
     return '';
   }
 
+  public static stripProvideKey(url: string): string {
+    if (!url) {
+      return '';
+    }
+    const queryIndex = url.indexOf('?');
+    if (queryIndex < 0) {
+      return url;
+    }
+    const base = url.substring(0, queryIndex);
+    const queryStr = url.substring(queryIndex + 1);
+    const pairs = queryStr.split('&');
+    const kept: string[] = [];
+    for (let i = 0; i < pairs.length; i++) {
+      const part = pairs[i];
+      const eq = part.indexOf('=');
+      const k = eq > 0 ? part.substring(0, eq).trim() : part.trim();
+      if (k !== 'key') {
+        kept.push(part);
+      }
+    }
+    return kept.length > 0 ? `${base}?${kept.join('&')}` : base;
+  }
+
+  public static buildServerUrl(baseUrl: string, key?: string): string {
+    const cleanBase = ServerConfigManager.stripProvideKey(baseUrl ? baseUrl.trim() : '');
+    const cleanKey = key ? key.trim() : '';
+    if (!cleanKey) {
+      return cleanBase;
+    }
+    const sep = cleanBase.indexOf('?') >= 0 ? '&' : '?';
+    return `${cleanBase}${sep}key=${encodeURIComponent(cleanKey)}`;
+  }
+
   public static stripApiSuffix(url: string): string {
     let base = url.trim();
     const queryIndex = base.indexOf('?');

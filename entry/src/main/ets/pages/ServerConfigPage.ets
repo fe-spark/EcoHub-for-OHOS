@@ -51,7 +51,8 @@ struct ServerConfigPage {
     }
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.reconnect = NavUtil.param(params, 'mode') === 'reconnect';
-    this.serverUrl = await ServerConfigManager.getInstance().getServerUrl();
+    const rawUrl = await ServerConfigManager.getInstance().getServerUrl();
+    this.serverUrl = rawUrl;
     await this.loadHistory();
   }
 
@@ -127,7 +128,8 @@ struct ServerConfigPage {
       this.inputController.stopEditing();
     } catch (_e) {
     }
-    if (!this.serverUrl.trim()) {
+    const finalUrl = this.serverUrl.trim();
+    if (!finalUrl) {
       try {
         this.getUIContext().getPromptAction().showToast({ message: '请输入软件源地址' });
       } catch (_e) {
@@ -135,16 +137,16 @@ struct ServerConfigPage {
       return;
     }
     this.isLoading = true;
-    const ok = await HttpClient.getInstance().testConnection(this.serverUrl);
+    const res = await HttpClient.getInstance().testConnection(finalUrl);
     this.isLoading = false;
-    if (!ok) {
+    if (!res.ok) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '无法连接该源，请检查地址' });
+        this.getUIContext().getPromptAction().showToast({ message: res.message || '无法连接该源，请检查地址' });
       } catch (_e) {
       }
       return;
     }
-    await ServerConfigManager.getInstance().setServerUrl(this.serverUrl);
+    await ServerConfigManager.getInstance().setServerUrl(finalUrl);
     await this.loadHistory();
     FilmApi.clearSiteConfig();
     SiteHeartbeat.getInstance().resetFailures();
@@ -307,13 +309,6 @@ struct ServerConfigPage {
                   .enabled(!this.isLoading)
                   .onClick(() => this.saveAndConnect())
                   .alignSelf(ItemAlign.Stretch)
-
-                Text('接口形如 https://your-host/api，配置后所有请求均走该源。')
-                  .fontSize(11)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                  .margin({ top: 8 })
-                  .width('100%')
-                  .textAlign(TextAlign.Center)
               }
               .layoutWeight(1)
               .constraintSize({ maxWidth: 440 })
@@ -420,6 +415,7 @@ struct ServerConfigPage {
                 .padding({ right: 4 })
                 .backgroundColor(AppTheme.BG_CARD)
                 .borderRadius(AppTheme.RADIUS_MD)
+                .margin({ bottom: 14 })
 
                 Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
                   .width('100%')
@@ -433,13 +429,6 @@ struct ServerConfigPage {
                   .enabled(!this.isLoading)
                   .onClick(() => this.saveAndConnect())
                   .alignSelf(ItemAlign.Stretch)
-
-                Text('接口形如 https://your-host/api，配置后所有请求均走该源。')
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                  .margin({ top: 16 })
-                  .width('100%')
-                  .textAlign(TextAlign.Center)
               }
               .width('100%')
               .constraintSize({ maxWidth: 480 })
@@ -556,13 +545,13 @@ struct ServerConfigPage {
                         AppIcon({
                           src: $r('sys.symbol.link'),
                           iconSize: 15,
-                          color: item === this.serverUrl ? AppTheme.ACCENT : AppTheme.TEXT_MUTED
+                          color: (item === this.serverUrl) ? AppTheme.ACCENT : AppTheme.TEXT_MUTED
                         })
 
                         Text(item)
                           .fontSize(13)
-                          .fontColor(item === this.serverUrl ? AppTheme.ACCENT : AppTheme.TEXT_PRIMARY)
-                          .fontWeight(item === this.serverUrl ? FontWeight.Bold : FontWeight.Normal)
+                          .fontColor((item === this.serverUrl) ? AppTheme.ACCENT : AppTheme.TEXT_PRIMARY)
+                          .fontWeight((item === this.serverUrl) ? FontWeight.Bold : FontWeight.Normal)
                           .maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                           .margin({ left: 8 })

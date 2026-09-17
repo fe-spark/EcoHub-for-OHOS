@@ -172,6 +172,9 @@ export struct RecommendTab {
   }
 
   private effectiveHeaderAlpha(): number {
+    if (this.banners.length === 0) {
+      return 1.0;
+    }
     return Breakpoint.isWide(this.widthBp) ? Math.min(0.92, 0.76 + 0.16 * this.headerAlpha) : this.headerAlpha;
   }
 
@@ -441,7 +444,11 @@ export struct RecommendTab {
       } else {
         Scroll(this.scroller) {
           Column() {
-            Blank().height(Breakpoint.isWide(this.widthBp) ? (48 + this.topInset + 8) : 0)
+            Blank().height(
+              Breakpoint.isWide(this.widthBp)
+                ? (48 + this.topInset + 8)
+                : (this.banners.length === 0 ? (48 + this.topInset + 12) : 0)
+            )
 
             HomeBanner({
               banners: this.banners,

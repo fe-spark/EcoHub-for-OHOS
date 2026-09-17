@@ -337,8 +337,6 @@ export struct HomeBanner {
         }
         .width('100%')
         .margin({ bottom: this.banners.length > 1 ? (Breakpoint.isWide(this.widthBp) && this.windowHeight < 500 ? 14 : AppTheme.SPACE_XL) : AppTheme.SPACE_LG })
-      } else {
-        Blank().height(48)
       }
     }
     .width('100%')
