@@ -14,6 +14,7 @@ export struct PlayDetailPanel {
   @Prop name: string = '';
   @Prop subTitle: string = '';
   @Prop actor: string = '';
+  @Prop sourceName: string = '';
   @Prop plot: string = '';
   @Prop descriptor: MovieDescriptor | null = null;
   @Prop @Watch('onSourcesChange') sources: PlaySource[] = [];
@@ -460,6 +461,7 @@ export struct PlayDetailPanel {
           name: this.name,
           subTitle: this.subTitle,
           actor: this.actor,
+          sourceName: this.sourceName,
           plot: this.plot,
           descriptor: this.descriptor
         })

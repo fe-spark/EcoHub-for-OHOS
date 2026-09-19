@@ -4,6 +4,7 @@ import { MovieBasicInfo, PageInfo, SearchResult, SearchSourceTab } from '../type
 export class CachedSource {
   list: MovieBasicInfo[] = [];
   page: PageInfo = { pageSize: 12, current: 1, pageCount: 0, total: 0 };
+  error: string = '';
 }
 
 export function emptySearchPage(): PageInfo {
@@ -67,10 +68,11 @@ export class SearchSourceCache {
     return this.gen === gen;
   }
 
-  put(id: string, list: MovieBasicInfo[], page: PageInfo): void {
+  put(id: string, list: MovieBasicInfo[], page: PageInfo, error: string): void {
     const bucket = new CachedSource();
     bucket.list = list;
     bucket.page = page;
+    bucket.error = error;
     this.cache[id] = bucket;
   }
 
@@ -80,17 +82,17 @@ export class SearchSourceCache {
   }
 
   async fetchOne(gen: number, kw: string, id: string): Promise<SearchResult> {
-    const empty: SearchResult = { list: [], page: emptySearchPage(), sources: [] };
+    const empty: SearchResult = { list: [], page: emptySearchPage(), sources: [], error: '搜索失败' };
     try {
       const res = await FilmApi.searchFilm(kw, 1, id);
       if (!this.alive(gen)) {
         return empty;
       }
-      this.put(id, res.list, res.page);
+      this.put(id, res.list, res.page, res.error || '');
       return res;
     } catch (_e) {
       if (this.alive(gen)) {
-        this.put(id, [], empty.page);
+        this.put(id, [], empty.page, empty.error);
       }
       return empty;
     }
@@ -105,6 +107,7 @@ export class SearchBag {
   loading: boolean = false;
   submitted: string = '';
   errorText: string = '';
+  sourceError: string = '';
   session: SearchSourceCache = new SearchSourceCache();
 }
 
@@ -113,10 +116,12 @@ export function applyCached(bag: SearchBag, id: string): void {
   if (hit) {
     bag.list = hit.list;
     bag.page = hit.page;
+    bag.sourceError = hit.error;
     bag.loading = false;
     return;
   }
   bag.list = [];
+  bag.sourceError = '';
   bag.loading = true;
 }
 
@@ -125,6 +130,7 @@ function onSourceReady(bag: SearchBag, id: string, result: SearchResult): void {
   if (bag.source === id) {
     bag.list = result.list;
     bag.page = result.page;
+    bag.sourceError = result.error || '';
     bag.loading = false;
   }
 }
@@ -142,7 +148,7 @@ export async function fanoutSearch(
     if (!session.alive(gen)) {
       return false;
     }
-    session.put('', agg.list, agg.page);
+    session.put('', agg.list, agg.page, '');
     onAggregate(agg, tabsFromAggregate(agg.sources || [], agg, session.cache));
     const ids: string[] = [];
     const sources = agg.sources || [];
@@ -185,9 +191,10 @@ export async function executeSearch(
     const more = await FilmApi.searchFilm(kw, bag.page.current + 1, bag.source);
     bag.submitted = kw;
     bag.errorText = '';
+    bag.sourceError = more.error || '';
     bag.page = more.page;
     bag.list = bag.list.concat(more.list);
-    bag.session.put(bag.source, bag.list, more.page);
+    bag.session.put(bag.source, bag.list, more.page, bag.sourceError);
     onUpdate();
     return true;
   }
@@ -199,6 +206,7 @@ export async function executeSearch(
   const ok = await fanoutSearch(kw, bag.source, bag.session, (result: SearchResult, tabs: SearchSourceTab[]) => {
     bag.submitted = kw;
     bag.errorText = '';
+    bag.sourceError = '';
     bag.sources = tabs;
     if (!bag.source) {
       bag.list = result.list;

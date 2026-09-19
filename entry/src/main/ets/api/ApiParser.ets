@@ -213,7 +213,8 @@ export class ApiParser {
     const result: SearchResult = {
       list: ApiParser.parseMovies(ApiParser.list(record, 'list')),
       page: ApiParser.parsePage(ApiParser.obj(record, 'page')),
-      sources: ApiParser.parseSearchSources(ApiParser.list(record, 'sources'))
+      sources: ApiParser.parseSearchSources(ApiParser.list(record, 'sources')),
+      error: ApiParser.str(record, 'error')
     };
     return result;
   }
@@ -376,7 +377,8 @@ export class ApiParser {
       pictureSlide: ApiParser.str(detailObj, 'pictureSlide'),
       descriptor: descriptor,
       list: sources,
-      localUpdateTime: ApiParser.num(detailObj, 'localUpdateTime')
+      localUpdateTime: ApiParser.num(detailObj, 'localUpdateTime'),
+      rawCid: ApiParser.num(detailObj, 'rawCid') || ApiParser.num(detailObj, 'cid')
     };
     const currentObj = ApiParser.obj(record, 'current');
     const current: MovieUrlInfo = {

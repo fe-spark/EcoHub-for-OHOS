@@ -33,6 +33,7 @@ struct SearchPage {
   @State hotKeywords: string[] = [];
   @State private refreshing: boolean = false;
   @State private errorText: string = '';
+  @State private sourceError: string = '';
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
@@ -155,6 +156,7 @@ struct SearchPage {
     this.loading = this.bag.loading;
     this.submitted = this.bag.submitted;
     this.errorText = this.bag.errorText;
+    this.sourceError = this.bag.sourceError;
   }
 
   private applySource(id: string): void {
@@ -199,6 +201,7 @@ struct SearchPage {
     this.bag.loading = this.loading;
     this.bag.submitted = this.submitted;
     this.bag.errorText = this.errorText;
+    this.bag.sourceError = this.sourceError;
     let ok = false;
     try {
       ok = await executeSearch(this.bag, kw, reset, fromPull, () => {
@@ -398,9 +401,9 @@ struct SearchPage {
             Column() {
               Blank().height(80)
               EmptyState({
-                title: '未找到相关影片',
-                subtitle: `未搜索到与“${this.submitted}”相关的结果，请换个关键词试试`,
-                icon: $r('sys.symbol.film')
+                title: this.sourceError ? '该采集源搜索失败' : '未找到相关影片',
+                subtitle: this.sourceError ? this.sourceError : `未搜索到与“${this.submitted}”相关的结果，请换个关键词试试`,
+                icon: this.sourceError ? $r('sys.symbol.info_circle') : $r('sys.symbol.film')
               })
             }
             .width('100%')

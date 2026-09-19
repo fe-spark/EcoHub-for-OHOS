@@ -12,6 +12,7 @@ export struct FilmDetailHeader {
   @Prop name: string = '';
   @Prop subTitle: string = '';
   @Prop actor: string = '';
+  @Prop sourceName: string = '';
   @Prop @Watch('onDataChange') plot: string = '';
   @Prop @Watch('onDataChange') descriptor: MovieDescriptor | null = null;
   @State private isFav: boolean = false;
@@ -188,6 +189,28 @@ export struct FilmDetailHeader {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .lineHeight(24)
           .layoutWeight(1)
+
+        if (this.sourceName) {
+          Row({ space: 4 }) {
+            AppIcon({
+              src: $r('sys.symbol.link'),
+              iconSize: 11,
+              color: '#FA8C16'
+            })
+            Text(this.sourceName)
+              .fontSize(AppTheme.FONT_SM)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#FA8C16')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .height(26)
+          .padding({ left: 9, right: 9 })
+          .backgroundColor('rgba(250, 140, 22, 0.12)')
+          .borderRadius(AppTheme.RADIUS_PILL)
+          .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.35)' })
+          .margin({ left: 8 })
+        }
 
         // 收藏按钮（右上角唯一的实体胶囊，26vp 精致尺寸，顶部对齐）
         Row({ space: 3 }) {
