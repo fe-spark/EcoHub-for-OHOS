@@ -3,10 +3,12 @@ import { AppTheme } from '../../common/constants/AppTheme';
 import { FormatUtil } from '../../common/utils/FormatUtil';
 import { NavUtil } from '../../common/utils/NavUtil';
 import { AppIcon } from '../common/AppIcon';
+import { FavoriteManager } from '../../services/FavoriteManager';
 
 @Component
 export struct SearchResultItem {
   @Prop film: MovieBasicInfo;
+  @StorageProp('FAVORITE_VERSION') private favVersion: number = 0;
   onSelect?: (film: MovieBasicInfo) => void;
 
   private handleClick(): void {
@@ -14,7 +16,33 @@ export struct SearchResultItem {
       this.onSelect(this.film);
       return;
     }
-    NavUtil.openPlay(this.film.id);
+    NavUtil.openPlay(FormatUtil.filmId(this.film));
+  }
+
+  private isFavorited(): boolean {
+    if (this.favVersion < 0) {
+      return false;
+    }
+    return FavoriteManager.isFavoriteSync(FormatUtil.filmId(this.film));
+  }
+
+  @Builder
+  favoriteTag() {
+    Row({ space: 2 }) {
+      AppIcon({
+        src: $r('sys.symbol.star_fill'),
+        iconSize: 9,
+        color: '#FA8C16'
+      })
+      Text('已收藏')
+        .fontSize(9)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#FA8C16')
+    }
+    .padding({ left: 4, right: 5, top: 2, bottom: 2 })
+    .backgroundColor('rgba(10, 11, 16, 0.85)')
+    .borderRadius(4)
+    .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.4)' })
   }
 
   build() {
@@ -38,6 +66,14 @@ export struct SearchResultItem {
         .justifyContent(FlexAlign.Center)
         .backgroundColor('rgba(0,0,0,0.55)')
         .borderRadius(14)
+
+        if (this.isFavorited()) {
+          Row() {
+            this.favoriteTag()
+          }
+          .position({ x: 4, y: 4 })
+          .hitTestBehavior(HitTestMode.Transparent)
+        }
       }
       Column() {
         Text(this.film.name)

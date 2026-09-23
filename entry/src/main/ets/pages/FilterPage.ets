@@ -12,6 +12,7 @@ import { FilterTagRow } from '../components/film/FilterTagRow';
 import { ScrollFab } from '../components/common/ScrollFab';
 import { FilmCard } from '../components/film/FilmCard';
 import { SourceGuard } from '../services/SourceGuard';
+import { FavoriteManager } from '../services/FavoriteManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
@@ -69,19 +70,26 @@ struct FilterPage {
 
   aboutToAppear() {
     this.applyWindowBar();
+    FavoriteManager.preload();
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.pid = NavUtil.param(params, 'Pid');
-    HttpClient.getInstance().trackView('classify', this.pid, 'FilterPage');
     const category = NavUtil.param(params, 'Category');
     const sort = NavUtil.param(params, 'Sort');
     if (category) this.setSelected('Category', category);
     if (sort) this.setSelected('Sort', sort);
+    HttpClient.getInstance().trackView('classify', this.pid, 'FilterPage', '', category || '');
     this.loadData(true, false);
-    this.reconnectCb = () => { this.loadData(true, false); };
+    this.reconnectCb = () => {
+      FavoriteManager.preload();
+      this.loadData(true, false);
+    };
     SourceGuard.onReconnect(this.reconnectCb);
   }
 
-  onPageShow(): void { this.applyWindowBar(); }
+  onPageShow(): void {
+    this.applyWindowBar();
+    FavoriteManager.preload();
+  }
   aboutToDisappear(): void { SourceGuard.offReconnect(this.reconnectCb); }
 
   private selectedOf(key: string): string {
@@ -111,6 +119,9 @@ struct FilterPage {
   private pick(key: string, value: string): void {
     if (this.isChipOn(key, value) || this.fetchLock) return;
     this.setSelected(key, value);
+    if (key === 'Category' && value) {
+      HttpClient.getInstance().trackView('classify', this.pid, 'FilterPage', '', value);
+    }
     this.loadData(true, false);
     this.scrollToTop();
   }

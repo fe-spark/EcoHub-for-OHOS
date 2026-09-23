@@ -1,10 +1,12 @@
 import { FilmApi } from '../api/FilmApi';
+import { HttpClient } from '../common/network/HttpClient';
 import { DailyUpdateCategory, MovieBasicInfo, PageInfo } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { AppIcon } from '../components/common/AppIcon';
 import { LoadingView } from '../components/common/LoadingView';
 import { EmptyState } from '../components/common/EmptyState';
 import { SourceGuard } from '../services/SourceGuard';
+import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { DailyUpdatePane } from './DailyUpdatePane';
 import { Breakpoint } from '../common/utils/Breakpoint';
@@ -48,7 +50,9 @@ export struct DailyUpdatesTab {
 
 
   aboutToAppear() {
+    FavoriteManager.preload();
     this.reconnectCb = () => {
+      FavoriteManager.preload();
       this.loadMeta();
     };
     SourceGuard.onReconnect(this.reconnectCb);
@@ -115,6 +119,14 @@ export struct DailyUpdatesTab {
     this.siblingResetToken = this.siblingResetToken + 1;
   }
 
+  private trackCategory(index: number): void {
+    if (index < 0 || index >= this.categories.length) return;
+    const cat = this.categories[index];
+    if (cat.pid > 0 || (cat.name && cat.name !== '全部')) {
+      HttpClient.getInstance().trackView('classify', `${cat.pid}`, 'DailyUpdatesTab', '', cat.name);
+    }
+  }
+
   private selectIndex(index: number): void {
     if (index < 0 || index >= this.categories.length || index === this.currentIndex) {
       return;
@@ -122,6 +134,7 @@ export struct DailyUpdatesTab {
     this.currentIndex = index;
     this.swiperController.changeIndex(index, true);
     this.focusChip(index);
+    this.trackCategory(index);
   }
 
   private focusChip(index: number): void {
@@ -340,6 +353,7 @@ export struct DailyUpdatesTab {
         .onChange((index: number) => {
           this.currentIndex = index;
           this.focusChip(index);
+          this.trackCategory(index);
         })
         .width('100%')
         .height('100%')

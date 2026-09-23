@@ -81,7 +81,6 @@ struct PlayPage {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
-    if (this.filmId) HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
     const paramSourceId = NavUtil.param(params, 'sourceId'), paramEp = NavUtil.param(params, 'episodeIndex'), paramTime = NavUtil.param(params, 'currentTime');
     let targetSourceId = paramSourceId, targetEpIndex = paramEp !== '' ? Number(paramEp) : -1, targetTime = paramTime !== '' ? Number(paramTime) : -1;
 
@@ -161,6 +160,16 @@ struct PlayPage {
         return;
       }
       const detail = info.detail;
+      if (firstOpen) {
+        HttpClient.getInstance().trackView(
+          'play',
+          this.filmId,
+          'PlayPage',
+          '',
+          detail.descriptor?.cName || '',
+          detail.name || ''
+        );
+      }
       this.name = detail.name;
       this.picture = detail.picture;
       this.descriptor = detail.descriptor;
@@ -284,7 +293,6 @@ struct PlayPage {
     const id = FormatUtil.filmId(film);
     if (!id || id === this.filmId) return;
     this.filmId = id;
-    HttpClient.getInstance().trackView('play', this.filmId, 'PlayPage');
     this.name = '';
     this.sources = [];
     this.playUrl = '';

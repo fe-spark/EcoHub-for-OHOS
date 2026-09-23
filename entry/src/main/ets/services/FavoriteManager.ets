@@ -7,6 +7,8 @@ const MAX_FAVORITE = 300;
 
 export class FavoriteManager {
   private static listeners: Array<() => void> = [];
+  private static cachedMap: Record<string, FavoriteItem> | null = null;
+  private static cachedKey: string = '';
 
   private static store(): preferences.Preferences | null {
     return ServerConfigManager.getInstance().getPreferences();
@@ -30,12 +32,29 @@ export class FavoriteManager {
   }
 
   private static notifyChange(): void {
+    AppStorage.setOrCreate<number>('FAVORITE_VERSION', Date.now());
     for (let i = 0; i < FavoriteManager.listeners.length; i++) {
       try {
         FavoriteManager.listeners[i]();
       } catch (_e) {
       }
     }
+  }
+
+  static isFavoriteSync(id: string): boolean {
+    if (!id || !FavoriteManager.cachedMap) {
+      return false;
+    }
+    const currentKey = FavoriteManager.dataKey();
+    if (FavoriteManager.cachedKey !== currentKey) {
+      return false;
+    }
+    return !!FavoriteManager.cachedMap[id];
+  }
+
+  static async preload(): Promise<void> {
+    await FavoriteManager.readMap();
+    AppStorage.setOrCreate<number>('FAVORITE_VERSION', Date.now());
   }
 
   static async isFavorite(id: string): Promise<boolean> {
@@ -132,23 +151,30 @@ export class FavoriteManager {
   }
 
   private static async readMap(): Promise<Record<string, FavoriteItem>> {
-    const store = FavoriteManager.store();
     const key = FavoriteManager.dataKey();
+    if (FavoriteManager.cachedMap !== null && FavoriteManager.cachedKey === key) {
+      return FavoriteManager.cachedMap;
+    }
+    const store = FavoriteManager.store();
     if (!store || !key) {
       return {};
     }
     try {
       const raw = (await store.get(key, '{}')) as string;
       const parsed = JSON.parse(raw) as Record<string, FavoriteItem>;
-      return parsed ? parsed : {};
+      FavoriteManager.cachedMap = parsed ? parsed : {};
+      FavoriteManager.cachedKey = key;
+      return FavoriteManager.cachedMap;
     } catch (err) {
       return {};
     }
   }
 
   private static async writeMap(map: Record<string, FavoriteItem>): Promise<void> {
-    const store = FavoriteManager.store();
     const key = FavoriteManager.dataKey();
+    FavoriteManager.cachedMap = map;
+    FavoriteManager.cachedKey = key;
+    const store = FavoriteManager.store();
     if (!store || !key) {
       return;
     }

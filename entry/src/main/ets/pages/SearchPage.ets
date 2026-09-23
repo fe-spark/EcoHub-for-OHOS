@@ -9,6 +9,7 @@ import { LoadingView } from '../components/common/LoadingView';
 import { AppIcon } from '../components/common/AppIcon';
 import { BackIcon } from '../components/common/BackIcon';
 import { SourceGuard } from '../services/SourceGuard';
+import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { SearchHistoryManager } from '../services/SearchHistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
@@ -66,6 +67,7 @@ struct SearchPage {
 
   aboutToAppear() {
     this.applyWindowBar();
+    FavoriteManager.preload();
     this.loadHistory();
     this.loadHotKeywords();
     const params = this.getUIContext().getRouter().getParams();
@@ -75,6 +77,7 @@ struct SearchPage {
       this.doSearch(true, false);
     }
     this.reconnectCb = () => {
+      FavoriteManager.preload();
       this.loadHistory();
       this.loadHotKeywords();
       if (this.submitted) {
@@ -86,6 +89,7 @@ struct SearchPage {
 
   onPageShow(): void {
     this.applyWindowBar();
+    FavoriteManager.preload();
     const params = this.getUIContext().getRouter().getParams();
     const initialKw = NavUtil.param(params, 'keyword');
     if (!initialKw && !this.submitted) {

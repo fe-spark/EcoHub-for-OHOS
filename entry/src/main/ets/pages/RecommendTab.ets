@@ -9,6 +9,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { AppIcon } from '../components/common/AppIcon';
 import { HomeBanner } from '../components/film/HomeBanner';
 import { SourceGuard } from '../services/SourceGuard';
+import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
 
@@ -53,7 +54,9 @@ export struct RecommendTab {
   private reconnectCb: () => void = () => {};
 
   aboutToAppear() {
+    FavoriteManager.preload();
     this.reconnectCb = () => {
+      FavoriteManager.preload();
       this.loadHome(false);
     };
     SourceGuard.onReconnect(this.reconnectCb);
