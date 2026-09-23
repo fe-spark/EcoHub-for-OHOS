@@ -49,7 +49,7 @@ export struct SearchSuggestPane {
                       .fontColor(AppTheme.TEXT_SECONDARY)
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .constraintSize({ maxWidth: 200 })
+                      .constraintSize({ maxWidth: '78%' })
                   }
                   .padding({ left: 12, right: 4, top: 6, bottom: 6 })
                   .onClick(() => {
@@ -113,7 +113,7 @@ export struct SearchSuggestPane {
                     .fontColor(AppTheme.TEXT_PRIMARY)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .constraintSize({ maxWidth: 200 })
+                    .constraintSize({ maxWidth: '82%' })
                 }
                 .padding({ left: 12, right: 12, top: 7, bottom: 7 })
                 .margin({ right: 8, bottom: 8 })
