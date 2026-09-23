@@ -366,11 +366,36 @@ struct LivePlayPage {
   private hudBottomInset(): number { return (this.playerFull || this.splitPlay()) ? this.bottomInset : 0; }
 
   @Builder
-  playTabItem(title: string, index: number) {
+  playTabItem(title: string, index: number, badge: string = '') {
     Column() {
-      Text(title)
-        .fontSize(16).fontWeight(FontWeight.Bold)
-        .fontColor(this.activeTab === index ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_MUTED)
+      Row({ space: 5 }) {
+        Text(title)
+          .fontSize(16).fontWeight(FontWeight.Bold)
+          .fontColor(this.activeTab === index ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_MUTED)
+        if (badge) {
+          Row({ space: 2 }) {
+            AppIcon({
+              src: $r('sys.symbol.link'),
+              iconSize: 10,
+              color: '#FA8C16'
+            })
+            Text(badge)
+              .fontSize(10)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#FA8C16')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .constraintSize({ maxWidth: 80 })
+          }
+          .height(18)
+          .padding({ left: 5, right: 5 })
+          .backgroundColor('rgba(250, 140, 22, 0.12)')
+          .borderRadius(AppTheme.RADIUS_PILL)
+          .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.35)' })
+        }
+      }
+      .alignItems(VerticalAlign.Center)
+
       Column()
         .width(18).height(3).borderRadius(2).margin({ top: 6 })
         .backgroundColor(this.activeTab === index ? AppTheme.ACCENT : Color.Transparent)
@@ -434,7 +459,7 @@ struct LivePlayPage {
       name: this.name,
       subTitle: this.subTitle,
       actor: this.actor,
-      sourceName: this.sourceName,
+      sourceName: '',
       plot: this.plot,
       descriptor: this.descriptor,
       sources: this.sources,
@@ -465,7 +490,7 @@ struct LivePlayPage {
   @Builder
   sideTabs() {
     Row() {
-      this.playTabItem('详情', 0)
+      this.playTabItem('详情', 0, this.sourceName)
       this.playTabItem('同类推荐', 1)
     }
     .width('100%')
