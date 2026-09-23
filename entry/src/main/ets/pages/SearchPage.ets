@@ -34,6 +34,7 @@ struct SearchPage {
   @State hotKeywords: string[] = [];
   @State private refreshing: boolean = false;
   @State private errorText: string = '';
+  @State private sourceError: string = '';
   @State private fetchLock: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
@@ -159,6 +160,7 @@ struct SearchPage {
     this.loading = this.bag.loading;
     this.submitted = this.bag.submitted;
     this.errorText = this.bag.errorText;
+    this.sourceError = this.bag.sourceError;
   }
 
   private applySource(id: string): void {
@@ -189,6 +191,7 @@ struct SearchPage {
     if (reset) {
       HttpClient.getInstance().trackView('search', kw, 'SearchPage');
       this.errorText = '';
+      this.sourceError = '';
       SearchHistoryManager.add(kw).then(() => {
         this.loadHistory();
       });
@@ -203,6 +206,7 @@ struct SearchPage {
     this.bag.loading = this.loading;
     this.bag.submitted = this.submitted;
     this.bag.errorText = this.errorText;
+    this.bag.sourceError = this.sourceError;
     let ok = false;
     try {
       ok = await executeSearch(this.bag, kw, reset, fromPull, () => {
@@ -270,9 +274,10 @@ struct SearchPage {
             .enterKeyType(EnterKeyType.Search)
             .onChange((val: string) => {
               this.keyword = val;
-              if (!val.trim() && (this.submitted || this.errorText)) {
+              if (!val.trim() && (this.submitted || this.errorText || this.sourceError)) {
                 this.submitted = '';
                 this.errorText = '';
+                this.sourceError = '';
                 this.list = [];
               }
             })
@@ -295,6 +300,7 @@ struct SearchPage {
               this.keyword = '';
               this.submitted = '';
               this.errorText = '';
+              this.sourceError = '';
               this.list = [];
               this.hideKeyboard();
             })
@@ -341,7 +347,7 @@ struct SearchPage {
       })
 
       if (this.loading) {
-        LoadingView({ label: '正在搜索' })
+        LoadingView({ label: this.source ? '正在搜索该采集源' : '正在搜索' })
       } else if (this.errorText) {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll() {
@@ -401,11 +407,23 @@ struct SearchPage {
           Scroll() {
             Column() {
               Blank().height(80)
-              EmptyState({
-                title: '未找到相关影片',
-                subtitle: `未搜索到与“${this.submitted}”相关的结果，请换个关键词试试`,
-                icon: $r('sys.symbol.film')
-              })
+              if (this.sourceError) {
+                EmptyState({
+                  title: '该采集源搜索失败',
+                  subtitle: this.sourceError,
+                  icon: $r('sys.symbol.info_circle'),
+                  actionText: '重新搜索',
+                  onAction: () => {
+                    this.doSearch(true, false, true);
+                  }
+                })
+              } else {
+                EmptyState({
+                  title: '未找到相关影片',
+                  subtitle: `未找到与“${this.submitted}”相关的影片\n建议缩短或更换搜索词，也可以尝试切换其他采集源`,
+                  icon: $r('sys.symbol.film')
+                })
+              }
             }
             .width('100%')
             .alignItems(HorizontalAlign.Center)
@@ -424,7 +442,7 @@ struct SearchPage {
             this.refreshing = false;
             return;
           }
-          this.doSearch(true, true);
+          this.doSearch(true, true, true);
         })
         .pullToRefresh(!this.fetchLock)
         .layoutWeight(1)
@@ -479,7 +497,7 @@ struct SearchPage {
             this.refreshing = false;
             return;
           }
-          this.doSearch(true, true);
+          this.doSearch(true, true, true);
         })
         .pullToRefresh(!this.fetchLock)
         .layoutWeight(1)

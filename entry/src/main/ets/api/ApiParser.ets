@@ -213,7 +213,8 @@ export class ApiParser {
     const result: SearchResult = {
       list: ApiParser.parseMovies(ApiParser.list(record, 'list')),
       page: ApiParser.parsePage(ApiParser.obj(record, 'page')),
-      sources: ApiParser.parseSearchSources(ApiParser.list(record, 'sources'))
+      sources: ApiParser.parseSearchSources(ApiParser.list(record, 'sources')),
+      error: ApiParser.str(record, 'error')
     };
     return result;
   }

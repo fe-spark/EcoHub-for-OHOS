@@ -147,6 +147,9 @@ export class FilmApi {
   }
 
   static async getPlayInfo(id: string, playFrom: string = '', episode: number = 0, sid: string = ''): Promise<PlayInfo> {
+    if ((!id || id === '0') && sid) {
+      return FilmApi.getLivePlayInfo(playFrom, sid, episode);
+    }
     const params = new QueryParams()
       .set('id', id)
       .set('playFrom', playFrom)
@@ -157,6 +160,18 @@ export class FilmApi {
     const res = await HttpClient.getInstance().get('/filmPlayInfo', params, 20000);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '播放数据获取失败');
+    }
+    return ApiParser.parsePlay(res.data as Object);
+  }
+
+  static async getLivePlayInfo(sourceId: string, sid: string, episode: number = 0): Promise<PlayInfo> {
+    const params = new QueryParams()
+      .set('source', sourceId)
+      .set('sid', sid)
+      .set('episode', episode);
+    const res = await HttpClient.getInstance().get('/liveFilmPlayInfo', params, 20000);
+    if (res.code !== 0 || !res.data) {
+      throw new Error(res.msg || '现场播放数据获取失败');
     }
     return ApiParser.parsePlay(res.data as Object);
   }

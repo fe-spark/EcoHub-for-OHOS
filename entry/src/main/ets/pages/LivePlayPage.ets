@@ -162,7 +162,7 @@ struct LivePlayPage {
     }
     this.playUrl = '';
     try {
-      const info = await FilmApi.getPlayInfo('', this.sourceId, this.episodeIndex, this.sourceMid);
+      const info = await FilmApi.getLivePlayInfo(this.sourceId, this.sourceMid, this.episodeIndex);
       if (token !== this.loadToken) {
         return;
       }

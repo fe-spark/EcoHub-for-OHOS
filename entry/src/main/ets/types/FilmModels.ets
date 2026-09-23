@@ -210,6 +210,7 @@ export interface SearchResult {
   list: MovieBasicInfo[];
   page: PageInfo;
   sources: SearchSourceTab[];
+  error?: string;
 }
 
 export interface FavoriteItem {
