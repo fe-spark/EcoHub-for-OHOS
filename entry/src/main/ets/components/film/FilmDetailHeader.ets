@@ -216,87 +216,84 @@ export struct FilmDetailHeader {
       .alignItems(VerticalAlign.Top)
       .padding({ left: 12, right: 12, top: 8, bottom: 4 })
 
-      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，右侧为现场采集源微标）
-      Row() {
-        Row({ space: 6 }) {
-          // 评分微标（如有）
-          if (this.scoreText !== '') {
-            Row({ space: 2 }) {
-              Text('★')
-                .fontSize(AppTheme.FONT_XS)
-                .fontColor(AppTheme.ACCENT)
-              Text(this.scoreText)
-                .fontSize(AppTheme.FONT_SM)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.ACCENT)
-              Text('分')
-                .fontSize(AppTheme.FONT_2XS)
-                .fontColor(AppTheme.ACCENT)
-            }
-            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .backgroundColor(AppTheme.ACCENT_SOFT)
-            .borderRadius(AppTheme.RADIUS_SM)
-          }
-
-          // 核心信息摘要（年份 · 分类 · 地区）
-          if (this.briefMetaText() !== '') {
-            Text(this.briefMetaText())
-              .fontSize(AppTheme.FONT_SM)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-
-          // 紧贴左侧的纯文字更多入口（主题高亮色链接，无按钮底色）
-          Row({ space: 1 }) {
-            if (this.briefMetaText() !== '') {
-              Text('· ')
-                .fontSize(AppTheme.FONT_SM)
-                .fontColor(AppTheme.TEXT_MUTED)
-            }
-            Text('更多')
-              .fontSize(AppTheme.FONT_SM)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(AppTheme.ACCENT)
-            AppIcon({
-              src: $r('sys.symbol.chevron_right'),
-              iconSize: 10,
-              color: AppTheme.ACCENT
-            })
-          }
-          .alignItems(VerticalAlign.Center)
-        }
-        .layoutWeight(1)
-        .alignItems(VerticalAlign.Center)
-        .onClick(() => {
-          this.openDetailDialog();
-        })
-
+      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，左侧排列采集源、评分、信息摘要与更多入口）
+      Row({ space: 6 }) {
+        // 采集源微标（如有）
         if (this.sourceName) {
-          Row({ space: 4 }) {
+          Row({ space: 3 }) {
             AppIcon({
               src: $r('sys.symbol.link'),
-              iconSize: 11,
+              iconSize: 10,
               color: '#FA8C16'
             })
             Text(this.sourceName)
-              .fontSize(AppTheme.FONT_SM)
+              .fontSize(11)
               .fontWeight(FontWeight.Medium)
               .fontColor('#FA8C16')
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
-          .height(24)
-          .padding({ left: 8, right: 8 })
+          .height(20)
+          .padding({ left: 6, right: 6 })
           .backgroundColor('rgba(250, 140, 22, 0.12)')
           .borderRadius(AppTheme.RADIUS_PILL)
           .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.35)' })
-          .margin({ left: 8 })
+          .constraintSize({ maxWidth: 120 })
         }
+
+        // 评分微标（如有）
+        if (this.scoreText !== '') {
+          Row({ space: 2 }) {
+            Text('★')
+              .fontSize(AppTheme.FONT_XS)
+              .fontColor(AppTheme.ACCENT)
+            Text(this.scoreText)
+              .fontSize(AppTheme.FONT_SM)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.ACCENT)
+            Text('分')
+              .fontSize(AppTheme.FONT_2XS)
+              .fontColor(AppTheme.ACCENT)
+          }
+          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+          .backgroundColor(AppTheme.ACCENT_SOFT)
+          .borderRadius(AppTheme.RADIUS_SM)
+        }
+
+        // 核心信息摘要（年份 · 分类 · 地区）
+        if (this.briefMetaText() !== '') {
+          Text(this.briefMetaText())
+            .fontSize(AppTheme.FONT_SM)
+            .fontColor(AppTheme.TEXT_SECONDARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+
+        // 紧贴左侧的纯文字更多入口（主题高亮色链接，无按钮底色）
+        Row({ space: 1 }) {
+          if (this.briefMetaText() !== '') {
+            Text('· ')
+              .fontSize(AppTheme.FONT_SM)
+              .fontColor(AppTheme.TEXT_MUTED)
+          }
+          Text('更多')
+            .fontSize(AppTheme.FONT_SM)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppTheme.ACCENT)
+          AppIcon({
+            src: $r('sys.symbol.chevron_right'),
+            iconSize: 10,
+            color: AppTheme.ACCENT
+          })
+        }
+        .alignItems(VerticalAlign.Center)
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
       .padding({ left: 12, right: 12, top: 2, bottom: 8 })
+      .onClick(() => {
+        this.openDetailDialog();
+      })
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
