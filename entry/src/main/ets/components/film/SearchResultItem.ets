@@ -88,7 +88,7 @@ export struct SearchResultItem {
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
           .lineHeight(22)
-          .maxLines(1)
+          .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(FormatUtil.joinMeta([this.film.cName, this.film.year, this.film.area, this.film.remarks]))
           .fontSize(AppTheme.FONT_SM)
