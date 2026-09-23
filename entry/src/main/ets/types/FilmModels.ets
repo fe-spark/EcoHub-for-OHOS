@@ -177,6 +177,7 @@ export interface MovieDetail {
   descriptor: MovieDescriptor;
   list: PlaySource[];
   localUpdateTime: number;
+  rawCid?: number;
 }
 
 export interface PlayInfo {

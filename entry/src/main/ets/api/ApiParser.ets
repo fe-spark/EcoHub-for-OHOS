@@ -377,7 +377,8 @@ export class ApiParser {
       pictureSlide: ApiParser.str(detailObj, 'pictureSlide'),
       descriptor: descriptor,
       list: sources,
-      localUpdateTime: ApiParser.num(detailObj, 'localUpdateTime')
+      localUpdateTime: ApiParser.num(detailObj, 'localUpdateTime'),
+      rawCid: ApiParser.num(detailObj, 'rawCid') || ApiParser.num(detailObj, 'cid')
     };
     const currentObj = ApiParser.obj(record, 'current');
     const current: MovieUrlInfo = {

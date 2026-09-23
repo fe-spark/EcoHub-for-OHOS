@@ -122,7 +122,8 @@ export class FilmApi {
       const empty: SearchResult = {
         list: [],
         page: { pageSize: 10, current: current, pageCount: 0, total: 0 },
-        sources: [] as SearchSourceTab[]
+        sources: [] as SearchSourceTab[],
+        error: '搜索失败'
       };
       return empty;
     }
@@ -164,9 +165,9 @@ export class FilmApi {
     return ApiParser.parsePlay(res.data as Object);
   }
 
-  static async getLivePlayInfo(sourceId: string, sid: string, episode: number = 0): Promise<PlayInfo> {
+  static async getLivePlayInfo(source: string, sid: string, episode: number = 0): Promise<PlayInfo> {
     const params = new QueryParams()
-      .set('source', sourceId)
+      .set('source', source)
       .set('sid', sid)
       .set('episode', episode);
     const res = await HttpClient.getInstance().get('/liveFilmPlayInfo', params, 20000);
@@ -179,6 +180,21 @@ export class FilmApi {
   static async getRelate(id: string): Promise<MovieBasicInfo[]> {
     const params = new QueryParams().set('id', id);
     const res = await HttpClient.getInstance().get('/filmRelate', params);
+    if (res.code !== 0 || !res.data) {
+      return [];
+    }
+    if (Array.isArray(res.data)) {
+      return ApiParser.parseMovies(res.data as Object[]);
+    }
+    return [];
+  }
+
+  static async getLiveRelate(source: string, cid: number | string = 0, sid: number | string = 0): Promise<MovieBasicInfo[]> {
+    const params = new QueryParams()
+      .set('source', source)
+      .set('cid', cid)
+      .set('sid', sid);
+    const res = await HttpClient.getInstance().get('/liveFilmRelate', params);
     if (res.code !== 0 || !res.data) {
       return [];
     }

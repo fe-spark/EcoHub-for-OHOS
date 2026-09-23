@@ -148,7 +148,7 @@ export async function fanoutSearch(
     if (!session.alive(gen)) {
       return false;
     }
-    session.put('', agg.list, agg.page);
+    session.put('', agg.list, agg.page, '');
     onAggregate(agg, tabsFromAggregate(agg.sources || [], agg, session.cache));
     const ids: string[] = [];
     const sources = agg.sources || [];
@@ -191,9 +191,10 @@ export async function executeSearch(
     const more = await FilmApi.searchFilm(kw, bag.page.current + 1, bag.source);
     bag.submitted = kw;
     bag.errorText = '';
+    bag.sourceError = more.error || '';
     bag.page = more.page;
     bag.list = bag.list.concat(more.list);
-    bag.session.put(bag.source, bag.list, more.page);
+    bag.session.put(bag.source, bag.list, more.page, bag.sourceError);
     onUpdate();
     return true;
   }
@@ -205,6 +206,7 @@ export async function executeSearch(
   const ok = await fanoutSearch(kw, bag.source, bag.session, (result: SearchResult, tabs: SearchSourceTab[]) => {
     bag.submitted = kw;
     bag.errorText = '';
+    bag.sourceError = '';
     bag.sources = tabs;
     if (!bag.source) {
       bag.list = result.list;
