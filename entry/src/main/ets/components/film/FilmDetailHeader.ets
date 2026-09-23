@@ -45,6 +45,7 @@ export struct FilmDetailHeader {
       builder: FilmDetailDialog({
         name: this.name,
         scoreText: this.scoreText,
+        sourceName: this.sourceName,
         tags: this.metaTagsList(),
         director: this.directorText(),
         actor: this.actorText(),
@@ -216,31 +217,8 @@ export struct FilmDetailHeader {
       .alignItems(VerticalAlign.Top)
       .padding({ left: 12, right: 12, top: 8, bottom: 4 })
 
-      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，左侧排列采集源、评分、信息摘要与更多入口）
+      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，左侧排列评分、信息摘要与更多入口）
       Row({ space: 6 }) {
-        // 采集源微标（如有）
-        if (this.sourceName) {
-          Row({ space: 3 }) {
-            AppIcon({
-              src: $r('sys.symbol.link'),
-              iconSize: 10,
-              color: '#FA8C16'
-            })
-            Text(this.sourceName)
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#FA8C16')
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .height(20)
-          .padding({ left: 6, right: 6 })
-          .backgroundColor('rgba(250, 140, 22, 0.12)')
-          .borderRadius(AppTheme.RADIUS_PILL)
-          .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.35)' })
-          .constraintSize({ maxWidth: 120 })
-        }
-
         // 评分微标（如有）
         if (this.scoreText !== '') {
           Row({ space: 2 }) {
