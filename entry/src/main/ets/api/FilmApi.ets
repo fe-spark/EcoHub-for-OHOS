@@ -10,7 +10,8 @@ import {
   HomeData,
   MovieBasicInfo,
   PlayInfo,
-  SearchResult
+  SearchResult,
+  SearchSourceTab
 } from '../types/FilmModels';
 
 export class FilmApi {
@@ -111,13 +112,17 @@ export class FilmApi {
     return ApiParser.parseStringList(res.data);
   }
 
-  static async searchFilm(keyword: string, current: number = 1): Promise<SearchResult> {
+  static async searchFilm(keyword: string, current: number = 1, source: string = ''): Promise<SearchResult> {
     const params = new QueryParams().set('keyword', keyword).set('current', current);
+    if (source) {
+      params.set('source', source);
+    }
     const res = await HttpClient.getInstance().get('/searchFilm', params);
     if (res.code !== 0 || !res.data) {
       const empty: SearchResult = {
         list: [],
-        page: { pageSize: 10, current: current, pageCount: 0, total: 0 }
+        page: { pageSize: 10, current: current, pageCount: 0, total: 0 },
+        sources: [] as SearchSourceTab[]
       };
       return empty;
     }
@@ -141,11 +146,14 @@ export class FilmApi {
     return ApiParser.parseFilter(res.data as Object);
   }
 
-  static async getPlayInfo(id: string, playFrom: string = '', episode: number = 0): Promise<PlayInfo> {
+  static async getPlayInfo(id: string, playFrom: string = '', episode: number = 0, sid: string = ''): Promise<PlayInfo> {
     const params = new QueryParams()
       .set('id', id)
       .set('playFrom', playFrom)
       .set('episode', episode);
+    if (sid) {
+      params.set('sid', sid);
+    }
     const res = await HttpClient.getInstance().get('/filmPlayInfo', params, 20000);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '播放数据获取失败');

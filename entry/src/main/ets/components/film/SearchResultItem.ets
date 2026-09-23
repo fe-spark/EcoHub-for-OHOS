@@ -16,7 +16,13 @@ export struct SearchResultItem {
       this.onSelect(this.film);
       return;
     }
-    NavUtil.openPlay(FormatUtil.filmId(this.film));
+    NavUtil.openPlay(
+      FormatUtil.filmId(this.film),
+      this.film.sourceId,
+      undefined,
+      undefined,
+      this.film.sourceMid > 0 ? `${this.film.sourceMid}` : ''
+    );
   }
 
   private isFavorited(): boolean {
@@ -49,23 +55,23 @@ export struct SearchResultItem {
     Row() {
       Stack({ alignContent: Alignment.Center }) {
         Image(FormatUtil.poster(this.film))
-          .width(86)
-          .height(128)
+          .width(96)
+          .height(142)
           .objectFit(ImageFit.Cover)
-          .borderRadius(AppTheme.RADIUS_MD)
+          .borderRadius(AppTheme.RADIUS_LG)
           .backgroundColor(AppTheme.BG_CARD)
         Row() {
           AppIcon({
             src: $r('sys.symbol.play_fill'),
-            iconSize: 12,
+            iconSize: 14,
             color: AppTheme.TEXT_PRIMARY
           })
         }
-        .width(28)
-        .height(28)
+        .width(30)
+        .height(30)
         .justifyContent(FlexAlign.Center)
         .backgroundColor('rgba(0,0,0,0.55)')
-        .borderRadius(14)
+        .borderRadius(15)
 
         if (this.isFavorited()) {
           Row() {
@@ -75,41 +81,49 @@ export struct SearchResultItem {
           .hitTestBehavior(HitTestMode.Transparent)
         }
       }
+
       Column() {
         Text(this.film.name)
-          .fontSize(16)
+          .fontSize(AppTheme.FONT_LG)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppTheme.TEXT_PRIMARY)
+          .lineHeight(22)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(FormatUtil.joinMeta([this.film.cName, this.film.year, this.film.area, this.film.remarks]))
-          .fontSize(12)
+          .fontSize(AppTheme.FONT_SM)
           .fontColor(AppTheme.TEXT_SECONDARY)
           .margin({ top: 8 })
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(`导演 ${this.film.director || '未知'}`)
-          .fontSize(12)
+          .fontSize(AppTheme.FONT_SM)
+          .fontColor(AppTheme.TEXT_MUTED)
+          .margin({ top: 8 })
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(`主演 ${this.film.actor || '未知'}`)
+          .fontSize(AppTheme.FONT_SM)
           .fontColor(AppTheme.TEXT_MUTED)
           .margin({ top: 6 })
           .maxLines(1)
-        Text(`主演 ${this.film.actor || '未知'}`)
-          .fontSize(12)
-          .fontColor(AppTheme.TEXT_MUTED)
-          .margin({ top: 4 })
-          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(this.film.blurb || '暂无简介')
-          .fontSize(12)
+          .fontSize(AppTheme.FONT_SM)
           .fontColor(AppTheme.TEXT_SECONDARY)
-          .margin({ top: 8 })
+          .margin({ top: 10 })
+          .lineHeight(18)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
+      .justifyContent(FlexAlign.Start)
       .alignItems(HorizontalAlign.Start)
-      .margin({ left: 12 })
+      .margin({ left: AppTheme.SPACE_LG })
+      .constraintSize({ minHeight: 142 })
     }
     .width('100%')
+    .alignItems(VerticalAlign.Top)
     .onClick(() => {
       this.handleClick();
     })
