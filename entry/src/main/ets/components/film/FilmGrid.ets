@@ -29,7 +29,7 @@ export struct FilmGrid {
         FilmCard({ film: film, onClickCard: this.onClickFilm })
           .width('100%')
       }
-    }, (film: MovieBasicInfo) => `${film.id}`)
+    }, (film: MovieBasicInfo, idx: number) => `${film.sourceId}_${film.id}_${film.sourceMid}_${film.name}_${idx}`)
   }
 
   build() {

@@ -7,13 +7,39 @@ import { FavoriteManager } from '../../services/FavoriteManager';
 
 @Component
 export struct FilmCard {
-  @Prop film: MovieBasicInfo;
+  @Prop @Watch('onFilmChange') film: MovieBasicInfo;
   @Prop cardWidth: number = 0;
   @Prop showMeta: boolean = true;
-  @StorageProp('FAVORITE_VERSION') private favVersion: number = 0;
+  @StorageProp('FAVORITE_VERSION') @Watch('onFavVersionChange') private favVersion: number = 0;
+  @State private isFav: boolean = false;
   onClickCard?: (film: MovieBasicInfo) => void;
   @State private broken: boolean = false;
   @State private pressed: boolean = false;
+  private favChangeCb: () => void = () => {};
+
+  aboutToAppear(): void {
+    this.updateFavState();
+    this.favChangeCb = () => {
+      this.updateFavState();
+    };
+    FavoriteManager.onFavoriteChange(this.favChangeCb);
+  }
+
+  aboutToDisappear(): void {
+    FavoriteManager.offFavoriteChange(this.favChangeCb);
+  }
+
+  private onFilmChange(): void {
+    this.updateFavState();
+  }
+
+  private onFavVersionChange(): void {
+    this.updateFavState();
+  }
+
+  private updateFavState(): void {
+    this.isFav = FavoriteManager.isFavoriteFilmSync(this.film);
+  }
 
   private posterUrl(): string {
     return FormatUtil.poster(this.film);
@@ -29,13 +55,6 @@ export struct FilmCard {
       return;
     }
     NavUtil.openPlay(FormatUtil.filmId(this.film));
-  }
-
-  private isFavorited(): boolean {
-    if (this.favVersion < 0) {
-      return false;
-    }
-    return FavoriteManager.isFavoriteSync(FormatUtil.filmId(this.film));
   }
 
   @Builder
@@ -107,7 +126,7 @@ export struct FilmCard {
             colors: [['rgba(0,0,0,0)', 0.65], ['rgba(10,11,16,0.60)', 1]]
           })
 
-        if (this.isFavorited()) {
+        if (this.isFav) {
           Row() {
             this.favoriteTag()
           }

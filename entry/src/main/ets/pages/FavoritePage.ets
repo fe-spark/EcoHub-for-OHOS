@@ -237,7 +237,7 @@ struct FavoritePage {
                 .backgroundColor(AppTheme.BG_CARD)
                 .borderRadius(AppTheme.RADIUS_LG)
                 .onClick(() => {
-                  NavUtil.openPlay(item.id);
+                  NavUtil.openPlay(item.id, '', undefined, undefined, '', undefined, item.name);
                 })
               }
               .swipeAction({

@@ -13,7 +13,7 @@ import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { SearchHistoryManager } from '../services/SearchHistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
-import { SearchResultRows } from '../components/film/SearchResultRows';
+import { SearchResultList } from '../components/film/SearchResultList';
 import { SearchSourceTabs } from '../components/film/SearchSourceTabs';
 import { SearchSuggestPane } from '../components/film/SearchSuggestPane';
 import { applyCached, executeSearch, SearchBag } from '../services/SearchSourceCache';
@@ -154,9 +154,9 @@ struct SearchPage {
   }
 
   private syncBag(): void {
-    this.list = this.bag.list;
+    this.list = this.bag.list.slice();
     this.page = this.bag.page;
-    this.sources = this.bag.sources;
+    this.sources = this.bag.sources.slice();
     this.loading = this.bag.loading;
     this.submitted = this.bag.submitted;
     this.errorText = this.bag.errorText;
@@ -227,6 +227,7 @@ struct SearchPage {
       }
     } finally {
       this.fetchLock = false;
+      this.loading = false;
       this.loadingMore = false;
       this.refreshing = false;
       if (fromPull && ok) {
@@ -335,16 +336,18 @@ struct SearchPage {
       .padding({ left: 8, right: 16, top: 8, bottom: 12 })
       .alignItems(VerticalAlign.Center)
 
-      SearchSourceTabs({
-        sources: this.sources,
-        activeId: this.source,
-        onChange: (id: string) => {
-          if (id === this.source || !this.submitted) {
-            return;
+      if (this.submitted && this.sources.length > 1) {
+        SearchSourceTabs({
+          sources: this.sources,
+          activeId: this.source,
+          onChange: (id: string) => {
+            if (id === this.source || !this.submitted) {
+              return;
+            }
+            this.applySource(id);
           }
-          this.applySource(id);
-        }
-      })
+        })
+      }
 
       if (this.loading) {
         LoadingView({ label: this.source ? '正在搜索该采集源' : '正在搜索' })
@@ -448,49 +451,29 @@ struct SearchPage {
         .layoutWeight(1)
       } else {
         Refresh({ refreshing: $$this.refreshing }) {
-          Column() {
-            List({ space: 12 }) {
-              ListItem() {
-                SearchResultRows({
-                  list: this.list,
-                  widthBp: this.widthBp,
-                  onSelect: (selected: MovieBasicInfo) => {
-                    this.hideKeyboard();
-                    NavUtil.openPlay(selected.id, selected.sourceId, undefined, undefined,
-                      selected.sourceMid > 0 ? `${selected.sourceMid}` : '');
-                  }
-                })
-              }
-
-              ListItem() {
-                Text(this.loadingMore ? '加载中...' : (this.page.current >= this.page.pageCount ? '没有更多了' : ''))
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                  .width('100%')
-                  .height(60)
-                  .textAlign(TextAlign.Center)
-              }
-            }
-            .width('100%')
-            .height('100%')
-            .padding({ left: 16, right: 16, top: 8 })
-            .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.None)
-            .nestedScroll({
-              scrollForward: NestedScrollMode.SELF_FIRST,
-              scrollBackward: NestedScrollMode.SELF_FIRST
-            })
-            .onScrollFrameBegin((offset: number, _state: ScrollState) => {
+          SearchResultList({
+            list: $list,
+            page: $page,
+            loadingMore: this.loadingMore,
+            onSelect: (selected: MovieBasicInfo) => {
               this.hideKeyboard();
-              return { offsetRemain: offset };
-            })
-            .onReachEnd(() => {
+              NavUtil.openPlay(
+                selected.id,
+                selected.sourceId,
+                undefined,
+                undefined,
+                selected.sourceMid > 0 ? `${selected.sourceMid}` : '',
+                undefined,
+                selected.name
+              );
+            },
+            onLoadMore: () => {
               this.doSearch(false);
-            })
-          }
-          .width('100%')
-          .height('100%')
-          .constraintSize({ maxWidth: AppTheme.CONTENT_MAX_WIDTH })
+            },
+            onScrollFrame: () => {
+              this.hideKeyboard();
+            }
+          })
         }
         .onRefreshing(() => {
           if (this.fetchLock) {

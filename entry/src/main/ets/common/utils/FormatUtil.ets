@@ -1,5 +1,6 @@
 import { BannerItem, MovieBasicInfo } from '../../types/FilmModels';
 import { ServerConfigManager } from '../../services/ServerConfigManager';
+import { PlayNavigation } from './PlayNavigation';
 
 export class FormatUtil {
   static text(value: string | number | undefined | null, fallback: string = ''): string {
@@ -60,7 +61,24 @@ export class FormatUtil {
     if (film.id > 0) {
       return `${film.id}`;
     }
-    return FormatUtil.text(film.mid);
+    const midText = FormatUtil.text(film.mid);
+    if (midText.indexOf(':') >= 0) {
+      return midText;
+    }
+    const sid = film.sourceMid > 0 ? `${film.sourceMid}` : midText;
+    if (film.sourceId && sid && sid !== '0') {
+      return PlayNavigation.livePlayHistoryId(film.sourceId, sid);
+    }
+    return sid;
+  }
+
+  static liveFilmId(film: MovieBasicInfo): string {
+    const midText = FormatUtil.text(film.mid);
+    const sid = film.sourceMid > 0 ? `${film.sourceMid}` : (midText.indexOf(':') >= 0 ? '' : midText);
+    if (film.sourceId && sid && sid !== '0') {
+      return PlayNavigation.livePlayHistoryId(film.sourceId, sid);
+    }
+    return '';
   }
 
   static pad2(value: number): string {

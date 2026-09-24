@@ -7,9 +7,35 @@ import { FavoriteManager } from '../../services/FavoriteManager';
 
 @Component
 export struct SearchResultItem {
-  @Prop film: MovieBasicInfo;
-  @StorageProp('FAVORITE_VERSION') private favVersion: number = 0;
+  @Prop @Watch('onFilmChange') film: MovieBasicInfo;
+  @StorageProp('FAVORITE_VERSION') @Watch('onFavVersionChange') private favVersion: number = 0;
+  @State private isFav: boolean = false;
   onSelect?: (film: MovieBasicInfo) => void;
+  private favChangeCb: () => void = () => {};
+
+  aboutToAppear(): void {
+    this.updateFavState();
+    this.favChangeCb = () => {
+      this.updateFavState();
+    };
+    FavoriteManager.onFavoriteChange(this.favChangeCb);
+  }
+
+  aboutToDisappear(): void {
+    FavoriteManager.offFavoriteChange(this.favChangeCb);
+  }
+
+  private onFilmChange(): void {
+    this.updateFavState();
+  }
+
+  private onFavVersionChange(): void {
+    this.updateFavState();
+  }
+
+  private updateFavState(): void {
+    this.isFav = FavoriteManager.isFavoriteFilmSync(this.film);
+  }
 
   private handleClick(): void {
     if (this.onSelect) {
@@ -21,15 +47,10 @@ export struct SearchResultItem {
       this.film.sourceId,
       undefined,
       undefined,
-      this.film.sourceMid > 0 ? `${this.film.sourceMid}` : ''
+      this.film.sourceMid > 0 ? `${this.film.sourceMid}` : '',
+      undefined,
+      this.film.name
     );
-  }
-
-  private isFavorited(): boolean {
-    if (this.favVersion < 0) {
-      return false;
-    }
-    return FavoriteManager.isFavoriteSync(FormatUtil.filmId(this.film));
   }
 
   @Builder
@@ -73,7 +94,7 @@ export struct SearchResultItem {
         .backgroundColor('rgba(0,0,0,0.55)')
         .borderRadius(15)
 
-        if (this.isFavorited()) {
+        if (this.isFav) {
           Row() {
             this.favoriteTag()
           }

@@ -3,6 +3,7 @@ import { AppTheme } from '../../common/constants/AppTheme';
 import { Breakpoint } from '../../common/utils/Breakpoint';
 import { AppIcon } from '../common/AppIcon';
 import { FilmDetailHeader } from './FilmDetailHeader';
+import { PlayGroupBar } from './PlayGroupBar';
 
 const GROUP_SIZE = 100;
 const EPISODE_MIN_H = 44, EP_COLS_COMPACT = 3, EP_COLS_WIDE = 2, EP_NAME_WIDE_LEN = 6;
@@ -45,8 +46,8 @@ export struct PlayDetailPanel {
   }
   private onViewSourceChange(): void {
     this.clampGroup(this.viewingSourceId);
-    this.checkReadyAndScroll();
     this.syncSourceBar(true);
+    this.syncGroupBar(true);
   }
 
   private onPlayIndexChange(): void {
@@ -89,7 +90,7 @@ export struct PlayDetailPanel {
     if (this.needsGrouping()) {
       try {
         const g = this.groupOf(this.viewingSourceId);
-        this.groupScroller.scrollToIndex(g, smooth, ScrollAlign.START);
+        this.groupScroller.scrollToIndex(g, smooth, ScrollAlign.CENTER);
       } catch (_e) {}
     }
   }
@@ -101,7 +102,7 @@ export struct PlayDetailPanel {
     for (let i = 0; i < this.sources.length; i++) {
       if (this.sources[i].id === this.viewingSourceId) {
         try {
-          this.sourceScroller.scrollToIndex(i, smooth, ScrollAlign.START);
+          this.sourceScroller.scrollToIndex(i, smooth, ScrollAlign.CENTER);
         } catch (_err) {}
         break;
       }
@@ -301,54 +302,6 @@ export struct PlayDetailPanel {
     return this.viewingSourceId === this.playingSourceId && this.episodeIndex === index;
   }
 
-  @Builder
-  sourceChip(source: PlaySource) {
-    Row({ space: 4 }) {
-      if (this.viewingSourceId === source.id) {
-        AppIcon({
-          src: $r('sys.symbol.checkmark'),
-          iconSize: 12,
-          color: AppTheme.TEXT_PRIMARY
-        })
-      }
-      Text(source.name)
-        .fontSize(13)
-        .fontWeight(this.viewingSourceId === source.id ? FontWeight.Bold : FontWeight.Regular)
-        .fontColor(this.viewingSourceId === source.id ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
-        .maxLines(1)
-    }
-    .height(32)
-    .padding({ left: 12, right: 12 })
-    .backgroundColor(this.viewingSourceId === source.id ? AppTheme.ACCENT : AppTheme.BG_CHIP)
-    .borderRadius(AppTheme.RADIUS_PILL)
-    .alignItems(VerticalAlign.Center)
-    .onClick(() => {
-      if (this.onViewSource) {
-        this.onViewSource(source.id);
-      }
-    })
-  }
-
-  @Builder
-  sourceRow() {
-    List({ space: 8, scroller: this.sourceScroller }) {
-      ForEach(this.sources, (source: PlaySource) => {
-        ListItem() {
-          this.sourceChip(source)
-        }
-      }, (source: PlaySource) => source.id)
-    }
-    .listDirection(Axis.Horizontal)
-    .alignListItem(ListItemAlign.Center)
-    .scrollBar(BarState.Off)
-    .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-    .width('100%')
-    .height(32)
-    .contentEndOffset(AppTheme.SPACE_LG)
-    .padding({ left: 12, right: 16 })
-    .margin({ top: 10 })
-  }
-
   private hasGroupBar(): boolean {
     return this.sources.length > 1 || this.needsGrouping();
   }
@@ -356,38 +309,24 @@ export struct PlayDetailPanel {
   @Builder
   groupBar() {
     if (this.hasGroupBar()) {
-      Column() {
-        // 实色不透明白线：保留视觉分区层次，同时 100% 阻断下层滚动内容透光
-        Row()
-          .width('100%')
-          .height(1)
-          .backgroundColor(AppTheme.BORDER_SOLID)
-
-        if (this.sources.length > 1) {
-          this.sourceRow()
-        }
-        if (this.needsGrouping()) {
-          List({ space: 8, scroller: this.groupScroller }) {
-            ForEach(this.groupIndexesOf(), (index: number) => {
-              ListItem() {
-                this.groupChip(index)
-              }
-            }, (index: number) => `group_${this.viewingSourceId}_${index}`)
+      PlayGroupBar({
+        sources: this.sources,
+        viewingSourceId: this.viewingSourceId,
+        needsGrouping: this.needsGrouping(),
+        groupIndexes: this.groupIndexesOf(),
+        currentGroup: this.groupOf(this.viewingSourceId),
+        sourceScroller: this.sourceScroller,
+        groupScroller: this.groupScroller,
+        onViewSource: (id: string) => {
+          if (this.onViewSource) {
+            this.onViewSource(id);
           }
-          .listDirection(Axis.Horizontal)
-          .alignListItem(ListItemAlign.Center)
-          .scrollBar(BarState.Off)
-          .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-          .width('100%')
-          .height(30)
-          .contentEndOffset(AppTheme.SPACE_LG)
-          .padding({ left: 12, right: 16 })
-          .margin({ top: 10 })
-        }
-      }
-      .width('100%')
-      .padding({ bottom: this.needsGrouping() ? 12 : 10 })
-      .backgroundColor(AppTheme.BG)
+        },
+        onSelectGroup: (index: number) => {
+          this.setGroup(this.viewingSourceId, index, true);
+        },
+        groupLabel: (index: number) => this.groupLabel(index)
+      })
     }
   }
 

@@ -142,7 +142,7 @@ export struct DailyUpdatesTab {
       return;
     }
     try {
-      this.chipsScroller.scrollToIndex(index, true, ScrollAlign.START);
+      this.chipsScroller.scrollToIndex(index, true, ScrollAlign.CENTER);
     } catch (_err) {
     }
   }

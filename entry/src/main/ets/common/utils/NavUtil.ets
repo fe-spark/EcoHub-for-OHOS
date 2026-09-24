@@ -8,6 +8,7 @@ export interface PlayRouteParams {
   sourceMid?: string;
   episodeIndex?: string;
   currentTime?: string;
+  title?: string;
 }
 
 export interface FilterRouteParams {
@@ -77,7 +78,7 @@ export class NavUtil {
   }
 
   static openPlay(id: string | number, sourceId: string = '', episodeIndex?: number,
-    currentTime?: number, sourceMid: string = '', uiContext?: UIContext): void {
+    currentTime?: number, sourceMid: string = '', uiContext?: UIContext, title?: string): void {
     const idText = `${id}`;
     try {
       const r = NavUtil.getRouter(uiContext);
@@ -94,6 +95,9 @@ export class NavUtil {
         }
         if (currentTime !== undefined && currentTime >= 0) {
           params.currentTime = `${currentTime}`;
+        }
+        if (title) {
+          params.title = title;
         }
         r.pushUrl({ url: 'pages/PlayPage', params: params });
         return;
@@ -118,6 +122,9 @@ export class NavUtil {
       }
       if (currentTime !== undefined && currentTime >= 0) {
         params.currentTime = `${currentTime}`;
+      }
+      if (title) {
+        params.title = title;
       }
       r.pushUrl({ url: 'pages/LivePlayPage', params: params });
     } catch (_e) {

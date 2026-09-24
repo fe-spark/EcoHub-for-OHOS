@@ -230,6 +230,37 @@ export class HttpClient {
     }
   }
 
+  private formatConnectionError(error: Object): string {
+    const msg = (error instanceof Error) ? error.message : `${error}`;
+    const lower = msg.toLowerCase();
+
+    // 1. 服务未启动、网关异常或拒绝连接，统一归为服务错误
+    if (lower.indexOf('502') >= 0 ||
+        lower.indexOf('503') >= 0 ||
+        lower.indexOf('504') >= 0 ||
+        lower.indexOf('bad gateway') >= 0 ||
+        lower.indexOf('gateway timeout') >= 0 ||
+        lower.indexOf('service unavailable') >= 0 ||
+        lower.indexOf('connection refused') >= 0 ||
+        lower.indexOf('connection reset') >= 0 ||
+        lower.indexOf('failed to connect') >= 0 ||
+        lower.indexOf('connection failed') >= 0) {
+      return '服务未启动或网关异常 (服务错误)';
+    }
+
+    // 2. 超时
+    if (lower.indexOf('timeout') >= 0 || lower.indexOf('timed out') >= 0) {
+      return '连接超时，服务可能未启动或网络不可达';
+    }
+
+    // 3. 域名解析失败
+    if (lower.indexOf('resolve') >= 0 || lower.indexOf('dns') >= 0 || lower.indexOf('host') >= 0) {
+      return '无法解析软件源地址，请检查域名或网络';
+    }
+
+    return msg ? msg : '服务未启动或网关异常 (服务错误)';
+  }
+
   public async testConnection(baseUrl: string): Promise<ConnectionResult> {
     const raw = baseUrl ? baseUrl.trim() : '';
     if (!raw) {
@@ -252,13 +283,25 @@ export class HttpClient {
         }
       } catch (appErr) {
         const msg = (appErr instanceof Error) ? appErr.message : '';
-        // 若服务端返回私有化相关报错，直接向用户明确反馈
+        const lower = msg.toLowerCase();
+
+        // 优先拦截 502/503/504 与拒绝连接等服务错误，防止误判为私有化
+        if (lower.indexOf('502') >= 0 ||
+            lower.indexOf('503') >= 0 ||
+            lower.indexOf('504') >= 0 ||
+            lower.indexOf('bad gateway') >= 0 ||
+            lower.indexOf('gateway timeout') >= 0 ||
+            lower.indexOf('service unavailable') >= 0 ||
+            lower.indexOf('connection refused') >= 0 ||
+            lower.indexOf('connection reset') >= 0) {
+          return { ok: false, message: this.formatConnectionError(appErr as Object) };
+        }
+
+        // 若服务端明确返回私有化相关报错，向用户明确反馈
         if (msg.indexOf('私有化') >= 0 || msg.indexOf('订阅密钥') >= 0) {
           return { ok: false, isPrivate: true, message: msg };
         }
-        if (msg.indexOf('401') >= 0 || msg.indexOf('403') >= 0) {
-          return { ok: false, isPrivate: true, message: '该软件源已开启私有化访问，请在地址后追加 ?key=密钥' };
-        }
+
         // 过渡兼容逻辑：若 404 说明为早期未支持 /api/provide/app 的旧版服务端，尝试兜底探测 /api/health。
         // 注意：服务端 /api/health 未来大版本将废弃移除，届时将仅支持 /api/provide/app 探测。
         if (msg.indexOf('404') >= 0) {
@@ -274,8 +317,7 @@ export class HttpClient {
       }
       return { ok: true };
     } catch (err) {
-      const msg = (err instanceof Error) ? err.message : '无法连接该源，请检查地址或网络';
-      return { ok: false, message: msg };
+      return { ok: false, message: this.formatConnectionError(err as Object) };
     } finally {
       SourceGuard.endSkip();
     }

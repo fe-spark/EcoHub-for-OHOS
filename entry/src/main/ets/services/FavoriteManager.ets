@@ -1,6 +1,8 @@
 import { preferences } from '@kit.ArkData';
 import { ServerConfigManager } from './ServerConfigManager';
-import { FavoriteItem } from '../types/FilmModels';
+import { FavoriteItem, MovieBasicInfo } from '../types/FilmModels';
+import { FormatUtil } from '../common/utils/FormatUtil';
+import { PlayNavigation } from '../common/utils/PlayNavigation';
 
 const KEY_FAVORITE = 'film_favorite';
 const MAX_FAVORITE = 300;
@@ -45,16 +47,39 @@ export class FavoriteManager {
     if (!id || !FavoriteManager.cachedMap) {
       return false;
     }
-    const currentKey = FavoriteManager.dataKey();
-    if (FavoriteManager.cachedKey !== currentKey) {
+    return !!FavoriteManager.cachedMap[id];
+  }
+
+  static isFavoriteFilmSync(film: MovieBasicInfo): boolean {
+    if (!film) {
       return false;
     }
-    return !!FavoriteManager.cachedMap[id];
+    const id = FormatUtil.filmId(film);
+    if (id && FavoriteManager.isFavoriteSync(id)) {
+      return true;
+    }
+    const liveId = FormatUtil.liveFilmId(film);
+    if (liveId && liveId !== id && FavoriteManager.isFavoriteSync(liveId)) {
+      return true;
+    }
+    if (film.id > 0 && `${film.id}` !== id && FavoriteManager.isFavoriteSync(`${film.id}`)) {
+      return true;
+    }
+    if (film.mid && film.mid !== id && film.mid !== liveId && FavoriteManager.isFavoriteSync(film.mid)) {
+      return true;
+    }
+    if (film.sourceId && film.mid && film.mid.indexOf(':') < 0) {
+      const combo = PlayNavigation.livePlayHistoryId(film.sourceId, film.mid);
+      if (combo && combo !== id && combo !== liveId && FavoriteManager.isFavoriteSync(combo)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static async preload(): Promise<void> {
     await FavoriteManager.readMap();
-    AppStorage.setOrCreate<number>('FAVORITE_VERSION', Date.now());
+    FavoriteManager.notifyChange();
   }
 
   static async isFavorite(id: string): Promise<boolean> {
