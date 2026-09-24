@@ -2,12 +2,15 @@ import { MovieBasicInfo } from '../../types/FilmModels';
 import { AppTheme } from '../../common/constants/AppTheme';
 import { FormatUtil } from '../../common/utils/FormatUtil';
 import { NavUtil } from '../../common/utils/NavUtil';
+import { AppIcon } from '../common/AppIcon';
+import { FavoriteManager } from '../../services/FavoriteManager';
 
 @Component
 export struct FilmCard {
   @Prop film: MovieBasicInfo;
   @Prop cardWidth: number = 0;
   @Prop showMeta: boolean = true;
+  @StorageProp('FAVORITE_VERSION') private favVersion: number = 0;
   onClickCard?: (film: MovieBasicInfo) => void;
   @State private broken: boolean = false;
   @State private pressed: boolean = false;
@@ -28,6 +31,32 @@ export struct FilmCard {
     NavUtil.openPlay(FormatUtil.filmId(this.film));
   }
 
+  private isFavorited(): boolean {
+    if (this.favVersion < 0) {
+      return false;
+    }
+    return FavoriteManager.isFavoriteSync(FormatUtil.filmId(this.film));
+  }
+
+  @Builder
+  favoriteTag() {
+    Row({ space: 2 }) {
+      AppIcon({
+        src: $r('sys.symbol.star_fill'),
+        iconSize: 10,
+        color: '#FA8C16'
+      })
+      Text('已收藏')
+        .fontSize(9)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#FA8C16')
+    }
+    .padding({ left: 4, right: 5, top: 2, bottom: 2 })
+    .backgroundColor('rgba(10, 11, 16, 0.85)')
+    .borderRadius(4)
+    .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.4)' })
+  }
+
   @Builder
   posterTag(text: string) {
     Text(text)
@@ -35,6 +64,8 @@ export struct FilmCard {
       .fontWeight(FontWeight.Medium)
       .fontColor('#FFFFFF')
       .maxLines(1)
+      .textOverflow({ overflow: TextOverflow.Ellipsis })
+      .constraintSize({ maxWidth: '90%' })
       .padding({ left: 6, right: 6, top: 2, bottom: 2 })
       .backgroundColor('rgba(10, 11, 16, 0.78)')
       .borderRadius(4)
@@ -42,11 +73,11 @@ export struct FilmCard {
 
   build() {
     Column() {
-      Stack({ alignContent: Alignment.TopEnd }) {
+      Stack({ alignContent: Alignment.BottomEnd }) {
         if (!this.broken && this.posterUrl()) {
           Image(this.posterUrl())
             .width('100%')
-            .aspectRatio(2 / 3)
+            .height('100%')
             .objectFit(ImageFit.Cover)
             .borderRadius(AppTheme.RADIUS_MD)
             .backgroundColor(AppTheme.BG_CARD)
@@ -61,7 +92,7 @@ export struct FilmCard {
               .fontColor(AppTheme.TEXT_SECONDARY)
           }
           .width('100%')
-          .aspectRatio(2 / 3)
+          .height('100%')
           .justifyContent(FlexAlign.Center)
           .backgroundColor(AppTheme.BG_CARD)
           .borderRadius(AppTheme.RADIUS_MD)
@@ -69,21 +100,31 @@ export struct FilmCard {
 
         Column()
           .width('100%')
-          .aspectRatio(2 / 3)
+          .height('100%')
           .borderRadius(AppTheme.RADIUS_MD)
           .linearGradient({
             angle: 180,
             colors: [['rgba(0,0,0,0)', 0.65], ['rgba(10,11,16,0.60)', 1]]
           })
 
+        if (this.isFavorited()) {
+          Row() {
+            this.favoriteTag()
+          }
+          .position({ x: 6, y: 6 })
+          .hitTestBehavior(HitTestMode.Transparent)
+        }
+
         if (this.film.remarks || this.film.cName) {
           Row() {
             this.posterTag(this.film.remarks || this.film.cName)
           }
           .padding(6)
+          .hitTestBehavior(HitTestMode.Transparent)
         }
       }
       .width('100%')
+      .aspectRatio(2 / 3)
       .clip(true)
       .borderRadius(AppTheme.RADIUS_MD)
       .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.08)' })

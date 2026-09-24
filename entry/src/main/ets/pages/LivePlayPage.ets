@@ -1,9 +1,9 @@
 import { FilmApi } from '../api/FilmApi';
 import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
-import { FormatUtil } from '../common/utils/FormatUtil';
 import { HistoryManager } from '../services/HistoryManager';
 import { NavUtil } from '../common/utils/NavUtil';
+import { PlayNavigation } from '../common/utils/PlayNavigation';
 import { ServerConfigManager } from '../services/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
@@ -15,21 +15,21 @@ import { LoadingView } from '../components/common/LoadingView';
 import { EmptyState } from '../components/common/EmptyState';
 import { SourceGuard } from '../services/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
-import { SiteHeartbeat } from '../services/SiteHeartbeat';
 import { Breakpoint } from '../common/utils/Breakpoint';
 
 @Entry
 @Component
-struct PlayPage {
-  @State private filmId: string = '';
+struct LivePlayPage {
+  @State private sourceId: string = '';
+  @State private sourceMid: string = '';
   @State private errorText: string = '';
   @State private name: string = '';
-  @State private picture: string = '';
   @State private subTitle: string = '';
   @State private actor: string = '';
+  @State private picture: string = '';
   @State private plot: string = '';
-  @State private loading: boolean = true;
   @State private descriptor: MovieDescriptor | null = null;
+  @State private loading: boolean = true;
   @State private sources: PlaySource[] = [];
   @State private playingSourceId: string = '';
   @State private viewingSourceId: string = '';
@@ -38,29 +38,30 @@ struct PlayPage {
   @State private playToken: number = 0;
   @State private playTitle: string = '';
   @State private initialTime: number = 0;
+  @State private activeTab: number = 0;
   @State private related: MovieBasicInfo[] = [];
   @State private relateLoading: boolean = false;
-  @State private activeTab: number = 0;
+  @State private pageW: number = 0;
+  @State private pageH: number = 0;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
   @State private leftInset: number = 0;
   @State private rightInset: number = 0;
-  @State private viewW: number = 16;
-  @State private viewH: number = 9;
   @State private playerFull: boolean = false;
   @State private playerActive: boolean = true;
-  @State private pageW: number = 0;
-  @State private pageH: number = 0;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   @StorageLink('SETTING_AUTO_PLAY_NEXT') private settingAutoPlayNext: boolean = true;
-  private sourceName: string = '';
+  private sourceName: string = '采集源';
   private reconnectCb: () => void = () => {};
   private loadToken: number = 0;
-  private relateToken: number = 0;
   private historySeq: number = 0;
   private persistEnabled: boolean = true;
   private lastCurrentTime: number = 0;
   private lastDuration: number = 0;
+
+  private historyId(): string {
+    return PlayNavigation.livePlayHistoryId(this.sourceId, this.sourceMid);
+  }
 
   private applyWindowBar(): void {
     WindowBar.apply(this.getUIContext().getHostContext() as common.UIAbilityContext,
@@ -69,30 +70,34 @@ struct PlayPage {
         this.bottomInset = bottom;
         this.leftInset = left;
         this.rightInset = right;
-      }, (left: number, right: number, width: number, height: number) => {
+      }, (left: number, right: number, _width: number, _height: number) => {
         this.leftInset = left;
         this.rightInset = right;
-        this.viewW = width;
-        this.viewH = height;
       });
   }
 
   async aboutToAppear(): Promise<void> {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
-    this.filmId = NavUtil.param(params, 'id');
-    const paramSourceId = NavUtil.param(params, 'sourceId'), paramEp = NavUtil.param(params, 'episodeIndex'), paramTime = NavUtil.param(params, 'currentTime');
-    let targetSourceId = paramSourceId, targetEpIndex = paramEp !== '' ? Number(paramEp) : -1, targetTime = paramTime !== '' ? Number(paramTime) : -1;
+    this.sourceId = NavUtil.param(params, 'sourceId');
+    this.sourceMid = NavUtil.param(params, 'sourceMid');
+    const historyKey = this.historyId();
+    if (historyKey) {
+      HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage');
+    }
+    const paramEp = NavUtil.param(params, 'episodeIndex');
+    const paramTime = NavUtil.param(params, 'currentTime');
+    let targetEpIndex = paramEp !== '' ? Number(paramEp) : -1;
+    let targetTime = paramTime !== '' ? Number(paramTime) : -1;
 
-    if (this.filmId) {
+    if (historyKey && targetEpIndex < 0 && targetTime < 0) {
       try {
-        const prev = await HistoryManager.find(this.filmId);
+        const prev = await HistoryManager.find(historyKey);
         if (prev) {
-          if (!targetSourceId && prev.sourceId) targetSourceId = prev.sourceId;
-          if (targetEpIndex < 0 && prev.episodeIndex !== undefined && prev.episodeIndex !== null) targetEpIndex = prev.episodeIndex;
-          if (targetTime < 0) {
-            targetTime = (prev.duration > 0 && prev.currentTime >= prev.duration - 3) ? 0 : (prev.currentTime || 0);
+          if (prev.episodeIndex !== undefined && prev.episodeIndex !== null) {
+            targetEpIndex = prev.episodeIndex;
           }
+          targetTime = (prev.duration > 0 && prev.currentTime >= prev.duration - 3) ? 0 : (prev.currentTime || 0);
           this.lastDuration = prev.duration || 0;
         }
       } catch (_e) {}
@@ -101,16 +106,16 @@ struct PlayPage {
     this.episodeIndex = Math.max(0, targetEpIndex >= 0 ? targetEpIndex : 0);
     this.initialTime = Math.max(0, targetTime >= 0 ? targetTime : 0);
     this.lastCurrentTime = this.initialTime;
-    this.loadPlay(targetSourceId);
-    this.loadRelate();
+    this.loadPlay();
 
     this.reconnectCb = () => {
       this.persistEnabled = false;
       this.historySeq++;
       this.playUrl = '';
-      if (!this.filmId) return;
-      this.loadPlay(this.playingSourceId);
-      this.loadRelate();
+      if (!this.sourceId || !this.sourceMid) {
+        return;
+      }
+      this.loadPlay();
     };
     SourceGuard.onReconnect(this.reconnectCb);
   }
@@ -118,33 +123,44 @@ struct PlayPage {
   onPageShow(): void {
     this.applyWindowBar();
     this.playerActive = true;
-    SiteHeartbeat.getInstance().start();
   }
 
   onPageHide(): void {
     this.playerActive = false;
-    if (this.lastCurrentTime > 0) this.persistHistory(this.lastCurrentTime, this.lastDuration);
+    if (this.lastCurrentTime > 0) {
+      this.persistHistory(this.lastCurrentTime, this.lastDuration);
+    }
   }
 
   onBackPress(): boolean {
-    if (this.playerFull) { this.setPlayerFull(false); return true; }
+    if (this.playerFull) {
+      this.setPlayerFull(false);
+      return true;
+    }
     return false;
   }
+
   aboutToDisappear(): void {
-    if (this.playerFull) this.setPlayerFull(false);
-    if (this.lastCurrentTime > 0) this.persistHistory(this.lastCurrentTime, this.lastDuration);
+    if (this.playerFull) {
+      this.setPlayerFull(false);
+    }
+    if (this.lastCurrentTime > 0) {
+      this.persistHistory(this.lastCurrentTime, this.lastDuration);
+    }
     SourceGuard.offReconnect(this.reconnectCb);
   }
 
   private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
-    if (this.playerFull === full) return;
+    if (this.playerFull === full) {
+      return;
+    }
     this.playerFull = full;
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
-  private async loadPlay(sourceId: string): Promise<void> {
-    if (!this.filmId) {
-      this.errorText = '未找到影片参数';
+  private async loadPlay(): Promise<void> {
+    if (!this.sourceId || !this.sourceMid) {
+      this.errorText = '缺少采集源播放参数';
       this.loading = false;
       return;
     }
@@ -155,76 +171,73 @@ struct PlayPage {
     }
     this.playUrl = '';
     try {
-      const info = await FilmApi.getPlayInfo(this.filmId, sourceId, this.episodeIndex);
+      const info = await FilmApi.getLivePlayInfo(this.sourceId, this.sourceMid, this.episodeIndex);
       if (token !== this.loadToken) {
         return;
       }
       const detail = info.detail;
-      if (firstOpen) {
-        HttpClient.getInstance().trackView(
-          'play',
-          this.filmId,
-          'PlayPage',
-          '',
-          detail.descriptor?.cName || '',
-          detail.name || ''
-        );
-      }
       this.name = detail.name;
+      this.subTitle = detail.descriptor.remarks || '';
+      this.actor = detail.descriptor.actor || '';
       this.picture = detail.picture;
-      this.descriptor = detail.descriptor;
-      this.subTitle = detail.descriptor.subTitle;
-      this.actor = detail.descriptor.actor;
       this.plot = detail.descriptor.content || detail.descriptor.blurb;
+      this.descriptor = detail.descriptor;
       this.sources = detail.list;
       this.playingSourceId = info.currentPlayFrom || (detail.list.length > 0 ? detail.list[0].id : '');
       this.viewingSourceId = this.playingSourceId;
       this.episodeIndex = info.currentEpisode;
       this.playUrl = info.current.link;
       this.playTitle = `${detail.name} · ${info.current.episode}`;
-      this.sourceName = this.findSource(this.playingSourceId)?.name || '默认源';
+      this.sourceName = this.findSource(this.playingSourceId)?.name || '采集源';
       this.errorText = '';
       this.persistEnabled = true;
       this.persistHistory();
+      this.loadRelate(detail.rawCid || detail.cid);
     } catch (err) {
-      if (token !== this.loadToken) return;
-      const msg = err instanceof Error ? err.message : '播放数据获取失败';
+      if (token !== this.loadToken) {
+        return;
+      }
+      const msg = err instanceof Error ? err.message : '现场播放数据获取失败';
       if (this.name) {
-        try { this.getUIContext().getPromptAction().showToast({ message: msg }); } catch (_e) {}
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: msg });
+        } catch (_e) {}
       } else {
         this.errorText = msg;
       }
     } finally {
-      if (token === this.loadToken) this.loading = false;
+      if (token === this.loadToken) {
+        this.loading = false;
+      }
     }
   }
 
-  private async loadRelate(): Promise<void> {
-    if (!this.filmId) return;
-    const token = ++this.relateToken;
+  private async loadRelate(cid: number): Promise<void> {
     this.relateLoading = true;
     try {
-      const list = await FilmApi.getRelate(this.filmId);
-      if (token !== this.relateToken) return;
-      this.related = list;
-    } catch (_err) {
-      if (token !== this.relateToken) return;
+      const res = await FilmApi.getLiveRelate(this.sourceId, cid, this.sourceMid);
+      this.related = res;
+    } catch (_e) {
       this.related = [];
     } finally {
-      if (token === this.relateToken) this.relateLoading = false;
+      this.relateLoading = false;
     }
   }
 
   private findSource(id: string): PlaySource | null {
     for (let i = 0; i < this.sources.length; i++) {
-      if (this.sources[i].id === id) return this.sources[i];
+      if (this.sources[i].id === id) {
+        return this.sources[i];
+      }
     }
     return this.sources.length > 0 ? this.sources[0] : null;
   }
 
   private selectEpisode(sourceId: string, index: number): void {
     const source = this.findSource(sourceId);
-    if (!source || index < 0 || index >= source.linkList.length) return;
+    if (!source || index < 0 || index >= source.linkList.length) {
+      return;
+    }
     const episode: MovieUrlInfo = source.linkList[index];
     this.playingSourceId = sourceId;
     this.viewingSourceId = sourceId;
@@ -240,8 +253,8 @@ struct PlayPage {
   }
 
   private hasNext(): boolean {
-    const s = this.findSource(this.playingSourceId);
-    return !!s && this.episodeIndex < s.linkList.length - 1;
+    const source = this.findSource(this.playingSourceId);
+    return !!source && this.episodeIndex < source.linkList.length - 1;
   }
 
   private hasPrev(): boolean {
@@ -250,7 +263,9 @@ struct PlayPage {
 
   private playPrev(): void {
     if (!this.hasPrev()) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' }); } catch (_e) {}
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' });
+      } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex - 1);
@@ -258,66 +273,78 @@ struct PlayPage {
 
   private playNext(): void {
     if (!this.hasNext()) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' }); } catch (_e) {}
+      try {
+        this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' });
+      } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex + 1);
   }
 
-  private currentEpisodeName(): string {
-    const source = this.findSource(this.playingSourceId);
-    return (source && this.episodeIndex < source.linkList.length) ? source.linkList[this.episodeIndex].episode : '';
-  }
-
-  private persistHistory(currentTime?: number, duration?: number): void {
-    if (!this.persistEnabled || !this.filmId || !this.name || !ServerConfigManager.getInstance().storageScope()) return;
-    const seq = ++this.historySeq, filmId = this.filmId, sourceId = this.playingSourceId;
-    const source = this.findSource(sourceId), episodeIndex = this.episodeIndex;
-    const fallback: MovieUrlInfo = { episode: this.playTitle, link: this.playUrl };
-    const episode: MovieUrlInfo = source && source.linkList.length > episodeIndex ? source.linkList[episodeIndex] : fallback;
-
-    HistoryManager.find(filmId).then((previous: HistoryItem | null) => {
-      if (seq !== this.historySeq || !this.persistEnabled) return;
-      HistoryManager.save({
-        id: filmId, name: this.name, picture: this.picture,
-        sourceId: sourceId, sourceName: source ? source.name : this.sourceName,
-        episodeIndex: episodeIndex, episode: episode.episode,
-        currentTime: currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0),
-        duration: duration !== undefined ? duration : (previous ? previous.duration : 0),
-        timeStamp: Date.now()
-      });
-    });
-  }
-
   private async openRelated(film: MovieBasicInfo): Promise<void> {
-    const id = FormatUtil.filmId(film);
-    if (!id || id === this.filmId) return;
-    this.filmId = id;
+    const newSid = film.sourceMid > 0 ? `${film.sourceMid}` : `${film.id}`;
+    if (!newSid || newSid === this.sourceMid) return;
+    this.sourceMid = newSid;
+    const historyKey = this.historyId();
+    if (historyKey) {
+      HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage');
+    }
     this.name = '';
     this.sources = [];
     this.playUrl = '';
     this.activeTab = 0;
     this.loading = true;
 
-    let targetSourceId = '', targetEpisodeIndex = -1, targetTime = -1;
-    try {
-      const prev = await HistoryManager.find(this.filmId);
-      if (prev) {
-        if (prev.sourceId) targetSourceId = prev.sourceId;
-        if (prev.episodeIndex !== undefined && prev.episodeIndex !== null && prev.episodeIndex >= 0) targetEpisodeIndex = prev.episodeIndex;
-        if (targetTime < 0) {
+    let targetEpisodeIndex = 0;
+    let targetTime = 0;
+    if (historyKey) {
+      try {
+        const prev = await HistoryManager.find(historyKey);
+        if (prev) {
+          if (prev.episodeIndex !== undefined && prev.episodeIndex !== null && prev.episodeIndex >= 0) {
+            targetEpisodeIndex = prev.episodeIndex;
+          }
           const isEnded = prev.duration > 0 && prev.currentTime >= prev.duration - 3;
           targetTime = isEnded ? 0 : (prev.currentTime || 0);
+          this.lastDuration = prev.duration || 0;
         }
-        this.lastDuration = prev.duration || 0;
-      }
-    } catch (_e) {}
+      } catch (_e) {}
+    }
 
-    this.episodeIndex = Math.max(0, targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0);
-    this.initialTime = Math.max(0, targetTime >= 0 ? targetTime : 0);
-    this.lastCurrentTime = this.initialTime;
-    this.loadPlay(targetSourceId);
-    this.loadRelate();
+    this.episodeIndex = targetEpisodeIndex;
+    this.initialTime = targetTime;
+    this.lastCurrentTime = targetTime;
+    this.loadPlay();
+  }
+
+  private persistHistory(currentTime?: number, duration?: number): void {
+    const filmId = this.historyId();
+    if (!this.persistEnabled || !filmId || !this.name || !ServerConfigManager.getInstance().storageScope()) {
+      return;
+    }
+    const seq = ++this.historySeq;
+    const source = this.findSource(this.playingSourceId);
+    const fallback: MovieUrlInfo = { episode: this.playTitle, link: this.playUrl };
+    const episode: MovieUrlInfo = source && source.linkList.length > this.episodeIndex
+      ? source.linkList[this.episodeIndex] : fallback;
+
+    HistoryManager.find(filmId).then((previous: HistoryItem | null) => {
+      if (seq !== this.historySeq || !this.persistEnabled) {
+        return;
+      }
+      HistoryManager.save({
+        id: filmId,
+        name: this.name,
+        picture: this.picture,
+        sourceId: this.sourceId,
+        sourceName: source ? source.name : this.sourceName,
+        episodeIndex: this.episodeIndex,
+        episode: episode.episode,
+        currentTime: currentTime !== undefined ? currentTime : (previous ? previous.currentTime : 0),
+        duration: duration !== undefined ? duration : (previous ? previous.duration : 0),
+        timeStamp: Date.now()
+      });
+    });
   }
 
   private isWideScreen(): boolean {
@@ -352,6 +379,7 @@ struct PlayPage {
     .onClick(() => { this.activeTab = index; })
   }
 
+
   @Builder
   playVideo() {
     VideoPlayer({
@@ -371,10 +399,19 @@ struct PlayPage {
       rightInset: this.hudRightInset(),
       bottomInset: this.hudBottomInset(),
       onBack: () => {
-        if (this.playerFull) this.setPlayerFull(false);
-        else { try { this.getUIContext().getRouter().back(); } catch (_e) {} }
+        if (this.playerFull) {
+          this.setPlayerFull(false);
+        } else {
+          try {
+            this.getUIContext().getRouter().back();
+          } catch (_e) {}
+        }
       },
-      onEnded: () => { if (this.settingAutoPlayNext && this.hasNext()) this.playNext(); },
+      onEnded: () => {
+        if (this.settingAutoPlayNext && this.hasNext()) {
+          this.playNext();
+        }
+      },
       onPrev: () => this.playPrev(),
       onNext: () => this.playNext(),
       onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
@@ -393,11 +430,12 @@ struct PlayPage {
   @Builder
   playDetail() {
     PlayDetailPanel({
-      filmId: this.filmId,
+      filmId: this.historyId(),
       picture: this.picture,
       name: this.name,
       subTitle: this.subTitle,
       actor: this.actor,
+      sourceName: this.sourceName,
       plot: this.plot,
       descriptor: this.descriptor,
       sources: this.sources,
@@ -412,9 +450,9 @@ struct PlayPage {
   @Builder
   relatedPane() {
     if (this.relateLoading) {
-      LoadingView({ label: '加载相关推荐' })
+      LoadingView({ label: '加载同类推荐' })
     } else if (this.related.length === 0) {
-      EmptyState({ title: '暂无相关推荐', subtitle: '换一部片子再看看', icon: $r('sys.symbol.film') })
+      EmptyState({ title: '暂无同类推荐', subtitle: '当前采集源该分类下暂无其它片源', icon: $r('sys.symbol.film') })
     } else {
       FilmGrid({
         films: this.related,
@@ -429,7 +467,7 @@ struct PlayPage {
   sideTabs() {
     Row() {
       this.playTabItem('详情', 0)
-      this.playTabItem('相关推荐', 1)
+      this.playTabItem('同类推荐', 1)
     }
     .width('100%')
     .height(44)
@@ -503,7 +541,9 @@ struct PlayPage {
     })
     .padding({
       top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
-      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset
+      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
+      left: (this.playerFull || this.splitPlay()) ? 0 : this.leftInset,
+      right: (this.playerFull || this.splitPlay()) ? 0 : this.rightInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
   }

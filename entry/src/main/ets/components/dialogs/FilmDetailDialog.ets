@@ -7,6 +7,7 @@ export struct FilmDetailDialog {
   controller?: CustomDialogController;
   name: string = '';
   scoreText: string = '';
+  sourceName: string = '';
   tags: string[] = [];
   director: string = '';
   actor: string = '';
@@ -101,11 +102,29 @@ export struct FilmDetailDialog {
         }
         .width('100%')
         .alignItems(VerticalAlign.Top)
-        .margin({ bottom: this.tags.length > 0 ? 8 : 0 })
+        .margin({ bottom: (this.tags.length > 0 || this.sourceName !== '') ? 8 : 0 })
 
         // 影视标签组（独立排版，自动折行）
-        if (this.tags.length > 0) {
+        if (this.tags.length > 0 || this.sourceName !== '') {
           Flex({ wrap: FlexWrap.Wrap }) {
+            if (this.sourceName !== '') {
+              Row({ space: 3 }) {
+                AppIcon({
+                  src: $r('sys.symbol.link'),
+                  iconSize: 11,
+                  color: '#FA8C16'
+                })
+                Text(`来源: ${this.sourceName}`)
+                  .fontSize(AppTheme.FONT_SM)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#FA8C16')
+              }
+              .padding({ left: 6, right: 6, top: 3, bottom: 3 })
+              .backgroundColor('rgba(250, 140, 22, 0.12)')
+              .borderRadius(AppTheme.RADIUS_SM)
+              .border({ width: 0.5, color: 'rgba(250, 140, 22, 0.35)' })
+              .margin({ right: 6, bottom: 6 })
+            }
             ForEach(this.tags, (tag: string) => {
               Text(tag)
                 .fontSize(AppTheme.FONT_SM)
@@ -120,7 +139,7 @@ export struct FilmDetailDialog {
         }
       }
       .width('100%')
-      .padding({ left: 12, right: 12, top: 12, bottom: this.tags.length > 0 ? 6 : 12 })
+      .padding({ left: 12, right: 12, top: 12, bottom: (this.tags.length > 0 || this.sourceName !== '') ? 6 : 12 })
       .backgroundColor(AppTheme.BG_CARD)
       .borderRadius(AppTheme.RADIUS_MD)
       .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.06)' })

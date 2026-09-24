@@ -54,6 +54,8 @@ export interface MovieBasicInfo {
   language: string;
   classTag: string;
   mid: string;
+  sourceId: string;
+  sourceMid: number;
 }
 
 export interface BannerItem {
@@ -175,6 +177,7 @@ export interface MovieDetail {
   descriptor: MovieDescriptor;
   list: PlaySource[];
   localUpdateTime: number;
+  rawCid?: number;
 }
 
 export interface PlayInfo {
@@ -197,9 +200,18 @@ export interface HistoryItem {
   timeStamp: number;
 }
 
+export interface SearchSourceTab {
+  id: string;
+  name: string;
+  count: number;
+  loading: boolean;
+}
+
 export interface SearchResult {
   list: MovieBasicInfo[];
   page: PageInfo;
+  sources: SearchSourceTab[];
+  error?: string;
 }
 
 export interface FavoriteItem {

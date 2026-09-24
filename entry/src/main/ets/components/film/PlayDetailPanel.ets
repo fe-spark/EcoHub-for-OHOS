@@ -14,6 +14,7 @@ export struct PlayDetailPanel {
   @Prop name: string = '';
   @Prop subTitle: string = '';
   @Prop actor: string = '';
+  @Prop sourceName: string = '';
   @Prop plot: string = '';
   @Prop descriptor: MovieDescriptor | null = null;
   @Prop @Watch('onSourcesChange') sources: PlaySource[] = [];
@@ -94,7 +95,7 @@ export struct PlayDetailPanel {
   }
 
   private syncSourceBar(smooth: boolean): void {
-    if (this.sources.length === 0) {
+    if (this.sources.length <= 1) {
       return;
     }
     for (let i = 0; i < this.sources.length; i++) {
@@ -348,40 +349,46 @@ export struct PlayDetailPanel {
     .margin({ top: 10 })
   }
 
+  private hasGroupBar(): boolean {
+    return this.sources.length > 1 || this.needsGrouping();
+  }
+
   @Builder
   groupBar() {
-    Column() {
-      // 实色不透明白线：保留视觉分区层次，同时 100% 阻断下层滚动内容透光
-      Row()
-        .width('100%')
-        .height(1)
-        .backgroundColor(AppTheme.BORDER_SOLID)
+    if (this.hasGroupBar()) {
+      Column() {
+        // 实色不透明白线：保留视觉分区层次，同时 100% 阻断下层滚动内容透光
+        Row()
+          .width('100%')
+          .height(1)
+          .backgroundColor(AppTheme.BORDER_SOLID)
 
-      if (this.sources.length > 0) {
-        this.sourceRow()
-      }
-      if (this.needsGrouping()) {
-        List({ space: 8, scroller: this.groupScroller }) {
-          ForEach(this.groupIndexesOf(), (index: number) => {
-            ListItem() {
-              this.groupChip(index)
-            }
-          }, (index: number) => `group_${this.viewingSourceId}_${index}`)
+        if (this.sources.length > 1) {
+          this.sourceRow()
         }
-        .listDirection(Axis.Horizontal)
-        .alignListItem(ListItemAlign.Center)
-        .scrollBar(BarState.Off)
-        .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
-        .width('100%')
-        .height(30)
-        .contentEndOffset(AppTheme.SPACE_LG)
-        .padding({ left: 12, right: 16 })
-        .margin({ top: 10 })
+        if (this.needsGrouping()) {
+          List({ space: 8, scroller: this.groupScroller }) {
+            ForEach(this.groupIndexesOf(), (index: number) => {
+              ListItem() {
+                this.groupChip(index)
+              }
+            }, (index: number) => `group_${this.viewingSourceId}_${index}`)
+          }
+          .listDirection(Axis.Horizontal)
+          .alignListItem(ListItemAlign.Center)
+          .scrollBar(BarState.Off)
+          .nestedScroll({ scrollForward: NestedScrollMode.SELF_FIRST, scrollBackward: NestedScrollMode.SELF_FIRST })
+          .width('100%')
+          .height(30)
+          .contentEndOffset(AppTheme.SPACE_LG)
+          .padding({ left: 12, right: 16 })
+          .margin({ top: 10 })
+        }
       }
+      .width('100%')
+      .padding({ bottom: this.needsGrouping() ? 12 : 10 })
+      .backgroundColor(AppTheme.BG)
     }
-    .width('100%')
-    .padding({ bottom: this.needsGrouping() ? 12 : 10 })
-    .backgroundColor(AppTheme.BG)
   }
 
   @Builder
@@ -460,6 +467,7 @@ export struct PlayDetailPanel {
           name: this.name,
           subTitle: this.subTitle,
           actor: this.actor,
+          sourceName: this.sourceName,
           plot: this.plot,
           descriptor: this.descriptor
         })

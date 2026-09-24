@@ -16,6 +16,8 @@ interface TrackViewPayload {
   action: string;
   resource: string;
   page: string;
+  resource_cat?: string;
+  resource_title?: string;
   app_version?: string;
   device_model?: string;
   device_id?: string;
@@ -147,8 +149,8 @@ export class HttpClient {
     }
   }
 
-  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = ''): void {
-    this.sendTrack(action, resource, page, deviceModel).catch(() => {});
+  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = '', resourceCat: string = '', resourceTitle: string = ''): void {
+    this.sendTrack(action, resource, page, deviceModel, resourceCat, resourceTitle).catch(() => {});
   }
 
   private resolveDeviceModel(customModel: string = ''): string {
@@ -167,11 +169,11 @@ export class HttpClient {
     }
   }
 
-  private async sendTrack(action: string, resource: string, page: string, deviceModel: string): Promise<void> {
+  private async sendTrack(action: string, resource: string, page: string, deviceModel: string, resourceCat: string = '', resourceTitle: string = ''): Promise<void> {
     const manager = ServerConfigManager.getInstance();
     let url = '';
     try {
-      url = manager.buildApiUrl('/stats/view');
+      url = manager.buildApiUrl('/stat/view');
     } catch (_err) {
       return;
     }
@@ -194,6 +196,8 @@ export class HttpClient {
       action: action,
       resource: resource,
       page: page || action,
+      resource_cat: resourceCat,
+      resource_title: resourceTitle,
       app_version: version,
       device_model: resolvedModel,
       device_id: deviceId
@@ -215,7 +219,7 @@ export class HttpClient {
       await httpRequest.request(url, {
         method: http.RequestMethod.POST,
         header: headers,
-        extraData: payload,
+        extraData: JSON.stringify(payload),
         expectDataType: http.HttpDataType.STRING,
         connectTimeout: 5000,
         readTimeout: 5000

@@ -12,6 +12,7 @@ export struct FilmDetailHeader {
   @Prop name: string = '';
   @Prop subTitle: string = '';
   @Prop actor: string = '';
+  @Prop sourceName: string = '';
   @Prop @Watch('onDataChange') plot: string = '';
   @Prop @Watch('onDataChange') descriptor: MovieDescriptor | null = null;
   @State private isFav: boolean = false;
@@ -44,6 +45,7 @@ export struct FilmDetailHeader {
       builder: FilmDetailDialog({
         name: this.name,
         scoreText: this.scoreText,
+        sourceName: this.sourceName,
         tags: this.metaTagsList(),
         director: this.directorText(),
         actor: this.actorText(),
@@ -215,7 +217,7 @@ export struct FilmDetailHeader {
       .alignItems(VerticalAlign.Top)
       .padding({ left: 12, right: 12, top: 8, bottom: 4 })
 
-      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，整行点击直达详情弹窗）
+      // 2. 元数据与简介行（纯信息展示，全靠左自然流式排布，左侧排列评分、信息摘要与更多入口）
       Row({ space: 6 }) {
         // 评分微标（如有）
         if (this.scoreText !== '') {
@@ -243,7 +245,6 @@ export struct FilmDetailHeader {
             .fontColor(AppTheme.TEXT_SECONDARY)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .constraintSize({ maxWidth: '65%' })
         }
 
         // 紧贴左侧的纯文字更多入口（主题高亮色链接，无按钮底色）
@@ -266,7 +267,6 @@ export struct FilmDetailHeader {
         .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .justifyContent(FlexAlign.Start)
       .alignItems(VerticalAlign.Center)
       .padding({ left: 12, right: 12, top: 2, bottom: 8 })
       .onClick(() => {

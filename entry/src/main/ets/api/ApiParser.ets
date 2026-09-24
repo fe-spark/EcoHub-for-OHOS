@@ -17,6 +17,7 @@ import {
   PlayInfo,
   PlaySource,
   SearchResult,
+  SearchSourceTab,
   TipChannel
 } from '../types/FilmModels';
 import { FormatUtil } from '../common/utils/FormatUtil';
@@ -92,7 +93,9 @@ export class ApiParser {
       year: FormatUtil.year(ApiParser.str(record, 'year')),
       language: ApiParser.str(record, 'language'),
       classTag: ApiParser.str(record, 'classTag'),
-      mid: ApiParser.str(record, 'mid')
+      mid: ApiParser.str(record, 'mid'),
+      sourceId: ApiParser.str(record, 'sourceId'),
+      sourceMid: ApiParser.num(record, 'sourceMid')
     };
     return item;
   }
@@ -209,9 +212,29 @@ export class ApiParser {
     const record = ApiParser.asRecord(raw);
     const result: SearchResult = {
       list: ApiParser.parseMovies(ApiParser.list(record, 'list')),
-      page: ApiParser.parsePage(ApiParser.obj(record, 'page'))
+      page: ApiParser.parsePage(ApiParser.obj(record, 'page')),
+      sources: ApiParser.parseSearchSources(ApiParser.list(record, 'sources')),
+      error: ApiParser.str(record, 'error')
     };
     return result;
+  }
+
+  static parseSearchSources(raw: Object[] | null | undefined): SearchSourceTab[] {
+    const tabs: SearchSourceTab[] = [];
+    if (!raw || !Array.isArray(raw)) {
+      return tabs;
+    }
+    for (let i = 0; i < raw.length; i++) {
+      const item = ApiParser.asRecord(raw[i]);
+      const tab: SearchSourceTab = {
+        id: ApiParser.str(item, 'id'),
+        name: ApiParser.str(item, 'name'),
+        count: ApiParser.num(item, 'count'),
+        loading: false
+      };
+      tabs.push(tab);
+    }
+    return tabs;
   }
 
   static parseFilter(raw: Object): FilterResult {
@@ -354,7 +377,8 @@ export class ApiParser {
       pictureSlide: ApiParser.str(detailObj, 'pictureSlide'),
       descriptor: descriptor,
       list: sources,
-      localUpdateTime: ApiParser.num(detailObj, 'localUpdateTime')
+      localUpdateTime: ApiParser.num(detailObj, 'localUpdateTime'),
+      rawCid: ApiParser.num(detailObj, 'rawCid') || ApiParser.num(detailObj, 'cid')
     };
     const currentObj = ApiParser.obj(record, 'current');
     const current: MovieUrlInfo = {

@@ -1,9 +1,11 @@
 import { UIContext } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
+import { PlayNavigation } from './PlayNavigation';
 
 export interface PlayRouteParams {
   id: string;
   sourceId?: string;
+  sourceMid?: string;
   episodeIndex?: string;
   currentTime?: string;
 }
@@ -75,30 +77,49 @@ export class NavUtil {
   }
 
   static openPlay(id: string | number, sourceId: string = '', episodeIndex?: number,
-    currentTime?: number, uiContext?: UIContext): void {
-    if (!id && id !== 0) {
-      return;
-    }
-    const params: PlayRouteParams = {
-      id: `${id}`
-    };
-    if (sourceId) {
-      params.sourceId = sourceId;
-    }
-    if (episodeIndex !== undefined && episodeIndex >= 0) {
-      params.episodeIndex = `${episodeIndex}`;
-    }
-    if (currentTime !== undefined && currentTime >= 0) {
-      params.currentTime = `${currentTime}`;
-    }
+    currentTime?: number, sourceMid: string = '', uiContext?: UIContext): void {
+    const idText = `${id}`;
     try {
       const r = NavUtil.getRouter(uiContext);
-      if (r) {
-        r.pushUrl({
-          url: 'pages/PlayPage',
-          params: params
-        });
+      if (!r) {
+        return;
       }
+      if (PlayNavigation.isLocalFilmId(idText)) {
+        const params: PlayRouteParams = { id: idText };
+        if (sourceId) {
+          params.sourceId = sourceId;
+        }
+        if (episodeIndex !== undefined && episodeIndex >= 0) {
+          params.episodeIndex = `${episodeIndex}`;
+        }
+        if (currentTime !== undefined && currentTime >= 0) {
+          params.currentTime = `${currentTime}`;
+        }
+        r.pushUrl({ url: 'pages/PlayPage', params: params });
+        return;
+      }
+      let liveSource = sourceId;
+      let liveSid = sourceMid;
+      const split = PlayNavigation.splitLivePlayId(idText);
+      if (split) {
+        liveSource = split.sourceId;
+        liveSid = split.sid;
+      }
+      if (!liveSource || !liveSid) {
+        return;
+      }
+      const params: PlayRouteParams = {
+        id: '',
+        sourceId: liveSource,
+        sourceMid: liveSid
+      };
+      if (episodeIndex !== undefined && episodeIndex >= 0) {
+        params.episodeIndex = `${episodeIndex}`;
+      }
+      if (currentTime !== undefined && currentTime >= 0) {
+        params.currentTime = `${currentTime}`;
+      }
+      r.pushUrl({ url: 'pages/LivePlayPage', params: params });
     } catch (_e) {
     }
   }

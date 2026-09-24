@@ -6,6 +6,7 @@
     "pages/SearchPage",
     "pages/FilterPage",
     "pages/PlayPage",
+    "pages/LivePlayPage",
     "pages/HistoryPage",
     "pages/FavoritePage",
     "pages/CustomPlayerPage",
