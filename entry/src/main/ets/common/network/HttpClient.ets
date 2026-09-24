@@ -3,6 +3,7 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { ServerConfigManager } from '../../services/ServerConfigManager';
 import { QueryParams } from '../utils/QueryParams';
 import { SourceGuard } from '../../services/SourceGuard';
+import { SiteHeartbeat } from '../../services/SiteHeartbeat';
 import { AppVersionUtil } from '../utils/AppVersionUtil';
 
 export interface ApiResponse {
@@ -27,6 +28,12 @@ export interface ConnectionResult {
   ok: boolean;
   message?: string;
   isPrivate?: boolean;
+}
+
+interface ThrownLike {
+  name?: string;
+  message?: string;
+  code?: number | string;
 }
 
 export class HttpClient {
@@ -77,11 +84,7 @@ export class HttpClient {
     try {
       return await this.send(url, timeout);
     } catch (err) {
-      SourceGuard.intercept();
-      if (err instanceof Error) {
-        throw err;
-      }
-      throw new Error('网络请求失败');
+      throw HttpClient.wrapError(err);
     }
   }
 
@@ -141,11 +144,7 @@ export class HttpClient {
       throw new Error(errMsg);
     } catch (err) {
       httpRequest.destroy();
-      SourceGuard.intercept();
-      if (err instanceof Error) {
-        throw err;
-      }
-      throw new Error('网络请求失败');
+      throw HttpClient.wrapError(err);
     }
   }
 
@@ -367,10 +366,36 @@ export class HttpClient {
       throw new Error(errMsg);
     } catch (err) {
       httpRequest.destroy();
-      if (err instanceof Error) {
-        throw err;
-      }
-      throw new Error('网络请求失败');
+      throw HttpClient.wrapError(err);
     }
+  }
+
+  /** 保留网络层原始异常文案，避免被收成「网络请求失败」 */
+  private static wrapError(err: Object): Error {
+    if (err instanceof Error) {
+      return err;
+    }
+    const thrown = err as ThrownLike;
+    const bits: string[] = [];
+    if (thrown && thrown.name) {
+      bits.push(`${thrown.name}`);
+    }
+    if (thrown && thrown.message) {
+      bits.push(`${thrown.message}`);
+    }
+    if (thrown && thrown.code !== undefined && thrown.code !== null) {
+      bits.push(`code: ${thrown.code}`);
+    }
+    if (bits.length > 0) {
+      return new Error(bits.join(' '));
+    }
+    try {
+      const rawJson = JSON.stringify(err);
+      if (rawJson && rawJson !== '{}' && rawJson !== 'null') {
+        return new Error(rawJson);
+      }
+    } catch (_e) {}
+    const raw = `${err}`;
+    return new Error(raw && raw !== '[object Object]' ? raw : '网络请求失败');
   }
 }

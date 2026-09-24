@@ -7,7 +7,7 @@ import { common } from '@kit.AbilityKit';
 import { QueryParams } from '../common/utils/QueryParams';
 import { LoadingView } from '../components/common/LoadingView';
 import { EmptyState } from '../components/common/EmptyState';
-import { BackIcon } from '../components/common/BackIcon';
+import { AppIcon } from '../components/common/AppIcon';
 import { FilterTagRow } from '../components/film/FilterTagRow';
 import { ScrollFab } from '../components/common/ScrollFab';
 import { FilmCard } from '../components/film/FilmCard';
@@ -86,10 +86,7 @@ struct FilterPage {
     SourceGuard.onReconnect(this.reconnectCb);
   }
 
-  onPageShow(): void {
-    this.applyWindowBar();
-    FavoriteManager.preload();
-  }
+  onPageShow(): void { this.applyWindowBar(); FavoriteManager.preload(); }
   aboutToDisappear(): void { SourceGuard.offReconnect(this.reconnectCb); }
 
   private selectedOf(key: string): string {
@@ -195,9 +192,9 @@ struct FilterPage {
       if (fromPull) {
         this.listLoading = false;
       } else if (this.sortList.length === 0) {
-        this.loading = true;
+        this.films = []; this.loading = true; this.listLoading = false; this.errorText = '';
       } else {
-        this.listLoading = true;
+        this.listLoading = true; this.loading = false; this.errorText = '';
       }
     } else {
       this.loadingMore = true;
@@ -212,7 +209,7 @@ struct FilterPage {
       ok = !this.errorText;
     } catch (err) {
       if (reset) {
-        this.errorText = err instanceof Error ? err.message : '筛选失败';
+        this.errorText = err instanceof Error ? err.message : `${err}`;
       }
     } finally {
       this.fetchLock = false;
@@ -231,28 +228,13 @@ struct FilterPage {
     }
   }
 
-  private titleOf(key: string): string {
-    const index = this.titleKeys.indexOf(key);
-    return index >= 0 ? this.titles[index] : key;
-  }
-
-  private namesOf(key: string): string[] {
-    const index = this.tagKeys.indexOf(key);
-    return index >= 0 ? this.tagNames[index] : [];
-  }
-
-  private valuesOf(key: string): string[] {
-    const index = this.tagKeys.indexOf(key);
-    return index >= 0 ? this.tagValues[index] : [];
-  }
-
+  private titleOf(key: string): string { const idx = this.titleKeys.indexOf(key); return idx >= 0 ? this.titles[idx] : key; }
+  private namesOf(key: string): string[] { const idx = this.tagKeys.indexOf(key); return idx >= 0 ? this.tagNames[idx] : []; }
+  private valuesOf(key: string): string[] { const idx = this.tagKeys.indexOf(key); return idx >= 0 ? this.tagValues[idx] : []; }
   private labelOf(key: string, value: string): string {
     if (!value) return '';
-    const values = this.valuesOf(key);
-    const names = this.namesOf(key);
-    for (let i = 0; i < values.length; i++) {
-      if (values[i] === value) return names[i] || value;
-    }
+    const values = this.valuesOf(key), names = this.namesOf(key);
+    for (let i = 0; i < values.length; i++) { if (values[i] === value) return names[i] || value; }
     return value;
   }
 
@@ -261,31 +243,17 @@ struct FilterPage {
     for (let i = 0; i < this.sortList.length; i++) {
       const key = this.sortList[i];
       const label = this.labelOf(key, this.selectedFor(key));
-      if (label && label !== '全部') {
-        keys.push({ key: key, label: label });
-      }
+      if (label && label !== '全部') keys.push({ key: key, label: label });
     }
     return keys;
   }
 
-  private rowIds(): number[] {
-    return Breakpoint.rowIds(this.films.length, this.gridCols());
-  }
-
-  private scrollToTop(): void {
-    this.showTopFab = false;
-    this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true });
-  }
-
-  private syncTopFab(y: number): void {
-    const show = this.listHeight > 0 && y > this.listHeight;
-    if (show !== this.showTopFab) {
-      this.showTopFab = show;
-    }
-  }
+  private rowIds(): number[] { return Breakpoint.rowIds(this.films.length, this.gridCols()); }
+  private scrollToTop(): void { this.showTopFab = false; this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: true }); }
+  private syncTopFab(y: number): void { const show = this.listHeight > 0 && y > this.listHeight; if (show !== this.showTopFab) this.showTopFab = show; }
 
   private handleTouch(event: TouchEvent): void {
-    if (this.refreshing || this.fetchLock || this.loading) {
+    if (this.refreshing || this.fetchLock || this.loading || this.errorText) {
       return;
     }
     if (event.type === TouchType.Down) {
@@ -422,11 +390,29 @@ struct FilterPage {
                 }
               } else if (this.errorText) {
                 ListItem() {
-                  EmptyState({
-                    title: '加载失败',
-                    subtitle: this.errorText,
-                    icon: $r('sys.symbol.info_circle')
-                  })
+                  EmptyState({ title: '加载失败', subtitle: this.errorText, icon: $r('sys.symbol.info_circle') }) {
+                    Column({ space: 12 }) {
+                      Button() {
+                        Row() {
+                          AppIcon({ src: $r('sys.symbol.link'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+                          Text('更换软件源').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+                        }
+                      }
+                      .width(148).height(38).backgroundColor(AppTheme.ACCENT).borderRadius(AppTheme.RADIUS_PILL)
+                      .onClick(() => {
+                        try { this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' }); } catch (_e) {}
+                      })
+
+                      Button() {
+                        Row() {
+                          AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+                          Text('刷新').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+                        }
+                      }
+                      .width(148).height(38).backgroundColor(AppTheme.BG_CARD).borderRadius(AppTheme.RADIUS_PILL)
+                      .onClick(() => { this.loadData(true, false); })
+                    }.margin({ top: 16 }).width('100%').alignItems(HorizontalAlign.Center)
+                  }
                 }
               } else if (this.films.length === 0) {
                 ListItem() {

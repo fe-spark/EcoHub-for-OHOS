@@ -1,6 +1,7 @@
 import { curves } from '@kit.ArkUI';
 import { AppTheme } from '../../common/constants/AppTheme';
 import { AppIcon } from '../common/AppIcon';
+import { MarkdownView } from '../common/MarkdownView';
 import { WindowBar } from '../../common/utils/WindowBar';
 
 @Component
@@ -12,6 +13,7 @@ export struct NoticeDialog {
   @State private maskOpacity: number = 0;
   @State private cardScale: number = 0.72;
   @State private cardOpacity: number = 0;
+  @State private contentActualHeight: number = 0;
   private isClosing: boolean = false;
 
   @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
@@ -25,15 +27,15 @@ export struct NoticeDialog {
     return this.windowWidth > this.windowHeight && this.windowHeight > 0;
   }
 
-  // 正文随内容收紧；仅在超出上限时滚动，避免短公告被 layoutWeight 撑高
+  // 正文随内容收紧；仅在超出安全高度时滚动，避免短公告被撑高，同时充分利用大屏安全可用空间
   private contentMaxHeight(): number {
     const pad = this.isLandscape() ? 14 : AppTheme.SPACE_LG;
     const headerGap = this.isLandscape() ? 8 : AppTheme.SPACE_MD;
     const btnGap = this.isLandscape() ? 10 : AppTheme.SPACE_LG;
     const btnH = this.isLandscape() ? 36 : 42;
     const chrome = pad * 2 + 32 + headerGap + btnGap + btnH;
-    const available = this.windowHeight - this.topInset - this.bottomInset - 24 - chrome;
-    return Math.max(48, Math.min(this.isLandscape() ? 160 : 260, available));
+    const available = this.windowHeight - this.topInset - this.bottomInset - 40 - chrome;
+    return Math.max(60, Math.min(this.isLandscape() ? 180 : 540, available));
   }
 
   aboutToAppear(): void {
@@ -120,26 +122,44 @@ export struct NoticeDialog {
           .alignItems(VerticalAlign.Center)
           .margin({ bottom: this.isLandscape() ? 8 : AppTheme.SPACE_MD })
 
+          Column()
+            .width('100%')
+            .height(1)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_SM })
+
           Scroll() {
             Column() {
-              Text(this.content)
-                .fontSize(14)
-                .lineHeight(22)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .width('100%')
+              MarkdownView({
+                content: this.content,
+                fontSize: 14,
+                fontColor: AppTheme.TEXT_SECONDARY
+              })
             }
             .width('100%')
             .alignItems(HorizontalAlign.Start)
+            .onAreaChange((_oldArea: Area, newArea: Area) => {
+              const h = Number(newArea.height);
+              if (h > 0 && Math.abs(this.contentActualHeight - h) > 1) {
+                this.contentActualHeight = h;
+              }
+            })
           }
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Auto)
           .edgeEffect(EdgeEffect.None)
           .constraintSize({ maxHeight: this.contentMaxHeight() })
+          .height(this.contentActualHeight > 0
+            ? Math.min(this.contentActualHeight + 8, this.contentMaxHeight())
+            : undefined)
           .width('100%')
-          .padding(AppTheme.SPACE_MD)
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(AppTheme.RADIUS_MD)
-          .margin({ bottom: this.isLandscape() ? 10 : AppTheme.SPACE_LG })
+          .padding({ left: 2, right: 2, top: 4, bottom: 4 })
+
+          Column()
+            .width('100%')
+            .height(1)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .margin({ top: this.isLandscape() ? 6 : AppTheme.SPACE_SM, bottom: this.isLandscape() ? 8 : AppTheme.SPACE_MD })
 
           Button('我知道了')
             .width('100%')
@@ -170,8 +190,8 @@ export struct NoticeDialog {
       .width('100%')
       .height('100%')
       .padding({
-        top: Math.max(8, this.topInset),
-        bottom: Math.max(8, this.bottomInset),
+        top: Math.max(16, this.topInset + 16),
+        bottom: Math.max(16, this.bottomInset + 16),
         left: Math.max(16, this.leftInset),
         right: Math.max(16, this.rightInset)
       })

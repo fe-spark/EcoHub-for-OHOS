@@ -1,6 +1,7 @@
 import { curves } from '@kit.ArkUI';
 import { AppTheme } from '../../common/constants/AppTheme';
 import { AppIcon } from '../common/AppIcon';
+import { MarkdownView } from '../common/MarkdownView';
 import { AppUpdateInfo } from '../../common/utils/AppVersionUtil';
 import { NavUtil } from '../../common/utils/NavUtil';
 import { WindowBar } from '../../common/utils/WindowBar';
@@ -22,6 +23,7 @@ export struct VersionUpdateDialog {
   @State private maskOpacity: number = 0;
   @State private cardScale: number = 0.72;
   @State private cardOpacity: number = 0;
+  @State private notesActualHeight: number = 0;
   private isClosing: boolean = false;
 
   @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
@@ -72,7 +74,7 @@ export struct VersionUpdateDialog {
   private notesMaxHeight(): number {
     const reserved = this.isLandscape() ? 200 : 280;
     const available = this.windowHeight - this.topInset - this.bottomInset - reserved;
-    return Math.max(60, Math.min(this.isLandscape() ? 140 : 240, available));
+    return Math.max(60, Math.min(this.isLandscape() ? 180 : 500, available));
   }
 
   build() {
@@ -154,7 +156,11 @@ export struct VersionUpdateDialog {
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
-          .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_SM })
+          Column()
+            .width('100%')
+            .height(1)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_SM })
 
           Scroll() {
             Column() {
@@ -165,25 +171,36 @@ export struct VersionUpdateDialog {
                   .fontColor(AppTheme.TEXT_PRIMARY)
                   .margin({ bottom: AppTheme.SPACE_XS })
               }
-              Text(this.updateInfo.releaseNotes ? this.updateInfo.releaseNotes.trim() : '包含稳定性优化与功能增强。')
-                .fontSize(13)
-                .lineHeight(20)
-                .fontColor(AppTheme.TEXT_SECONDARY)
-                .width('100%')
+              MarkdownView({
+                content: this.updateInfo.releaseNotes ? this.updateInfo.releaseNotes.trim() : '包含稳定性优化与功能增强。',
+                fontSize: 13,
+                fontColor: AppTheme.TEXT_SECONDARY
+              })
             }
             .width('100%')
             .alignItems(HorizontalAlign.Start)
+            .onAreaChange((_oldArea: Area, newArea: Area) => {
+              const h = Number(newArea.height);
+              if (h > 0 && Math.abs(this.notesActualHeight - h) > 1) {
+                this.notesActualHeight = h;
+              }
+            })
           }
-          .layoutWeight(1)
           .scrollable(ScrollDirection.Vertical)
           .scrollBar(BarState.Auto)
           .edgeEffect(EdgeEffect.None)
-          .constraintSize({ minHeight: 60, maxHeight: this.notesMaxHeight() })
+          .constraintSize({ maxHeight: this.notesMaxHeight() })
+          .height(this.notesActualHeight > 0
+            ? Math.min(this.notesActualHeight + 8, this.notesMaxHeight())
+            : undefined)
           .width('100%')
-          .padding(AppTheme.SPACE_MD)
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(AppTheme.RADIUS_MD)
-          .margin({ bottom: this.isLandscape() ? 6 : AppTheme.SPACE_MD })
+          .padding({ left: 2, right: 2, top: 4, bottom: 4 })
+
+          Column()
+            .width('100%')
+            .height(1)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .margin({ top: this.isLandscape() ? 4 : AppTheme.SPACE_SM, bottom: this.isLandscape() ? 6 : AppTheme.SPACE_SM })
 
           Row() {
             AppIcon({
@@ -275,8 +292,8 @@ export struct VersionUpdateDialog {
       .width('100%')
       .height('100%')
       .padding({
-        top: Math.max(8, this.topInset),
-        bottom: Math.max(8, this.bottomInset),
+        top: Math.max(16, this.topInset + 16),
+        bottom: Math.max(16, this.bottomInset + 16),
         left: Math.max(16, this.leftInset),
         right: Math.max(16, this.rightInset)
       })

@@ -34,6 +34,7 @@ struct Index {
     currentVersion: '', latestVersion: '', hasUpdate: false, releaseName: '', releaseNotes: '', releaseUrl: '', downloadUrl: ''
   };
   private hasDismissedNotice: boolean = false;
+  private currentNoticeKey: string = '';
   @State private tabReady: boolean[] = [true, false, false];
   @State private showClipBanner: boolean = false;
   private isPageActive: boolean = false;
@@ -64,12 +65,15 @@ struct Index {
     const targetVersion = config.noticeAppVersion || config.noticeVersion;
     const appVersion = await AppVersionUtil.getVersionName();
     const isMatched = AppVersionUtil.isVersionMatched(appVersion, targetVersion);
-    // 版本号匹配且本次启动会话未关闭过时，弹出开屏公告
-    if (isMatched && !this.hasDismissedNotice) {
+    const serverUrl = ServerConfigManager.getInstance().getCachedServerUrl();
+    const noticeKey = `${serverUrl}::${config.noticeTitle || ''}::${config.noticeContent.length}_${config.noticeContent.slice(0, 32)}`;
+    const dismissedKey = AppStorage.get<string>('DISMISSED_NOTICE_KEY') || '';
+    if (isMatched && dismissedKey !== noticeKey) {
       this.noticeTitle = config.noticeTitle || '站点公告';
       this.noticeContent = config.noticeContent;
+      this.currentNoticeKey = noticeKey;
       this.showNotice = true;
-    } else if (!isMatched) {
+    } else if (!isMatched || dismissedKey === noticeKey) {
       this.showNotice = false;
     }
   }
@@ -460,14 +464,16 @@ struct Index {
       .width('100%')
       .height('100%')
       .backgroundColor(AppTheme.BG)
-      .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
-        [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
+      .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
 
       if (this.showNotice && this.ready && this.siteOpen) {
         NoticeDialog({
           title: this.noticeTitle,
           content: this.noticeContent,
           onClose: () => {
+            if (this.currentNoticeKey) {
+              AppStorage.setOrCreate<string>('DISMISSED_NOTICE_KEY', this.currentNoticeKey);
+            }
             this.hasDismissedNotice = true;
             AppStorage.setOrCreate<boolean>('NOTICE_DISMISSED_SESSION', true);
             this.showNotice = false;
@@ -486,7 +492,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
-      [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
+    .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }
 }

@@ -117,6 +117,22 @@ export class SourceGuard {
     }
   }
 
+  private static reconnectSkipTimer: number = -1;
+
+  public static markReconnectedCooldown(durationMs: number = 4000): void {
+    SourceGuard.intercepting = false;
+    if (SourceGuard.reconnectSkipTimer !== -1) {
+      clearTimeout(SourceGuard.reconnectSkipTimer);
+      SourceGuard.reconnectSkipTimer = -1;
+      SourceGuard.endSkip();
+    }
+    SourceGuard.beginSkip();
+    SourceGuard.reconnectSkipTimer = setTimeout(() => {
+      SourceGuard.endSkip();
+      SourceGuard.reconnectSkipTimer = -1;
+    }, durationMs);
+  }
+
   public static markClosed(): void {
     SourceGuard.intercepting = false;
   }

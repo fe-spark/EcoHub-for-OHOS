@@ -290,42 +290,21 @@ export struct DailyUpdatesTab {
             right: this.rightInset
           })
       } else if (!this.ready && this.errorText) {
-        Refresh({ refreshing: $$this.refreshing }) {
-          Scroll() {
-            Column() {
-              Blank().height(this.getHeaderHeight() + 20)
-              EmptyState({
-                title: '加载失败',
-                subtitle: this.errorText,
-                icon: $r('sys.symbol.info_circle'),
-                actionText: '重试',
-                onAction: () => {
-                  this.loadMeta();
-                }
-              })
+        Column() {
+          Blank().height(this.getHeaderHeight() + 20)
+          EmptyState({
+            title: '加载失败',
+            subtitle: this.errorText,
+            icon: $r('sys.symbol.info_circle'),
+            actionText: '重试',
+            onAction: () => {
+              this.loadMeta();
             }
-            .width('100%')
-            .alignItems(HorizontalAlign.Center)
-          }
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.None)
-          .nestedScroll({
-            scrollForward: NestedScrollMode.SELF_FIRST,
-            scrollBackward: NestedScrollMode.SELF_FIRST
           })
-          .width('100%')
-          .height('100%')
         }
-        .onRefreshing(() => {
-          if (this.fetchLock) {
-            this.refreshing = false;
-            return;
-          }
-          this.loadMeta();
-        })
-        .pullToRefresh(!this.fetchLock)
         .width('100%')
         .height('100%')
+        .alignItems(HorizontalAlign.Center)
       } else {
         Swiper(this.swiperController) {
           ForEach(this.categories, (item: DailyUpdateCategory, index: number) => {

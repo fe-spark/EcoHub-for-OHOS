@@ -1,5 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
-import { BannerItem, HomeSection } from '../types/FilmModels';
+import { BannerItem, HomeSection, MovieBasicInfo } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
 import { NavUtil } from '../common/utils/NavUtil';
@@ -13,19 +13,11 @@ import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
 
-const CATEGORY_FONT_FAMILY: string = 'CalligraphyFont';
-const CATEGORY_ICON_SIZE: number = 17;
-const CATEGORY_ICON_RADIUS: number = 8.5;
-const CATEGORY_TAG_HEIGHT: number = 32;
-const CATEGORY_GLYPH_SIZE: number = 10;
-const CATEGORY_LABEL_SIZE: number = 13;
-const CATEGORY_ICON_BG: string = 'rgba(250, 140, 22, 0.12)';
-const CATEGORY_ICON_BORDER: string = 'rgba(250, 140, 22, 0.28)';
-const CATEGORY_ICON_BORDER_WIDTH: number = 0.6;
-const CATEGORY_CHIP_BG: string = 'rgba(255, 255, 255, 0.05)';
-const CATEGORY_CHIP_BORDER: string = 'rgba(255, 255, 255, 0.10)';
-const CATEGORY_CHIP_BORDER_WIDTH: number = 0.8;
-const CATEGORY_CHIP_BLUR: number = 20;
+const CAT_FONT: string = 'CalligraphyFont';
+const CAT_ICON_BG: string = 'rgba(250, 140, 22, 0.12)';
+const CAT_ICON_BORDER: string = 'rgba(250, 140, 22, 0.28)';
+const CAT_CHIP_BG: string = 'rgba(255, 255, 255, 0.05)';
+const CAT_CHIP_BORDER: string = 'rgba(255, 255, 255, 0.10)';
 
 @Component
 export struct RecommendTab {
@@ -43,12 +35,10 @@ export struct RecommendTab {
   @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
   @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
   @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
-
   @State private pullDistance: number = 0;
   @State private isPulling: boolean = false;
   private touchStartY: number = 0;
   private touchStartX: number = 0;
-
   private hasLoaded: boolean = false;
   @State private fetchLock: boolean = false;
   private reconnectCb: () => void = () => {};
@@ -60,9 +50,7 @@ export struct RecommendTab {
       this.loadHome(false);
     };
     SourceGuard.onReconnect(this.reconnectCb);
-    if (this.hasLoaded) {
-      return;
-    }
+    if (this.hasLoaded) return;
     this.hasLoaded = true;
     this.loadHome(false);
   }
@@ -76,17 +64,22 @@ export struct RecommendTab {
       return;
     }
     this.fetchLock = true;
-    this.loading = !fromPull && this.banners.length === 0 && this.sections.length === 0;
-    this.errorText = '';
+    if (!fromPull) {
+      this.banners = [];
+      this.sections = [];
+      this.loading = true;
+      this.errorText = '';
+    }
     let ok = false;
     try {
       const home = await FilmApi.getHome();
       this.banners = home.banners;
       this.sections = home.content;
       this.reloadToken = Date.now();
+      this.errorText = '';
       ok = true;
     } catch (err) {
-      this.errorText = err instanceof Error ? err.message : '首页加载失败';
+      this.errorText = err instanceof Error ? err.message : `${err}`;
     } finally {
       this.fetchLock = false;
       this.loading = false;
@@ -102,14 +95,12 @@ export struct RecommendTab {
     }
   }
 
+  private sectionFilms(sec: HomeSection): MovieBasicInfo[] {
+    return (sec.movies && sec.movies.length > 0) ? sec.movies : ((sec.hot && sec.hot.length > 0) ? sec.hot : []);
+  }
+
   private visibleSections(): HomeSection[] {
-    const list: HomeSection[] = [];
-    for (let i = 0; i < this.sections.length; i++) {
-      if (this.sections[i].nav.show !== false) {
-        list.push(this.sections[i]);
-      }
-    }
-    return list;
+    return this.sections.filter((s: HomeSection) => s.nav.show !== false && this.sectionFilms(s).length > 0);
   }
 
   private categoryGlyph(name: string): string {
@@ -127,47 +118,32 @@ export struct RecommendTab {
       if (this.categoryGlyph(section.nav.name)) {
         Row() {
           Text(this.categoryGlyph(section.nav.name))
-            .fontFamily(CATEGORY_FONT_FAMILY)
-            .fontSize(this.isWide() ? 11 : CATEGORY_GLYPH_SIZE)
+            .fontFamily(CAT_FONT)
+            .fontSize(this.isWide() ? 11 : 10)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppTheme.ACCENT)
         }
-        .width(this.isWide() ? 19 : CATEGORY_ICON_SIZE)
-        .height(this.isWide() ? 19 : CATEGORY_ICON_SIZE)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(VerticalAlign.Center)
-        .borderRadius(this.isWide() ? 9.5 : CATEGORY_ICON_RADIUS)
-        .backgroundColor(this.isWide() ? 'rgba(250, 140, 22, 0.14)' : CATEGORY_ICON_BG)
-        .border({
-          width: this.isWide() ? 0.7 : CATEGORY_ICON_BORDER_WIDTH,
-          color: this.isWide() ? 'rgba(250, 140, 22, 0.32)' : CATEGORY_ICON_BORDER
-        })
+        .width(this.isWide() ? 19 : 17).height(this.isWide() ? 19 : 17)
+        .justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Center)
+        .borderRadius(this.isWide() ? 9.5 : 8.5)
+        .backgroundColor(this.isWide() ? 'rgba(250, 140, 22, 0.14)' : CAT_ICON_BG)
+        .border({ width: this.isWide() ? 0.7 : 0.6, color: this.isWide() ? 'rgba(250, 140, 22, 0.32)' : CAT_ICON_BORDER })
         .clip(true)
       }
       Text(section.nav.name)
-        .fontSize(this.isWide() ? 13.5 : CATEGORY_LABEL_SIZE)
+        .fontSize(this.isWide() ? 13.5 : 13)
         .fontWeight(FontWeight.Medium)
         .fontColor(AppTheme.TEXT_PRIMARY)
         .maxLines(1)
     }
-    .height(this.isWide() ? 35 : CATEGORY_TAG_HEIGHT)
-    .padding({
-      left: this.isWide() ? 8 : (AppTheme.SPACE_SM - 2),
-      right: this.isWide() ? 13 : (AppTheme.SPACE_MD - 1)
-    })
-    .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
-    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.06)' : CATEGORY_CHIP_BG)
-    .backdropBlur(CATEGORY_CHIP_BLUR)
-    .borderRadius(AppTheme.RADIUS_PILL)
-    .clip(true)
-    .border({
-      width: this.isWide() ? 0.8 : CATEGORY_CHIP_BORDER_WIDTH,
-      color: this.isWide() ? 'rgba(255, 255, 255, 0.12)' : CATEGORY_CHIP_BORDER
-    })
-    .onClick(() => {
-      NavUtil.openFilter(section.nav.id);
-    })
+    .height(this.isWide() ? 35 : 32)
+    .padding({ left: this.isWide() ? 8 : (AppTheme.SPACE_SM - 2), right: this.isWide() ? 13 : (AppTheme.SPACE_MD - 1) })
+    .justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Center)
+    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.06)' : CAT_CHIP_BG)
+    .backdropBlur(20)
+    .borderRadius(AppTheme.RADIUS_PILL).clip(true)
+    .border({ width: this.isWide() ? 0.8 : 0.8, color: this.isWide() ? 'rgba(255, 255, 255, 0.12)' : CAT_CHIP_BORDER })
+    .onClick(() => { NavUtil.openFilter(section.nav.id); })
   }
 
   private isWide(): boolean {
@@ -225,11 +201,7 @@ export struct RecommendTab {
         color: `rgba(255, 255, 255, ${0.16 * (1 - this.effectiveHeaderAlpha()) + 0.08 * this.effectiveHeaderAlpha()})`
       })
       .onClick(() => {
-        if (this.onOpenSearch) {
-          this.onOpenSearch();
-        } else {
-          NavUtil.openSearch();
-        }
+        if (this.onOpenSearch) this.onOpenSearch(); else NavUtil.openSearch();
       })
     }
     .width('100%')
@@ -250,9 +222,7 @@ export struct RecommendTab {
   }
 
   private handleTouch(event: TouchEvent): void {
-    if (this.refreshing || this.fetchLock) {
-      return;
-    }
+    if (this.refreshing || this.fetchLock || this.errorText) return;
     if (event.type === TouchType.Down) {
       this.touchStartY = event.touches[0].y;
       this.touchStartX = event.touches[0].x;
@@ -267,7 +237,6 @@ export struct RecommendTab {
 
       const currentY = event.touches[0].y;
       const currentX = event.touches[0].x;
-
       if (scrollY > 0) {
         this.touchStartY = currentY;
         this.touchStartX = currentX;
@@ -339,6 +308,58 @@ export struct RecommendTab {
     }
   }
 
+  @Builder
+  centeredState(title: string, subtitle: string, icon: Resource, retryText: string, onRetry: () => void) {
+    Scroll() {
+      Column() {
+        EmptyState({ title: title, subtitle: subtitle, icon: icon }) {
+          this.stateActions(retryText, onRetry)
+        }
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .padding({
+        top: 48 + this.topInset,
+        left: this.leftInset,
+        right: this.rightInset
+      })
+    }
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.None)
+    .nestedScroll({
+      scrollForward: NestedScrollMode.SELF_FIRST,
+      scrollBackward: NestedScrollMode.SELF_FIRST
+    })
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  stateActions(retryText: string, onRetry: () => void) {
+    Column({ space: 12 }) {
+      Button() {
+        Row() {
+          AppIcon({ src: $r('sys.symbol.link'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+          Text('更换软件源').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+        }
+      }
+      .width(148).height(38).backgroundColor(AppTheme.ACCENT).borderRadius(AppTheme.RADIUS_PILL)
+      .onClick(() => {
+        try { this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' }); } catch (_e) {}
+      })
+
+      Button() {
+        Row() {
+          AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+          Text(retryText).fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+        }
+      }
+      .width(148).height(38).backgroundColor(AppTheme.BG_CARD).borderRadius(AppTheme.RADIUS_PILL)
+      .onClick(onRetry)
+    }.margin({ top: 16 }).width('100%').alignItems(HorizontalAlign.Center)
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       // 1. 主页面滚动区
@@ -352,98 +373,9 @@ export struct RecommendTab {
             right: this.rightInset
           })
       } else if (this.errorText) {
-        Scroll() {
-          Column() {
-            Blank().height(80 + this.topInset)
-            EmptyState({
-              title: '加载失败',
-              subtitle: this.errorText,
-              icon: $r('sys.symbol.info_circle'),
-              actionText: '重试',
-              onAction: () => {
-                this.loadHome(true, true);
-              }
-            })
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({
-            left: this.leftInset,
-            right: this.rightInset
-          })
-        }
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.None)
-        .nestedScroll({
-          scrollForward: NestedScrollMode.SELF_FIRST,
-          scrollBackward: NestedScrollMode.SELF_FIRST
-        })
-        .width('100%')
-        .height('100%')
+        this.centeredState('加载失败', this.errorText, $r('sys.symbol.info_circle'), '刷新', () => { this.loadHome(false, true); })
       } else if (this.banners.length === 0 && this.visibleSections().length === 0) {
-        Scroll() {
-          Column() {
-            Blank().height(80 + this.topInset)
-            EmptyState({
-              title: '暂无影片数据',
-              subtitle: '当前软件源内暂无影片或尚未采集，可下拉刷新或更换软件源',
-              icon: $r('sys.symbol.film')
-            })
-            Row({ space: 12 }) {
-              Button() {
-                Row() {
-                  AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
-                  Text('刷新')
-                    .fontSize(13)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-                    .margin({ left: 4 })
-                }
-              }
-              .height(36)
-              .padding({ left: 16, right: 16 })
-              .backgroundColor(AppTheme.BG_CARD)
-              .borderRadius(AppTheme.RADIUS_PILL)
-              .onClick(() => {
-                this.loadHome(true, true);
-              })
-
-              Button() {
-                Row() {
-                  AppIcon({ src: $r('sys.symbol.link'), iconSize: 14, color: AppTheme.TEXT_PRIMARY })
-                  Text('更换软件源')
-                    .fontSize(13)
-                    .fontColor(AppTheme.TEXT_PRIMARY)
-                    .margin({ left: 4 })
-                }
-              }
-              .height(36)
-              .padding({ left: 16, right: 16 })
-              .backgroundColor(AppTheme.ACCENT)
-              .borderRadius(AppTheme.RADIUS_PILL)
-              .onClick(() => {
-                try {
-                  this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' });
-                } catch (_e) {
-                }
-              })
-            }
-            .margin({ top: 16 })
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({
-            left: this.leftInset,
-            right: this.rightInset
-          })
-        }
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.None)
-        .nestedScroll({
-          scrollForward: NestedScrollMode.SELF_FIRST,
-          scrollBackward: NestedScrollMode.SELF_FIRST
-        })
-        .width('100%')
-        .height('100%')
+        this.centeredState('暂无影片数据', '当前软件源内暂无影片或尚未采集，可下拉刷新或更换软件源', $r('sys.symbol.film'), '刷新', () => { this.loadHome(true, true); })
       } else {
         Scroll(this.scroller) {
           Column() {
@@ -492,7 +424,7 @@ export struct RecommendTab {
             ForEach(this.visibleSections(), (section: HomeSection) => {
               FilmRow({
                 title: section.nav.name,
-                films: section.movies.length > 0 ? section.movies : section.hot,
+                films: this.sectionFilms(section),
                 pid: section.nav.id,
                 onMore: () => {
                   NavUtil.openFilter(section.nav.id);

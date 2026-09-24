@@ -150,9 +150,10 @@ struct ServerConfigPage {
     await this.loadHistory();
     FilmApi.clearSiteConfig();
     SiteHeartbeat.getInstance().resetFailures();
+    AppStorage.delete('NOTICE_DISMISSED_SESSION');
+    AppStorage.delete('DISMISSED_NOTICE_KEY');
     AppStorage.setOrCreate<number>('SOURCE_EPOCH', Date.now());
-    SourceGuard.markClosed();
-    SourceGuard.notifyReconnected();
+    SourceGuard.markReconnectedCooldown();
 
     try {
       this.getUIContext().getPromptAction().showToast({ message: this.reconnect ? '已重新接入' : '源已接入' });
@@ -168,6 +169,7 @@ struct ServerConfigPage {
       r.replaceUrl({ url: 'pages/Index' });
     } catch (_e) {
     }
+    SourceGuard.notifyReconnected();
   }
 
   build() {

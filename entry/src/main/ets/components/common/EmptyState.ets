@@ -8,6 +8,10 @@ export struct EmptyState {
   @Prop icon: Resource = $r('sys.symbol.film');
   @Prop actionText: string = '';
   onAction?: () => void;
+  @BuilderParam action: () => void = this.emptyAction;
+
+  @Builder
+  emptyAction() {}
 
   build() {
     Column() {
@@ -21,7 +25,9 @@ export struct EmptyState {
         Text(this.subtitle)
           .fontSize(13)
           .fontColor(AppTheme.TEXT_MUTED)
+          .lineHeight(19)
           .margin({ top: 8 })
+          .width('100%')
           .textAlign(TextAlign.Center)
       }
       if (this.actionText && this.onAction) {
@@ -35,9 +41,10 @@ export struct EmptyState {
             }
           })
       }
+      this.action()
     }
     .width('100%')
-    .padding({ top: 80, bottom: 80, left: 24, right: 24 })
+    .padding({ top: 24, bottom: 24, left: 24, right: 24 })
     .alignItems(HorizontalAlign.Center)
   }
 }

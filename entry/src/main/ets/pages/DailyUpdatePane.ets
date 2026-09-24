@@ -7,6 +7,7 @@ import { LoadingView } from '../components/common/LoadingView';
 import { EmptyState } from '../components/common/EmptyState';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
+import { AppIcon } from '../components/common/AppIcon';
 
 const PAGE_SIZE = 21;
 
@@ -101,25 +102,27 @@ export struct DailyUpdatePane {
     }
     this.fetchLock = true;
     if (reset) {
-      if (!fromPull && this.films.length === 0) {
+      if (!fromPull) {
+        this.films = [];
         this.loading = true;
+        this.errorText = '';
       }
     } else {
       this.loadingMore = true;
     }
-    this.errorText = '';
     let ok = false;
     try {
       const result = await FilmApi.getDailyUpdates(this.pid, nextPage, PAGE_SIZE);
       this.page = result.page;
       this.films = reset ? result.list : this.films.concat(result.list);
       this.hasLoaded = true;
+      this.errorText = '';
       ok = true;
       if (fromPull && this.pid === this.seedPid) {
         this.onAllRefreshed();
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '每日更新加载失败';
+      const msg = err instanceof Error ? err.message : `${err}`;
       if (reset) {
         this.errorText = msg;
       } else {
@@ -196,7 +199,7 @@ export struct DailyUpdatePane {
   }
 
   private handleTouch(event: TouchEvent): void {
-    if (this.refreshing || this.fetchLock) {
+    if (this.refreshing || this.fetchLock || this.errorText) {
       return;
     }
     if (event.type === TouchType.Down) {
@@ -298,7 +301,29 @@ export struct DailyUpdatePane {
                 title: '加载失败',
                 subtitle: this.errorText,
                 icon: $r('sys.symbol.info_circle')
-              })
+              }) {
+                Column({ space: 12 }) {
+                  Button() {
+                    Row() {
+                      AppIcon({ src: $r('sys.symbol.link'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+                      Text('更换软件源').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+                    }
+                  }
+                  .width(148).height(38).backgroundColor(AppTheme.ACCENT).borderRadius(AppTheme.RADIUS_PILL)
+                  .onClick(() => {
+                    try { this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' }); } catch (_e) {}
+                  })
+
+                  Button() {
+                    Row() {
+                      AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+                      Text('刷新').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+                    }
+                  }
+                  .width(148).height(38).backgroundColor(AppTheme.BG_CARD).borderRadius(AppTheme.RADIUS_PILL)
+                  .onClick(() => { this.load(true, false); })
+                }.margin({ top: 16 }).width('100%').alignItems(HorizontalAlign.Center)
+              }
             } else {
               EmptyState({
                 title: '暂无更新',

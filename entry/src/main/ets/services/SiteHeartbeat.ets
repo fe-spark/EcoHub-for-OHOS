@@ -14,6 +14,7 @@ export class SiteHeartbeat {
   private probing: boolean = false;
   private timerId: number = -1;
   private consecutiveFailures: number = 0;
+  private generation: number = 0;
 
   private constructor() {}
 
@@ -51,7 +52,9 @@ export class SiteHeartbeat {
    */
   public resetFailures(): void {
     this.consecutiveFailures = 0;
-    if (this.running && this.timerId === -1 && !this.probing) {
+    this.generation++;
+    this.clearTimer();
+    if (this.running) {
       this.scheduleNext(HEARTBEAT_INTERVAL_MS);
     }
   }
@@ -77,7 +80,7 @@ export class SiteHeartbeat {
   /**
    * 核查设备当前是否具备有效外网访问能力
    */
-  private static async hasInternetConnection(): Promise<boolean> {
+  public static async hasInternetConnection(): Promise<boolean> {
     try {
       const hasNet = await connection.hasDefaultNet();
       if (!hasNet) {
@@ -112,7 +115,11 @@ export class SiteHeartbeat {
    * 严格串行探活：等上一次请求明确成功/失败后，才开启下一次 10s 调度，防止请求堆积
    */
   private async runProbe(): Promise<void> {
-    if (!this.running || this.probing) {
+    if (!this.running) {
+      return;
+    }
+    if (this.probing) {
+      this.scheduleNext(HEARTBEAT_INTERVAL_MS);
       return;
     }
     const serverUrl = ServerConfigManager.getInstance().getCachedServerUrl();
@@ -148,18 +155,25 @@ export class SiteHeartbeat {
       return;
     }
 
+    const currentGen = this.generation;
     this.probing = true;
     try {
       // 探活请求：获取最新站点状态，自动触发 FilmApi.onConfigChange 广播，单次探活超时限制为 8000ms
       const config = await FilmApi.getSiteConfig(true, 8000);
+      if (currentGen !== this.generation) {
+        return;
+      }
       // 明确成功：重置连续故障计数
       this.consecutiveFailures = 0;
       // 站点关闭运行状态检测
       this.checkSiteClosedState(config);
     } catch (_err) {
+      if (currentGen !== this.generation) {
+        return;
+      }
       // 探活请求异常时二次核验本地网络状态，若本地网络中断或异常，清零故障计数，不计入软件源故障
       const hasNetAfterErr = await SiteHeartbeat.hasInternetConnection();
-      if (!hasNetAfterErr) {
+      if (!hasNetAfterErr || currentGen !== this.generation) {
         this.consecutiveFailures = 0;
         return;
       }
@@ -178,8 +192,8 @@ export class SiteHeartbeat {
       }
     } finally {
       this.probing = false;
-      // 只有本次请求完全结束后，若当前仍处于前台运行状态且未触发失效拦截，才开启下一次 10s 倒计时
-      if (this.running && this.consecutiveFailures < MAX_FAILURES) {
+      // 过期探针只负责释放 probing；调度由当前 generation 的探针或 resetFailures 负责
+      if (currentGen === this.generation && this.running && this.consecutiveFailures < MAX_FAILURES) {
         this.scheduleNext(HEARTBEAT_INTERVAL_MS);
       }
     }
