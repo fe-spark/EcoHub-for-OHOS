@@ -51,6 +51,24 @@
 
 ---
 
+## 推荐
+
+### 服务器
+
+| 服务商 | 说明 | 链接 |
+| --- | --- | --- |
+| CloudCone | 1. 演示站点所用服务商<br>2. 高性价比 VPS，磁盘 I/O 不受限 | [前往选购](https://app.cloudcone.com/?ref=14393) |
+
+### 网络服务
+
+| 服务商 | 特点 / 价格 | 链接 |
+| --- | --- | --- |
+| 良心云 | 低至 2 元/月 <br>新用户注册即获体验流量 | [前往注册](https://xn--9kqz23b19z.com/#/register?code=xAmvfdic) |
+| 赔钱机场 | 低至 1.5 元/月 <br>适合高流量与备用需求 | [前往注册](https://xn--mes358aby2apfg.com/register?code=FA4xlzHD&cover=sfw) |
+| iKuuu | 老牌稳定机场 <br>新用户注册即获体验流量 | [前往注册](https://ikuuu.top/auth/register?code=Uubm) |
+
+---
+
 ## 🛠️ 本地开发
 
 使用 [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/) 打开本工程目录进行调试与打包构建。
