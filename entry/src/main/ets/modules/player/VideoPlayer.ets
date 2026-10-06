@@ -22,6 +22,7 @@ import { DlnaDevice } from '../../types/DlnaTypes';
 import { PlayerScale, PlayerScaleMode } from './PlayerScale';
 import { PlayerScaleController } from './PlayerScaleController';
 import { PlayerAv } from './PlayerAv';
+import { AppToast } from '../../common/utils/AppToast';
 import { PlayerPip } from './PlayerPip';
 
 @Component
@@ -97,6 +98,8 @@ export struct VideoPlayer {
   private state: PlayerPlaybackState = new PlayerPlaybackState();
   private observer: PlayerVideoObserver | null = null;
   private pageWasHidden: boolean = false;
+  private playEpoch: number = 0;
+  private seekGesture: number = 0;
   private playerW: number = 1;
   private playerH: number = 1;
   private volumeSub: (() => void) | null = null;
@@ -291,6 +294,8 @@ export struct VideoPlayer {
   }
 
   private resetPlayState(): void {
+    this.playEpoch++;
+    this.seekGesture = 0;
     this.watcher.clearOpenWatch();
     this.watcher.clearSeekWatch();
     this.state.reset(this.videoUrl);
@@ -423,13 +428,13 @@ export struct VideoPlayer {
   private handleManualStartPip(): void {
     if (this.isCasting()) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '当前正在投屏，无法开启画中画' });
+        AppToast.show('当前正在投屏，无法开启画中画');
       } catch (_e) {}
       return;
     }
     if (!this.pip.enabled) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '当前设备不支持画中画' });
+        AppToast.show('当前设备不支持画中画');
       } catch (_e) {}
       return;
     }
@@ -447,7 +452,7 @@ export struct VideoPlayer {
     this.pip.start().catch((err: Error) => {
       console.error(`[VideoPlayer] 手动开启画中画失败: ${err.message}`);
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '开启画中画失败' });
+        AppToast.show('开启画中画失败');
       } catch (_e) {}
     });
   }
@@ -456,14 +461,14 @@ export struct VideoPlayer {
     const next = !this.fullNow();
     if (next && this.isCasting()) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '投屏中无法全屏，请先停止投屏' });
+        AppToast.show('投屏中无法全屏，请先停止投屏');
       } catch (_e) {
       }
       return;
     }
     this.closeCastDialog();
     const isPort = this.state.isPortrait();
-    console.info(`[VideoPlayer] 点击全屏 -> targetFull: ${next}, isPortrait: ${isPort}, dimensions: ${this.state.videoWidth}x${this.state.videoHeight}`);
+    console.info(`[VideoLink] 全屏切换 full=${next} size=${this.state.videoWidth}x${this.state.videoHeight} url=${this.videoUrl}`);
     this.innerFull = next;
     this.pulseHud();
     if (this.onFullscreenChange) this.onFullscreenChange(next, isPort);
@@ -591,7 +596,7 @@ export struct VideoPlayer {
       onCastUi: () => this.syncCastUi(),
       toast: (msg: string) => {
         try {
-          this.getUIContext().getPromptAction().showToast({ message: msg });
+          AppToast.show(msg);
         } catch (_e) {
         }
       },
@@ -728,6 +733,7 @@ export struct VideoPlayer {
   private cycleScaleMode(): void {
     const next = this.scaleCtrl.cycle();
     this.scaleMode = next;
+    this.playerAv.setScaleMode(next);
     this.scaleLabel = this.scaleCtrl.label(this.isPortraitVideo());
     this.pulseHud();
     this.watcher.showTip(`画面：${this.scaleLabel}`, PlayerTipKind.SCALE,
@@ -739,6 +745,9 @@ export struct VideoPlayer {
     const res = this.gestures.move(event, this.longPressing, this.fullNow(), this.duration, this.playerW, this.playerH);
     if (!res) return;
     if (res.mode === 2 && res.time !== undefined) {
+      if (this.seekGesture !== this.playEpoch) {
+        this.seekGesture = this.playEpoch;
+      }
       this.state.dragging = true; this.currentTime = res.time; this.state.currentTime = res.time;
       this.feedback = res.feedback; this.feedbackKind = res.feedbackKind; this.watcher.clearHide();
     } else if (res.mode === 3 && res.bright !== undefined && res.bright >= 0) {
@@ -750,9 +759,13 @@ export struct VideoPlayer {
   }
 
   private finishPanSeek(): void {
+    const gesture = this.seekGesture;
     const res = this.gestures.finish(this.currentTime);
     this.watcher.clearTip(); this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE;
-    if (res.shouldSeek) this.seekTo(res.targetTime);
+    this.seekGesture = 0;
+    if (res.shouldSeek && gesture === this.playEpoch && this.state.ready) {
+      this.seekTo(res.targetTime);
+    }
     this.state.dragging = false; this.pulseHud();
   }
 
@@ -767,7 +780,7 @@ export struct VideoPlayer {
             try {
               const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, rawErr);
               pasteboard.getSystemPasteboard().setDataSync(data);
-              this.getUIContext().getPromptAction().showToast({ message: '已复制报错信息' });
+              AppToast.show('已复制报错信息');
             } catch (_e) {}
           }
         }
@@ -785,9 +798,28 @@ export struct VideoPlayer {
       onRetry: () => this.retry(), onErrorDetail: () => this.showErrorDetail(),
       onSeekBack: () => { this.seekTo(this.currentTime - VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
       onSeekForward: () => { this.seekTo(this.currentTime + VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
-      onSeekStart: (val) => { this.state.dragging = true; this.currentTime = val; this.state.currentTime = val; this.watcher.clearHide(); this.showHud = true; },
-      onSeekUpdate: (val) => { this.currentTime = val; this.state.currentTime = val; },
-      onSeekEnd: (val) => { this.currentTime = val; this.state.currentTime = val; this.seekTo(val); this.state.dragging = false; this.pulseHud(); },
+      onSeekStart: (val) => {
+        if (!this.state.ready || this.state.opening) {
+          return;
+        }
+        this.seekGesture = this.playEpoch;
+        this.state.dragging = true; this.currentTime = val; this.state.currentTime = val; this.watcher.clearHide(); this.showHud = true;
+      },
+      onSeekUpdate: (val) => {
+        if (this.seekGesture !== this.playEpoch) {
+          return;
+        }
+        this.currentTime = val; this.state.currentTime = val;
+      },
+      onSeekEnd: (val) => {
+        const accept = this.seekGesture === this.playEpoch && this.state.ready && !this.state.opening;
+        this.seekGesture = 0;
+        this.state.dragging = false;
+        if (!accept) {
+          return;
+        }
+        this.currentTime = val; this.state.currentTime = val; this.seekTo(val); this.pulseHud();
+      },
       onToggleHud: () => {
         if (this.speedCtrl.showing || this.gestures.pan.mode > 1 || this.longPressing) return;
         if (this.showHud) {

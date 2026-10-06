@@ -10,6 +10,8 @@ import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppIcon } from '../components/common/AppIcon';
 import { BackIcon } from '../components/common/BackIcon';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
+import { AppFrame } from '../components/common/AppFrame';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -89,7 +91,7 @@ struct ServerConfigPage {
       }
       this.lastBackPressTime = now;
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '再按一次退出应用' });
+        AppToast.show('再按一次退出应用');
       } catch (_e) {
       }
       return true;
@@ -112,7 +114,7 @@ struct ServerConfigPage {
           ServerConfigManager.getInstance().clearServerHistory().then(() => {
             this.serverHistory = [];
             try {
-              this.getUIContext().getPromptAction().showToast({ message: '已清空历史软件源' });
+              AppToast.show('已清空历史软件源');
             } catch (_e) {
             }
           });
@@ -131,7 +133,7 @@ struct ServerConfigPage {
     const finalUrl = this.serverUrl.trim();
     if (!finalUrl) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '请输入软件源地址' });
+        AppToast.show('请输入软件源地址');
       } catch (_e) {
       }
       return;
@@ -141,7 +143,7 @@ struct ServerConfigPage {
     this.isLoading = false;
     if (!res.ok) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: res.message || '无法连接该源，请检查地址' });
+        AppToast.show(res.message || '无法连接该源，请检查地址');
       } catch (_e) {
       }
       return;
@@ -156,7 +158,7 @@ struct ServerConfigPage {
     SourceGuard.markReconnectedCooldown();
 
     try {
-      this.getUIContext().getPromptAction().showToast({ message: this.reconnect ? '已重新接入' : '源已接入' });
+      AppToast.show(this.reconnect ? '已重新接入' : '源已接入');
     } catch (_e) {
     }
 
@@ -173,6 +175,8 @@ struct ServerConfigPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Stack({ alignContent: Alignment.TopStart }) {
       // Main Page Column that pads away safe insets and the soft keyboard
       Column() {
@@ -636,6 +640,10 @@ struct ServerConfigPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }
 

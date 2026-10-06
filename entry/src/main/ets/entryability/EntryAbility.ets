@@ -6,6 +6,7 @@ import { ServerConfigManager } from '../services/ServerConfigManager';
 import { AppSettingsManager } from '../services/AppSettingsManager';
 import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
+import { AppOrientation } from '../common/utils/AppOrientation';
 
 
 const CUSTOM_FONT_FAMILY: string = 'CalligraphyFont';
@@ -23,15 +24,18 @@ export default class EntryAbility extends UIAbility {
     if (ServerConfigManager.getInstance().getCachedServerUrl()) {
       SiteHeartbeat.getInstance().start();
     }
+    AppOrientation.onForeground(this.context);
     AppStorage.setOrCreate<number>('APP_FOREGROUND_TICK', Date.now());
   }
 
   onBackground(): void {
     SiteHeartbeat.getInstance().stop();
+    AppOrientation.onBackground();
   }
 
   onDestroy(): void {
     SiteHeartbeat.getInstance().stop();
+    AppOrientation.onDestroy();
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
@@ -60,7 +64,7 @@ export default class EntryAbility extends UIAbility {
             const rect = win.getWindowProperties().windowRect;
             const ui = win.getUIContext();
             Breakpoint.publish(ui.px2vp(rect.width), ui.px2vp(rect.height));
-            win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
+            AppOrientation.start(this.context);
           } catch (_e) {
           }
           win.setWindowSystemBarEnable(['status', 'navigation']);
@@ -79,7 +83,9 @@ export default class EntryAbility extends UIAbility {
       windowStage.loadContent('pages/ServerConfigPage', (loadErr) => {
         if (loadErr.code) {
           console.error('Failed to load content:', JSON.stringify(loadErr));
+          return;
         }
+        AppOrientation.start(this.context);
       });
     });
   }

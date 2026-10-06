@@ -1,6 +1,8 @@
+import { DialogTurn } from '../../components/common/DialogTurn';
 import { AppTheme } from '../../common/constants/AppTheme';
 import { DlnaClient } from './DlnaClient';
 import { DlnaDevice, DlnaScanState, soapErrorMessage } from '../../types/DlnaTypes';
+import { AppToast } from '../../common/utils/AppToast';
 
 let launchStartSec: number = 0;
 
@@ -70,7 +72,7 @@ struct PlayerCastPicker {
 
   private toast(msg: string): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: msg });
+      AppToast.show(msg);
     } catch (_e) {
     }
   }
@@ -156,6 +158,7 @@ struct PlayerCastPicker {
   }
 
   build() {
+    DialogTurn({ onBlank: () => { if (this.controller) { this.controller.close(); } } }) {
     Column() {
       Row() {
         Text('投屏到电视')
@@ -264,6 +267,7 @@ struct PlayerCastPicker {
     })
     .backgroundColor('#191B20')
     .borderRadius({ topLeft: 20, topRight: 20 })
+    }
   }
 }
 
@@ -311,7 +315,7 @@ export struct PlayerCastSheet {
         }
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Bottom,
+      alignment: DialogAlignment.Center,
       customStyle: true,
       backgroundColor: Color.Transparent,
       maskColor: 'rgba(0,0,0,0.52)',

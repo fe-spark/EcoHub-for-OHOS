@@ -1,3 +1,5 @@
+import { deviceInfo } from '@kit.BasicServicesKit';
+
 export enum PlayerScaleMode {
   FIT = 0,
   COVER = 1,
@@ -12,6 +14,14 @@ export interface PlayerScaleItem {
 
 export class PlayerScale {
   static readonly DEFAULT_MODE: PlayerScaleMode = PlayerScaleMode.FIT;
+
+  static useNativeAspect(): boolean {
+    try {
+      return deviceInfo.sdkApiVersion >= 20;
+    } catch (_e) {
+      return false;
+    }
+  }
 
   static readonly RATIO_16_9: number = 16 / 9;
   static readonly RATIO_9_16: number = 9 / 16;

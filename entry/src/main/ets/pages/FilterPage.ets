@@ -18,6 +18,7 @@ import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
 import { FloatingRefreshIndicator } from '../components/common/FloatingRefreshIndicator';
 import { FilterNavHeader, FilterSelectedTag } from '../components/film/FilterNavHeader';
+import { AppFrame } from '../components/common/AppFrame';
 
 @Entry
 @Component
@@ -347,6 +348,8 @@ struct FilterPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
         if (this.loading) {
@@ -492,5 +495,9 @@ struct FilterPage {
     .onTouch((event: TouchEvent) => {
       this.handleTouch(event);
     })
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { AppFrame } from '../components/common/AppFrame';
 import { ServerConfigManager } from '../services/ServerConfigManager';
 import { FilmApi } from '../api/FilmApi';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -6,6 +7,7 @@ import { WindowBar } from '../common/utils/WindowBar';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
 import { VersionUpdateDialog } from '../components/dialogs/VersionUpdateDialog';
 import { BasicConfig } from '../types/FilmModels';
+import { AppToast } from '../common/utils/AppToast';
 
 const MIN_SPLASH_TIME = 800;
 const PROBE_ATTEMPTS = 3;
@@ -66,7 +68,7 @@ struct SplashPage {
     if (!url || !url.trim()) {
       await this.ensureMinTime(startTime, MIN_SPLASH_TIME);
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '请先配置软件源' });
+        AppToast.show('请先配置软件源');
         this.getUIContext().getRouter().replaceUrl({ url: 'pages/ServerConfigPage' });
       } catch (_e) {
       }
@@ -93,7 +95,7 @@ struct SplashPage {
 
     if (!ok || !siteConfig) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '软件源连接失败，请检查网络或重新配置' });
+        AppToast.show('软件源连接失败，请检查网络或重新配置');
         this.getUIContext().getRouter().replaceUrl({
           url: 'pages/ServerConfigPage',
           params: { mode: 'reconnect' }
@@ -135,6 +137,8 @@ struct SplashPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         Image($r('app.media.startIcon'))
@@ -182,6 +186,10 @@ struct SplashPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
     .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
       [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }

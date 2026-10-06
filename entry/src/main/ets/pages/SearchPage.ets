@@ -11,6 +11,8 @@ import { BackIcon } from '../components/common/BackIcon';
 import { SourceGuard } from '../services/SourceGuard';
 import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
+import { AppFrame } from '../components/common/AppFrame';
+import { AppToast } from '../common/utils/AppToast';
 import { SearchHistoryManager } from '../services/SearchHistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
 import { SearchResultList } from '../components/film/SearchResultList';
@@ -145,7 +147,7 @@ struct SearchPage {
         action: () => {
           SearchHistoryManager.clear().then(() => {
             this.loadHistory();
-        try { this.getUIContext().getPromptAction().showToast({ message: '已清空搜索历史' }); } catch (_e) {}
+        try { AppToast.show('已清空搜索历史'); } catch (_e) {}
           });
         }
       },
@@ -175,7 +177,7 @@ struct SearchPage {
     if (!kw) {
       this.refreshing = false;
       if (reset && !fromPull) {
-        try { this.getUIContext().getPromptAction().showToast({ message: '请输入搜索关键词' }); } catch (_e) {}
+        try { AppToast.show('请输入搜索关键词'); } catch (_e) {}
       }
       return;
     }
@@ -220,9 +222,7 @@ struct SearchPage {
         this.list = fromPull ? this.list : [];
       }
       try {
-        this.getUIContext().getPromptAction().showToast({
-          message: reset ? `搜索失败: ${errorMsg}` : `加载更多失败: ${errorMsg}`
-        });
+        AppToast.show(reset ? `搜索失败: ${errorMsg}` : `加载更多失败: ${errorMsg}`);
       } catch (_e) {
       }
     } finally {
@@ -238,6 +238,8 @@ struct SearchPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       // Top search bar with Back button
       Row() {
@@ -495,5 +497,9 @@ struct SearchPage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

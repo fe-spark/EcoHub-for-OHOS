@@ -33,6 +33,8 @@ export class PlayerPlaybackState {
   public videoHeight: number = 0;
   /** Consume-once resume after stopping cast; -1 = unset. */
   public pendingResumeSec: number = -1;
+  /** Next prepare starts at initialTime. A new source must not keep the previous playhead. */
+  public resumeInitialOnce: boolean = false;
 
   public live(): boolean {
     return this.playerOn && this.bootGen === this.mountGen;
@@ -50,7 +52,12 @@ export class PlayerPlaybackState {
     if (this.pendingResumeSec >= 0) {
       const t: number = this.pendingResumeSec;
       this.pendingResumeSec = -1;
+      this.resumeInitialOnce = false;
       return t;
+    }
+    if (this.resumeInitialOnce) {
+      this.resumeInitialOnce = false;
+      return Math.max(0, initialTime);
     }
     return this.currentTime >= PlayerPlaybackState.MIN_RESUME_THRESHOLD_SEC ? this.currentTime : initialTime;
   }
@@ -79,6 +86,7 @@ export class PlayerPlaybackState {
     this.videoWidth = 0;
     this.videoHeight = 0;
     this.pendingResumeSec = -1;
+    this.resumeInitialOnce = true;
   }
 
   public emitProgress(cb?: ProgressCallback, force: boolean = false): void {

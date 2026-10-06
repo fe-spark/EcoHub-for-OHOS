@@ -1,4 +1,5 @@
 import { UIContext } from '@kit.ArkUI';
+import { AppToast } from './AppToast';
 
 export class RefreshHint {
   static succeed(uiContext?: UIContext): void {
@@ -15,7 +16,7 @@ export class RefreshHint {
       return;
     }
     try {
-      ctx.getPromptAction().showToast({ message: message });
+      AppToast.show(message);
     } catch (_e) {
     }
   }

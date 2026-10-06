@@ -1,4 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
+import { AppFrame } from '../components/common/AppFrame';
 import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { FormatUtil } from '../common/utils/FormatUtil';
@@ -6,6 +7,7 @@ import { HistoryManager } from '../services/HistoryManager';
 import { NavUtil } from '../common/utils/NavUtil';
 import { ServerConfigManager } from '../services/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
+import { AppOrientation } from '../common/utils/AppOrientation';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { common } from '@kit.AbilityKit';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
@@ -17,6 +19,7 @@ import { SourceGuard } from '../services/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
 import { Breakpoint } from '../common/utils/Breakpoint';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -137,8 +140,11 @@ struct PlayPage {
   }
 
   private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
-    if (this.playerFull === full) return;
+    if (full === this.playerFull) {
+      return;
+    }
     this.playerFull = full;
+    AppOrientation.setFullscreenRotation(full, !isPortrait);
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
@@ -181,6 +187,7 @@ struct PlayPage {
       this.viewingSourceId = this.playingSourceId;
       this.episodeIndex = info.currentEpisode;
       this.playUrl = info.current.link;
+      console.info(`[VideoLink] 播放页接口地址: ${this.playUrl}`);
       this.playTitle = `${detail.name} · ${info.current.episode}`;
       this.sourceName = this.findSource(this.playingSourceId)?.name || '默认源';
       this.errorText = '';
@@ -190,7 +197,7 @@ struct PlayPage {
       if (token !== this.loadToken) return;
       const msg = err instanceof Error ? err.message : '播放数据获取失败';
       if (this.name) {
-        try { this.getUIContext().getPromptAction().showToast({ message: msg }); } catch (_e) {}
+        try { AppToast.show(msg); } catch (_e) {}
       } else {
         this.errorText = msg;
       }
@@ -233,6 +240,7 @@ struct PlayPage {
     this.lastCurrentTime = 0;
     this.lastDuration = 0;
     this.playUrl = episode.link;
+    console.info(`[VideoLink] 切换选集: ${this.playUrl}`);
     this.playToken += 1;
     this.playTitle = `${this.name} · ${episode.episode}`;
     this.sourceName = source.name;
@@ -250,7 +258,7 @@ struct PlayPage {
 
   private playPrev(): void {
     if (!this.hasPrev()) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' }); } catch (_e) {}
+      try { AppToast.show('已经是第一集了'); } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex - 1);
@@ -258,7 +266,7 @@ struct PlayPage {
 
   private playNext(): void {
     if (!this.hasNext()) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' }); } catch (_e) {}
+      try { AppToast.show('已经是最后一集了'); } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex + 1);
@@ -482,6 +490,8 @@ struct PlayPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       if (this.loading && !this.name) {
         LoadingView({ label: '正在打开播放页' })
@@ -503,8 +513,14 @@ struct PlayPage {
     })
     .padding({
       top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
-      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset
+      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
+      left: this.playerFull ? 0 : this.leftInset,
+      right: this.playerFull ? 0 : this.rightInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

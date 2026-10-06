@@ -1,6 +1,8 @@
 import { media } from '@kit.MediaKit';
 import { audio } from '@kit.AudioKit';
 import { PlayerSpeed } from './PlayerSpeed';
+import { PlayerPlayableUrl } from './PlayerPlayableUrl';
+import { PlayerScale, PlayerScaleMode } from './PlayerScale';
 
 export class PlayerAvListener {
   onPrepared: (duration: number) => void = (_duration: number) => {};
@@ -34,6 +36,7 @@ export class PlayerAv {
   private url: string = '';
   private gen: number = 0;
   private speedIndex: number = 1;
+  private scaleMode: number = PlayerScaleMode.FIT;
   private muted: boolean = false;
   private pendingPrepare: boolean = false;
   private seekGen: number = 0;
@@ -42,9 +45,19 @@ export class PlayerAv {
   setSurface(id: string): void {
     console.info(`[PlayerAv] setSurface id: ${id}, hasPlayer: ${!!this.player}, pending: ${this.pendingPrepare}`);
     this.surfaceId = id;
-    if (this.player && this.pendingPrepare && id) {
+    const player = this.player;
+    if (!player || !id) {
+      return;
+    }
+    if (this.pendingPrepare) {
       this.pendingPrepare = false;
-      this.prepareWithSurface(this.player, id);
+      this.prepareWithSurface(player, id);
+      return;
+    }
+    try {
+      player.surfaceId = id;
+    } catch (err) {
+      console.error(`[PlayerAv] 重新绑定 surface 失败: ${JSON.stringify(err)}`);
     }
   }
 
@@ -58,9 +71,38 @@ export class PlayerAv {
     this.applyVolume();
   }
 
+  setScaleMode(mode: number): void {
+    this.scaleMode = mode;
+    this.applyScale();
+  }
+
+  private applyScale(): void {
+    const player = this.player;
+    if (!player) {
+      return;
+    }
+    try {
+      if (this.scaleMode === PlayerScaleMode.COVER) {
+        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT_CROP;
+      } else if (this.scaleMode === PlayerScaleMode.STRETCH) {
+        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+      } else if (PlayerScale.useNativeAspect()) {
+        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_SCALED_ASPECT;
+      } else {
+        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+      }
+    } catch (_err) {
+      try {
+        player.videoScaleType = this.scaleMode === PlayerScaleMode.COVER ?
+          media.VideoScaleType.VIDEO_SCALE_TYPE_FIT_CROP : media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
+      } catch (_again) {
+      }
+    }
+  }
+
   async open(url: string): Promise<void> {
     const gen = ++this.gen;
-    console.info(`[PlayerAv] open 启动 (gen: ${gen}), url: ${url}`);
+    console.info(`[VideoLink] 原始地址: ${url}`);
     await this.resetPlayer();
     if (gen !== this.gen) {
       console.info(`[PlayerAv] open 时序被覆盖，丢弃: gen=${gen}, curGen=${this.gen}`);
@@ -80,8 +122,19 @@ export class PlayerAv {
       }
       this.player = player;
       this.bind(player, gen);
-      console.info(`[PlayerAv] 设置 player.url: ${url}`);
-      player.url = url;
+      let playable = url;
+      try {
+        playable = await PlayerPlayableUrl.normalize(url);
+      } catch (normErr) {
+        console.error(`[PlayerAv] 解析播放地址失败，使用原始地址: ${JSON.stringify(normErr)}`);
+      }
+      if (gen !== this.gen) {
+        console.info(`[PlayerAv] 地址解析期间已过期，交给新的 open 释放`);
+        return;
+      }
+      console.info(`[VideoLink] 实际播放: ${playable}`);
+      this.url = playable;
+      player.url = playable;
     } catch (err) {
       console.error(`[PlayerAv] 创建 AVPlayer 异常: ${JSON.stringify(err)}`);
       if (gen === this.gen) {
@@ -170,10 +223,7 @@ export class PlayerAv {
         console.info(`[PlayerAv] prepared 完成! duration: ${duration}s, size: ${player.width}x${player.height}`);
         this.applyVolume();
         this.applySpeed();
-        try {
-          player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
-        } catch (_e) {
-        }
+        this.applyScale();
         if (player.width > 0 && player.height > 0) {
           this.listener.onVideoSize(player.width, player.height);
         }

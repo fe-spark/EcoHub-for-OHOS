@@ -30,7 +30,7 @@ export struct PlayerSpeedSheet {
         }
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Bottom,
+      alignment: DialogAlignment.Center,
       customStyle: true,
       backgroundColor: Color.Transparent,
       maskColor: 'rgba(0,0,0,0.52)',
