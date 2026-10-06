@@ -98,6 +98,8 @@ export struct VideoPlayer {
   private state: PlayerPlaybackState = new PlayerPlaybackState();
   private observer: PlayerVideoObserver | null = null;
   private pageWasHidden: boolean = false;
+  private playEpoch: number = 0;
+  private seekGesture: number = 0;
   private playerW: number = 1;
   private playerH: number = 1;
   private volumeSub: (() => void) | null = null;
@@ -292,6 +294,8 @@ export struct VideoPlayer {
   }
 
   private resetPlayState(): void {
+    this.playEpoch++;
+    this.seekGesture = 0;
     this.watcher.clearOpenWatch();
     this.watcher.clearSeekWatch();
     this.state.reset(this.videoUrl);
@@ -741,6 +745,9 @@ export struct VideoPlayer {
     const res = this.gestures.move(event, this.longPressing, this.fullNow(), this.duration, this.playerW, this.playerH);
     if (!res) return;
     if (res.mode === 2 && res.time !== undefined) {
+      if (this.seekGesture !== this.playEpoch) {
+        this.seekGesture = this.playEpoch;
+      }
       this.state.dragging = true; this.currentTime = res.time; this.state.currentTime = res.time;
       this.feedback = res.feedback; this.feedbackKind = res.feedbackKind; this.watcher.clearHide();
     } else if (res.mode === 3 && res.bright !== undefined && res.bright >= 0) {
@@ -752,9 +759,13 @@ export struct VideoPlayer {
   }
 
   private finishPanSeek(): void {
+    const gesture = this.seekGesture;
     const res = this.gestures.finish(this.currentTime);
     this.watcher.clearTip(); this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE;
-    if (res.shouldSeek) this.seekTo(res.targetTime);
+    this.seekGesture = 0;
+    if (res.shouldSeek && gesture === this.playEpoch && this.state.ready) {
+      this.seekTo(res.targetTime);
+    }
     this.state.dragging = false; this.pulseHud();
   }
 
@@ -787,9 +798,28 @@ export struct VideoPlayer {
       onRetry: () => this.retry(), onErrorDetail: () => this.showErrorDetail(),
       onSeekBack: () => { this.seekTo(this.currentTime - VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
       onSeekForward: () => { this.seekTo(this.currentTime + VideoPlayer.SEEK_STEP_SEC); this.pulseHud(); },
-      onSeekStart: (val) => { this.state.dragging = true; this.currentTime = val; this.state.currentTime = val; this.watcher.clearHide(); this.showHud = true; },
-      onSeekUpdate: (val) => { this.currentTime = val; this.state.currentTime = val; },
-      onSeekEnd: (val) => { this.currentTime = val; this.state.currentTime = val; this.seekTo(val); this.state.dragging = false; this.pulseHud(); },
+      onSeekStart: (val) => {
+        if (!this.state.ready || this.state.opening) {
+          return;
+        }
+        this.seekGesture = this.playEpoch;
+        this.state.dragging = true; this.currentTime = val; this.state.currentTime = val; this.watcher.clearHide(); this.showHud = true;
+      },
+      onSeekUpdate: (val) => {
+        if (this.seekGesture !== this.playEpoch) {
+          return;
+        }
+        this.currentTime = val; this.state.currentTime = val;
+      },
+      onSeekEnd: (val) => {
+        const accept = this.seekGesture === this.playEpoch && this.state.ready && !this.state.opening;
+        this.seekGesture = 0;
+        this.state.dragging = false;
+        if (!accept) {
+          return;
+        }
+        this.currentTime = val; this.state.currentTime = val; this.seekTo(val); this.pulseHud();
+      },
       onToggleHud: () => {
         if (this.speedCtrl.showing || this.gestures.pan.mode > 1 || this.longPressing) return;
         if (this.showHud) {
