@@ -4,6 +4,7 @@ import { AppIcon } from '../common/AppIcon';
 import { FilmDetailDialog } from '../dialogs/FilmDetailDialog';
 import { FavoriteManager } from '../../services/FavoriteManager';
 import { FormatUtil } from '../../common/utils/FormatUtil';
+import { AppToast } from '../../common/utils/AppToast';
 
 @Component
 export struct FilmDetailHeader {
@@ -52,7 +53,7 @@ export struct FilmDetailHeader {
         plot: this.cleanPlot
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Bottom,
+      alignment: DialogAlignment.Center,
       customStyle: true,
       backgroundColor: Color.Transparent,
       maskColor: 'rgba(0, 0, 0, 0.65)',
@@ -174,7 +175,7 @@ export struct FilmDetailHeader {
     const next: boolean = await FavoriteManager.toggleFavorite(item);
     this.isFav = next;
     try {
-      this.getUIContext().getPromptAction().showToast({ message: next ? '已加入收藏' : '已取消收藏' });
+      AppToast.show(next ? '已加入收藏' : '已取消收藏');
     } catch (_e) {}
   }
 

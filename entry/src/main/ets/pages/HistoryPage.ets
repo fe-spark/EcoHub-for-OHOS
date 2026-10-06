@@ -13,6 +13,8 @@ import { EmptyState } from '../components/common/EmptyState';
 import { AppIcon } from '../components/common/AppIcon';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
+import { AppFrame } from '../components/common/AppFrame';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -79,7 +81,7 @@ struct HistoryPage {
           HistoryManager.clear().then(() => {
             this.reload(false);
             try {
-              this.getUIContext().getPromptAction().showToast({ message: '已清空' });
+              AppToast.show('已清空');
             } catch (_e) {
             }
           });
@@ -93,7 +95,7 @@ struct HistoryPage {
     HistoryManager.remove(item.id).then(() => {
       this.reload(false);
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '已删除' });
+        AppToast.show('已删除');
       } catch (_e) {
       }
     });
@@ -124,6 +126,8 @@ struct HistoryPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       PageHeader({
         title: '观看历史',
@@ -260,5 +264,9 @@ struct HistoryPage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

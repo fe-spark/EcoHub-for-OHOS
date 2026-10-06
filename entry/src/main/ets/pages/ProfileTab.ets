@@ -6,6 +6,7 @@ import { NavUtil } from '../common/utils/NavUtil';
 import { AppIcon } from '../components/common/AppIcon';
 import { SourceGuard } from '../services/SourceGuard';
 import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
+import { AppToast } from '../common/utils/AppToast';
 
 @Component
 export struct ProfileTab {
@@ -85,7 +86,7 @@ export struct ProfileTab {
     }
     this.isCheckingVersion = true;
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '正在检查版本更新...' });
+      AppToast.show('正在检查版本更新...');
     } catch (_e) {
     }
     try {
@@ -96,13 +97,13 @@ export struct ProfileTab {
         this.showUpdateDialog = true;
       } else {
         try {
-          this.getUIContext().getPromptAction().showToast({ message: `当前已是最新版本 (v${this.appVersion})` });
+          AppToast.show(`当前已是最新版本 (v${this.appVersion})`);
         } catch (_e) {
         }
       }
     } catch (err) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '检查版本失败，请稍后重试' });
+        AppToast.show('检查版本失败，请稍后重试');
       } catch (_e) {
       }
     } finally {

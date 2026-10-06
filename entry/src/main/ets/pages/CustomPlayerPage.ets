@@ -1,12 +1,15 @@
 import { AppTheme } from '../common/constants/AppTheme';
+import { AppFrame } from '../components/common/AppFrame';
 import { HttpClient } from '../common/network/HttpClient';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
 import { PageHeader } from '../components/common/PageHeader';
 import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
+import { AppOrientation } from '../common/utils/AppOrientation';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { Breakpoint } from '../common/utils/Breakpoint';
 import { common } from '@kit.AbilityKit';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -80,10 +83,11 @@ struct CustomPlayerPage {
   }
 
   private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
-    if (this.playerFull === full) {
+    if (full === this.playerFull) {
       return;
     }
     this.playerFull = full;
+    AppOrientation.setFullscreenRotation(full, !isPortrait);
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
@@ -99,12 +103,13 @@ struct CustomPlayerPage {
     const url = this.inputUrl.trim();
     if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '请输入正确的 mp4 或 m3u8 地址' });
+        AppToast.show('请输入正确的 mp4 或 m3u8 地址');
       } catch (_e) {
       }
       return;
     }
     this.playUrl = url;
+    console.info(`[VideoLink] 自定义播放地址: ${this.playUrl}`);
   }
 
   @Builder
@@ -189,6 +194,8 @@ struct CustomPlayerPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       if (!this.playerFull) {
         Column() {
@@ -237,5 +244,9 @@ struct CustomPlayerPage {
       right: this.playerFull ? 0 : this.rightInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

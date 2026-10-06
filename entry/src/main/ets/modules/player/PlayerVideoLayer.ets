@@ -50,70 +50,26 @@ export struct PlayerVideoLayer {
     return { W, H, hasLayer, isPortrait, videoRatio, containerRatio };
   }
 
-  private calcTargetWidth(): Length {
+  private calcTargetWidth(): string {
     const d = this.getDimensions();
-    if (!d.hasLayer) {
+    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0 || d.videoRatio >= d.containerRatio) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    if (d.videoRatio >= d.containerRatio) {
-      return d.W;
-    }
-    return d.H * d.videoRatio;
+    const pct = Math.min(100, (d.videoRatio / d.containerRatio) * 100);
+    return `${pct}%`;
   }
 
-  private calcTargetHeight(): Length {
+  private calcTargetHeight(): string {
     const d = this.getDimensions();
-    if (!d.hasLayer) {
+    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0 || d.videoRatio < d.containerRatio) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    if (d.videoRatio >= d.containerRatio) {
-      return d.W / d.videoRatio;
-    }
-    return d.H;
+    const pct = Math.min(100, (d.containerRatio / d.videoRatio) * 100);
+    return `${pct}%`;
   }
 
-  private calcScaleX(): number {
-    const d = this.getDimensions();
-    if (!d.hasLayer || this.scaleMode === PlayerScaleMode.FIT) {
-      return 1;
-    }
-    const baseW = d.videoRatio >= d.containerRatio ? d.W : d.H * d.videoRatio;
-    if (baseW <= 0) {
-      return 1;
-    }
-    if (this.scaleMode === PlayerScaleMode.COVER) {
-      const baseH = d.videoRatio >= d.containerRatio ? d.W / d.videoRatio : d.H;
-      if (baseH <= 0) {
-        return 1;
-      }
-      return d.videoRatio >= d.containerRatio ? (d.H / baseH) : (d.W / baseW);
-    }
-    if (this.scaleMode === PlayerScaleMode.STRETCH) {
-      return d.W / baseW;
-    }
-    return 1;
-  }
-
-  private calcScaleY(): number {
-    const d = this.getDimensions();
-    if (!d.hasLayer || this.scaleMode === PlayerScaleMode.FIT) {
-      return 1;
-    }
-    const baseH = d.videoRatio >= d.containerRatio ? d.W / d.videoRatio : d.H;
-    if (baseH <= 0) {
-      return 1;
-    }
-    if (this.scaleMode === PlayerScaleMode.COVER) {
-      const baseW = d.videoRatio >= d.containerRatio ? d.W : d.H * d.videoRatio;
-      if (baseW <= 0) {
-        return 1;
-      }
-      return d.videoRatio >= d.containerRatio ? (d.H / baseH) : (d.W / baseW);
-    }
-    if (this.scaleMode === PlayerScaleMode.STRETCH) {
-      return d.H / baseH;
-    }
-    return 1;
+  private letterbox(): boolean {
+    return this.scaleMode === PlayerScaleMode.FIT && !PlayerScale.useNativeAspect();
   }
 
   build() {
@@ -123,24 +79,20 @@ export struct PlayerVideoLayer {
         type: XComponentType.SURFACE,
         controller: this.xComponentController
       })
-        .width(this.calcTargetWidth())
-        .height(this.calcTargetHeight())
-        .scale({
-          x: this.calcScaleX(),
-          y: this.calcScaleY()
-        })
+        .width(this.letterbox() ? this.calcTargetWidth() : PlayerVideoLayer.FULL_PERCENT)
+        .height(this.letterbox() ? this.calcTargetHeight() : PlayerVideoLayer.FULL_PERCENT)
         .hitTestBehavior(HitTestMode.None)
         .onLoad(() => {
-          try {
-            const sId = this.xComponentController.getXComponentSurfaceId();
-            console.info(`[PlayerVideoLayer] XComponent onLoad 成功获取 surfaceId: ${sId}`);
-            if (sId && this.onSurfaceCreated) {
-              this.onSurfaceCreated(sId);
+            try {
+              const sId = this.xComponentController.getXComponentSurfaceId();
+              console.info(`[PlayerVideoLayer] XComponent onLoad 成功获取 surfaceId: ${sId}`);
+              if (sId && this.onSurfaceCreated) {
+                this.onSurfaceCreated(sId);
+              }
+            } catch (e) {
+              console.error(`[PlayerVideoLayer] 获取 surfaceId 异常: ${JSON.stringify(e)}`);
             }
-          } catch (e) {
-            console.error(`[PlayerVideoLayer] 获取 surfaceId 异常: ${JSON.stringify(e)}`);
-          }
-        })
+          })
 
       if (this.poster && (!this.ready || this.opening)) {
         Image(this.poster)

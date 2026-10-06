@@ -9,6 +9,7 @@ import { PageHeader } from '../components/common/PageHeader';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingView } from '../components/common/LoadingView';
 import { SourceGuard } from '../services/SourceGuard';
+import { AppFrame } from '../components/common/AppFrame';
 
 @Component
 struct TipQrImage {
@@ -133,6 +134,8 @@ struct TipPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       PageHeader({ title: this.config.tipTitle || '赞赏支持' })
 
@@ -184,5 +187,9 @@ struct TipPage {
     })
     .alignItems(HorizontalAlign.Center)
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

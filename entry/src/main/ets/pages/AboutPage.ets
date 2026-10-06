@@ -1,4 +1,5 @@
 import { AppTheme } from '../common/constants/AppTheme';
+import { AppFrame } from '../components/common/AppFrame';
 import { PageHeader } from '../components/common/PageHeader';
 import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
@@ -7,6 +8,7 @@ import { AppVersionUtil, AppUpdateInfo } from '../common/utils/AppVersionUtil';
 import { VersionUpdateDialog } from '../components/dialogs/VersionUpdateDialog';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
+import { AppToast } from '../common/utils/AppToast';
 
 interface ProjectLinkItem {
   title: string;
@@ -89,7 +91,7 @@ struct AboutPage {
     }
     this.isCheckingVersion = true;
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '正在检查版本更新...' });
+      AppToast.show('正在检查版本更新...');
     } catch (_e) {
     }
     try {
@@ -100,13 +102,13 @@ struct AboutPage {
         this.showUpdateDialog = true;
       } else {
         try {
-          this.getUIContext().getPromptAction().showToast({ message: `当前已是最新版本 (v${this.appVersion})` });
+          AppToast.show(`当前已是最新版本 (v${this.appVersion})`);
         } catch (_e) {
         }
       }
     } catch (err) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '检查版本失败，请稍后重试' });
+        AppToast.show('检查版本失败，请稍后重试');
       } catch (_e) {
       }
     } finally {
@@ -132,10 +134,10 @@ struct AboutPage {
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
       pasteboard.getSystemPasteboard().setDataSync(data);
-      this.getUIContext().getPromptAction().showToast({ message: '链接已复制到剪贴板' });
+      AppToast.show('链接已复制到剪贴板');
     } catch (_e) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '复制失败，请手动复制' });
+        AppToast.show('复制失败，请手动复制');
       } catch (_err) {}
     }
   }
@@ -164,6 +166,8 @@ struct AboutPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         PageHeader({ title: '关于' })
@@ -409,5 +413,9 @@ struct AboutPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

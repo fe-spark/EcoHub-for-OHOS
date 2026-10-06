@@ -13,6 +13,8 @@ import { EmptyState } from '../components/common/EmptyState';
 import { AppIcon } from '../components/common/AppIcon';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
+import { AppFrame } from '../components/common/AppFrame';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -89,7 +91,7 @@ struct FavoritePage {
           FavoriteManager.clear().then(() => {
             this.reload(false);
             try {
-              this.getUIContext().getPromptAction().showToast({ message: '已清空收藏' });
+              AppToast.show('已清空收藏');
             } catch (_e) {
             }
           });
@@ -103,7 +105,7 @@ struct FavoritePage {
     FavoriteManager.remove(item.id).then(() => {
       this.reload(false);
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '已取消收藏' });
+        AppToast.show('已取消收藏');
       } catch (_e) {
       }
     });
@@ -148,6 +150,8 @@ struct FavoritePage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       PageHeader({
         title: '我的收藏',
@@ -282,5 +286,9 @@ struct FavoritePage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

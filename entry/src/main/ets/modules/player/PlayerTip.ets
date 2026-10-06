@@ -1,3 +1,4 @@
+import { DialogTurn } from '../../components/common/DialogTurn';
 import { AppTheme } from '../../common/constants/AppTheme';
 import { PlayerSpeed } from './PlayerSpeed';
 import { AppIcon } from '../../components/common/AppIcon';
@@ -320,6 +321,7 @@ export struct PlayerSpeedDialog {
   onPickSpeed: (index: number) => void = (_index: number) => {}
 
   build() {
+    DialogTurn({ onBlank: () => { if (this.controller) { this.controller.close(); } } }) {
     Column() {
       Row() {
         Text('播放速度')
@@ -364,6 +366,7 @@ export struct PlayerSpeedDialog {
     .padding({ left: 16, right: 16, top: 16, bottom: 24 })
     .backgroundColor('#191B20')
     .borderRadius({ topLeft: 20, topRight: 20 })
+    }
   }
 }
 
@@ -389,6 +392,7 @@ export struct PlayerScaleDialog {
   onPickScale: (mode: number) => void = (_mode: number) => {}
 
   build() {
+    DialogTurn({ onBlank: () => { if (this.controller) { this.controller.close(); } } }) {
     Column() {
       Row() {
         Text('画面填充')
@@ -439,5 +443,6 @@ export struct PlayerScaleDialog {
     .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG, top: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_XL })
     .backgroundColor(PlayerScaleDialog.DIALOG_BG_COLOR)
     .borderRadius({ topLeft: PlayerScaleDialog.DIALOG_RADIUS_TOP, topRight: PlayerScaleDialog.DIALOG_RADIUS_TOP })
+    }
   }
 }

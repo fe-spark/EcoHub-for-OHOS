@@ -1,4 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
+import { AppFrame } from '../components/common/AppFrame';
 import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { HistoryManager } from '../services/HistoryManager';
@@ -7,6 +8,7 @@ import { NavUtil } from '../common/utils/NavUtil';
 import { PlayNavigation } from '../common/utils/PlayNavigation';
 import { ServerConfigManager } from '../services/ServerConfigManager';
 import { WindowBar } from '../common/utils/WindowBar';
+import { AppOrientation } from '../common/utils/AppOrientation';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { common } from '@kit.AbilityKit';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
@@ -17,6 +19,7 @@ import { SourceGuard } from '../services/SourceGuard';
 import { HttpClient } from '../common/network/HttpClient';
 import { Breakpoint } from '../common/utils/Breakpoint';
 import { LivePlayErrorView } from '../components/player/LivePlayErrorView';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -151,8 +154,11 @@ struct LivePlayPage {
   }
 
   private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
-    if (this.playerFull === full) return;
+    if (full === this.playerFull) {
+      return;
+    }
     this.playerFull = full;
+    AppOrientation.setFullscreenRotation(full, !isPortrait);
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
@@ -178,6 +184,7 @@ struct LivePlayPage {
       this.viewingSourceId = this.playingSourceId;
       this.episodeIndex = info.currentEpisode;
       this.playUrl = info.current.link;
+      console.info(`[VideoLink] 现场播放接口地址: ${this.playUrl}`);
       this.playTitle = `${detail.name} · ${info.current.episode}`;
       this.sourceName = this.findSource(this.playingSourceId)?.name || '采集源';
       this.errorText = '';
@@ -198,9 +205,9 @@ struct LivePlayPage {
     try {
       await FavoriteManager.remove(key);
       this.isFav = false;
-      this.getUIContext().getPromptAction().showToast({ message: '已从收藏中移出' });
+      AppToast.show('已从收藏中移出');
     } catch (_e) {
-      this.getUIContext().getPromptAction().showToast({ message: '移出收藏失败' });
+      AppToast.show('移出收藏失败');
     }
   }
 
@@ -233,6 +240,7 @@ struct LivePlayPage {
     this.lastCurrentTime = 0;
     this.lastDuration = 0;
     this.playUrl = episode.link;
+    console.info(`[VideoLink] 现场切换选集: ${this.playUrl}`);
     this.playToken += 1;
     this.playTitle = `${this.name} · ${episode.episode}`;
     this.sourceName = source.name;
@@ -250,7 +258,7 @@ struct LivePlayPage {
 
   private playPrev(): void {
     if (!this.hasPrev()) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '已经是第一集了' }); } catch (_e) {}
+      try { AppToast.show('已经是第一集了'); } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex - 1);
@@ -258,7 +266,7 @@ struct LivePlayPage {
 
   private playNext(): void {
     if (!this.hasNext()) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '已经是最后一集了' }); } catch (_e) {}
+      try { AppToast.show('已经是最后一集了'); } catch (_e) {}
       return;
     }
     this.selectEpisode(this.playingSourceId, this.episodeIndex + 1);
@@ -460,6 +468,8 @@ struct LivePlayPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       if (this.loading && !this.sources.length) {
         LoadingView({ label: '正在打开播放页' })
@@ -491,9 +501,13 @@ struct LivePlayPage {
     .padding({
       top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
       bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
-      left: (this.playerFull || this.splitPlay()) ? 0 : this.leftInset,
-      right: (this.playerFull || this.splitPlay()) ? 0 : this.rightInset
+      left: this.playerFull ? 0 : this.leftInset,
+      right: this.playerFull ? 0 : this.rightInset
     })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

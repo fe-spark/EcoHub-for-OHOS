@@ -4,6 +4,7 @@ import { PlayerTipKind } from './PlayerPan';
 import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerLabelBtn, PlayerTextBtn } from './PlayerControl';
 import { PlayerGestureLayer } from './PlayerGesture';
 import { PlayerErrorPad, PlayerLoadingCard, PlayerTip } from './PlayerTip';
+import { AppToast } from '../../common/utils/AppToast';
 
 @Component
 export struct PlayerSkin {
@@ -135,7 +136,7 @@ export struct PlayerSkin {
       return;
     }
     try {
-      this.getUIContext().getPromptAction().showToast({ message: '投屏不可用' });
+      AppToast.show('投屏不可用');
     } catch (_e) {}
   }
 

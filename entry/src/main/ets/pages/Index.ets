@@ -1,4 +1,5 @@
 import { ServerConfigManager } from '../services/ServerConfigManager';
+import { AppFrame } from '../components/common/AppFrame';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
@@ -16,6 +17,7 @@ import { HttpClient } from '../common/network/HttpClient';
 import { NoticeDialog } from '../components/dialogs/NoticeDialog';
 import { VersionUpdateDialog } from '../components/dialogs/VersionUpdateDialog';
 import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -144,14 +146,12 @@ struct Index {
     if (target) {
       ClipboardSniffer.markHandled(res.raw);
       try {
-        this.getUIContext().getPromptAction().showToast({
-          message: res.url ? '已提取播放链接并跳转' : '已提取剪贴板并跳转'
-        });
+        AppToast.show(res.url ? '已提取播放链接并跳转' : '已提取剪贴板并跳转');
         NavUtil.openCustomPlayer(target, this.getUIContext());
       } catch (_e) {}
     } else if (result === PasteButtonOnClickResult.SUCCESS) {
       try {
-        this.getUIContext().getPromptAction().showToast({ message: '剪贴板暂无内容' });
+        AppToast.show('剪贴板暂无内容');
       } catch (_e) {}
     }
   }
@@ -187,7 +187,7 @@ struct Index {
         ClipboardSniffer.markHandled(res.raw);
         this.dismissClipBanner(false);
         try {
-          this.getUIContext().getPromptAction().showToast({ message: '检测到播放链接，正在跳转...' });
+          AppToast.show('检测到播放链接，正在跳转...');
           NavUtil.openCustomPlayer(res.url, this.getUIContext());
         } catch (_e) {}
         return;
@@ -272,6 +272,8 @@ struct Index {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         if (!this.ready) {
@@ -489,6 +491,10 @@ struct Index {
           }
         })
       }
+    }
+    .width('100%')
+    .height('100%')
+    }
     }
     .width('100%')
     .height('100%')

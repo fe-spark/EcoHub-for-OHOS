@@ -12,6 +12,29 @@ export class WindowBar {
   private static onDisplay?: (left: number, right: number, width: number, height: number) => void;
   private static avoidTimer: number = -1;
   private static overlayCount: number = 0;
+  private static rawW: number = 0;
+  private static rawH: number = 0;
+
+  static requestBars(context: common.UIAbilityContext | undefined, show: boolean): void {
+    if (!context) {
+      return;
+    }
+    if (show) {
+      WindowBar.apply(context);
+      return;
+    }
+    const seq = ++WindowBar.applySeq;
+    window.getLastWindow(context).then((win: window.Window) => {
+      if (seq !== WindowBar.applySeq) {
+        return;
+      }
+      win.setWindowSystemBarEnable([]).catch((err: Error) => {
+        console.error(`[WindowBar] 隐藏系统栏失败: ${JSON.stringify(err)}`);
+      });
+    }).catch((err: Error) => {
+      console.error(`[WindowBar] 获取窗口失败: ${JSON.stringify(err)}`);
+    });
+  }
 
   static apply(context?: common.UIAbilityContext,
     onInsets?: (top: number, bottom: number, left: number, right: number) => void,
@@ -102,15 +125,17 @@ export class WindowBar {
       const leftVp = uiContext.px2vp(left);
       const rightVp = uiContext.px2vp(right);
       const keyboardVp = uiContext.px2vp(keyboardHeight);
+      const turned = WindowBar.isTurned(WindowBar.pageAngle());
+      const mapped = WindowBar.mapInsets(topVp, turned ? bottomVp + keyboardVp : bottomVp, leftVp, rightVp);
 
-      AppStorage.setOrCreate<number>('SAFE_INSET_TOP', topVp);
-      AppStorage.setOrCreate<number>('SAFE_INSET_BOTTOM', bottomVp);
-      AppStorage.setOrCreate<number>('SAFE_INSET_LEFT', leftVp);
-      AppStorage.setOrCreate<number>('SAFE_INSET_RIGHT', rightVp);
-      AppStorage.setOrCreate<number>('KEYBOARD_HEIGHT', keyboardVp);
+      AppStorage.setOrCreate<number>('SAFE_INSET_TOP', mapped.top);
+      AppStorage.setOrCreate<number>('SAFE_INSET_BOTTOM', mapped.bottom);
+      AppStorage.setOrCreate<number>('SAFE_INSET_LEFT', mapped.left);
+      AppStorage.setOrCreate<number>('SAFE_INSET_RIGHT', mapped.right);
+      AppStorage.setOrCreate<number>('KEYBOARD_HEIGHT', turned ? 0 : keyboardVp);
 
       if (WindowBar.onInsets) {
-        WindowBar.onInsets(topVp, bottomVp, leftVp, rightVp);
+        WindowBar.onInsets(mapped.top, mapped.bottom, mapped.left, mapped.right);
       }
     } catch (err) {
       console.error('notifyInsets failed:', JSON.stringify(err));
@@ -130,14 +155,13 @@ export class WindowBar {
         widthPx = rect.width;
         heightPx = rect.height;
       }
-      const widthVp = uiContext.px2vp(widthPx);
-      const heightVp = uiContext.px2vp(heightPx);
-      Breakpoint.publish(widthVp, heightVp);
-      if (WindowBar.onDisplay) {
-        const leftVp = WindowBar.leftInset();
-        const rightVp = WindowBar.rightInset();
-        WindowBar.onDisplay(leftVp, rightVp, widthVp, heightVp);
-      }
+      WindowBar.rawW = uiContext.px2vp(widthPx);
+      WindowBar.rawH = uiContext.px2vp(heightPx);
+      AppStorage.setOrCreate<number>('WINDOW_RAW_W', WindowBar.rawW);
+      AppStorage.set<number>('WINDOW_RAW_W', WindowBar.rawW);
+      AppStorage.setOrCreate<number>('WINDOW_RAW_H', WindowBar.rawH);
+      AppStorage.set<number>('WINDOW_RAW_H', WindowBar.rawH);
+      WindowBar.republish();
     } catch (err) {
       console.error('notifySize failed:', JSON.stringify(err));
     }
@@ -183,10 +207,73 @@ export class WindowBar {
   }
 
   static bottomInset(): number {
-    return AppStorage.get<number>('SAFE_INSET_BOTTOM') || 16;
+    const value = AppStorage.get<number>('SAFE_INSET_BOTTOM');
+    return value === undefined ? 16 : value;
   }
 
   static keyboardHeight(): number {
     return AppStorage.get<number>('KEYBOARD_HEIGHT') || 0;
   }
+
+  static refresh(): void {
+    if (WindowBar.listenedWin) {
+      WindowBar.notifyInsets(WindowBar.listenedWin);
+    }
+    WindowBar.republish();
+  }
+
+  private static pageAngle(): number {
+    const held = AppStorage.get<boolean>('APP_ROTATION_HELD') === true;
+    const frozen = AppStorage.get<number>('APP_FROZEN_ANGLE') ?? 0;
+    const sensor = AppStorage.get<number>('APP_DEVICE_ANGLE') ?? 0;
+    return held ? frozen : sensor;
+  }
+
+  private static isTurned(angle: number): boolean {
+    return angle === 90 || angle === -90 || angle === 270 || angle === -270;
+  }
+
+  private static republish(): void {
+    if (WindowBar.rawW <= 0 || WindowBar.rawH <= 0) {
+      return;
+    }
+    const turned = WindowBar.isTurned(WindowBar.pageAngle());
+    const width = turned ? WindowBar.rawH : WindowBar.rawW;
+    const height = turned ? WindowBar.rawW : WindowBar.rawH;
+    Breakpoint.publish(width, height);
+    if (WindowBar.onDisplay) {
+      WindowBar.onDisplay(WindowBar.leftInset(), WindowBar.rightInset(), width, height);
+    }
+  }
+
+  private static mapInsets(top: number, bottom: number, left: number, right: number): EdgeInsets {
+    const angle = WindowBar.pageAngle();
+    const mapped = new EdgeInsets();
+    if (angle === 90 || angle === -270) {
+      mapped.top = right;
+      mapped.bottom = left;
+      mapped.left = top;
+      mapped.right = bottom;
+      return mapped;
+    }
+    if (angle === -90 || angle === 270) {
+      mapped.top = left;
+      mapped.bottom = right;
+      mapped.left = bottom;
+      mapped.right = top;
+      return mapped;
+    }
+    mapped.top = top;
+    mapped.bottom = bottom;
+    mapped.left = left;
+    mapped.right = right;
+    return mapped;
+  }
+}
+
+class EdgeInsets {
+  top: number = 0;
+  bottom: number = 0;
+  left: number = 0;
+  right: number = 0;
 }

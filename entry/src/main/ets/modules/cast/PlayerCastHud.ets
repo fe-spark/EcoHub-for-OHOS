@@ -3,6 +3,7 @@ import { CastSession } from './CastSession';
 import { CastPhase } from '../../types/DlnaTypes';
 import { FormatUtil } from '../../common/utils/FormatUtil';
 import { PlayerIconBtn } from '../player/PlayerControl';
+import { AppToast } from '../../common/utils/AppToast';
 
 @Component
 export struct PlayerCastHud {
@@ -65,7 +66,7 @@ export struct PlayerCastHud {
 
   private toast(msg: string): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: msg });
+      AppToast.show(msg);
     } catch (_e) {
     }
   }

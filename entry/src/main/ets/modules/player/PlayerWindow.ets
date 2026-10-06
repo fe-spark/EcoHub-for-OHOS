@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { audio } from '@kit.AudioKit';
+import { AppOrientation } from '../../common/utils/AppOrientation';
 import { WindowBar } from '../../common/utils/WindowBar';
 
 export class PlayerVolumeInfo {
@@ -14,21 +15,17 @@ export class PlayerWindow {
       return;
     }
     console.info(`[PlayerWindow] setFullscreen -> full: ${full}, isPortrait: ${isPortrait}`);
+    AppOrientation.setBarsHeld(full);
     try {
       const win = await window.getLastWindow(context);
-      if (full) {
-        await win.setWindowSystemBarEnable([]);
-        if (isPortrait) {
-          console.info(`[PlayerWindow] 执行竖屏全屏 -> setPreferredOrientation(PORTRAIT)`);
-          await win.setPreferredOrientation(window.Orientation.PORTRAIT);
-        } else {
-          console.info(`[PlayerWindow] 执行横屏全屏 -> setPreferredOrientation(AUTO_ROTATION_LANDSCAPE)`);
-          await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_LANDSCAPE);
-        }
+      try {
+        win.setWindowBackgroundColor(full ? '#FF000000' : '#FF0A0B10');
+      } catch (_err) {
+      }
+      if (full || AppOrientation.angle() !== 0) {
+        WindowBar.requestBars(context, false);
       } else {
-        console.info(`[PlayerWindow] 退出全屏 -> 恢复 AUTO_ROTATION_RESTRICTED`);
-        await win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED);
-        WindowBar.apply(context);
+        WindowBar.requestBars(context, true);
       }
     } catch (err) {
       console.error('[PlayerWindow] player fullscreen failed:', JSON.stringify(err));

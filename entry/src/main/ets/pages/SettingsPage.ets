@@ -4,6 +4,8 @@ import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
 import { AppSettingsManager } from '../services/AppSettingsManager';
 import { common } from '@kit.AbilityKit';
+import { AppFrame } from '../components/common/AppFrame';
+import { AppToast } from '../common/utils/AppToast';
 
 @Entry
 @Component
@@ -77,7 +79,7 @@ struct SettingsPage {
               const ctx = this.getContextSafe();
               await AppSettingsManager.getInstance().clearCache(ctx);
               await this.refreshCacheSize();
-              this.getUIContext().getPromptAction().showToast({ message: '缓存已清理' });
+              AppToast.show('缓存已清理');
             } catch (_e) {}
           })();
         }
@@ -102,6 +104,8 @@ struct SettingsPage {
   }
 
   build() {
+    Stack() {
+    AppFrame() {
     Column() {
       PageHeader({ title: '设置' })
 
@@ -268,5 +272,9 @@ struct SettingsPage {
       left: this.leftInset,
       right: this.rightInset
     })
+    }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

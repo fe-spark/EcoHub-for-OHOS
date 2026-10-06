@@ -35,7 +35,7 @@ export struct PlayerScaleSheet {
         }
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Bottom,
+      alignment: DialogAlignment.Center,
       customStyle: true,
       backgroundColor: Color.Transparent,
       maskColor: PlayerScaleSheet.DIALOG_MASK_COLOR,
