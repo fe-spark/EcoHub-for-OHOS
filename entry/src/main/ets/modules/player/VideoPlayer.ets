@@ -47,7 +47,8 @@ export struct VideoPlayer {
   onBack?: () => void;
   onPrev?: () => void;
   onNext?: () => void;
-  onFullscreenChange?: (full: boolean, isPortrait?: boolean) => void;
+  onFullscreenChange?: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => void;
+  onVideoSize?: (width: number, height: number) => void;
 
   private static readonly SEEK_STEP_SEC: number = 10;
   private static readonly PLAY_TOGGLE_DEBOUNCE_MS: number = 280;
@@ -98,6 +99,8 @@ export struct VideoPlayer {
   private state: PlayerPlaybackState = new PlayerPlaybackState();
   private observer: PlayerVideoObserver | null = null;
   private pageWasHidden: boolean = false;
+  private sentW: number = 0;
+  private sentH: number = 0;
   private playEpoch: number = 0;
   private seekGesture: number = 0;
   private playerW: number = 1;
@@ -291,6 +294,14 @@ export struct VideoPlayer {
     this.errorText = this.state.errorText; this.seeking = this.state.seeking;
     this.stalled = this.state.stalled; this.ready = this.state.ready;
     this.videoWidth = this.state.videoWidth; this.videoHeight = this.state.videoHeight;
+    if (this.videoWidth > 0 && this.videoHeight > 0 &&
+      (this.videoWidth !== this.sentW || this.videoHeight !== this.sentH)) {
+      this.sentW = this.videoWidth;
+      this.sentH = this.videoHeight;
+      if (this.onVideoSize) {
+        this.onVideoSize(this.videoWidth, this.videoHeight);
+      }
+    }
   }
 
   private resetPlayState(): void {
@@ -299,6 +310,8 @@ export struct VideoPlayer {
     this.watcher.clearOpenWatch();
     this.watcher.clearSeekWatch();
     this.state.reset(this.videoUrl);
+    this.sentW = 0;
+    this.sentH = 0;
     this.syncFromState();
     this.showHud = true;
     this.closeSpeedDialog();
@@ -468,10 +481,11 @@ export struct VideoPlayer {
     }
     this.closeCastDialog();
     const isPort = this.state.isPortrait();
-    console.info(`[VideoLink] 全屏切换 full=${next} size=${this.state.videoWidth}x${this.state.videoHeight} url=${this.videoUrl}`);
+    const isLand = this.state.isLandscape();
+    console.info(`[VideoLink] 全屏切换 full=${next} size=${this.state.videoWidth}x${this.state.videoHeight} land=${isLand} url=${this.videoUrl}`);
     this.innerFull = next;
     this.pulseHud();
-    if (this.onFullscreenChange) this.onFullscreenChange(next, isPort);
+    if (this.onFullscreenChange) this.onFullscreenChange(next, isPort, isLand);
     else PlayerWindow.setFullscreen(this.ctx(), next, isPort);
     this.syncKeepScreen();
   }

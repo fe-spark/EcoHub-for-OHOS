@@ -1,9 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { audio } from '@kit.AudioKit';
-import { AppOrientation } from '../../common/utils/AppOrientation';
-import { WindowBar } from '../../common/utils/WindowBar';
-
 export class PlayerVolumeInfo {
   current: number = 8;
   max: number = 15;
@@ -15,17 +12,11 @@ export class PlayerWindow {
       return;
     }
     console.info(`[PlayerWindow] setFullscreen -> full: ${full}, isPortrait: ${isPortrait}`);
-    AppOrientation.setBarsHeld(full);
     try {
       const win = await window.getLastWindow(context);
       try {
         win.setWindowBackgroundColor(full ? '#FF000000' : '#FF0A0B10');
       } catch (_err) {
-      }
-      if (full || AppOrientation.angle() !== 0) {
-        WindowBar.requestBars(context, false);
-      } else {
-        WindowBar.requestBars(context, true);
       }
     } catch (err) {
       console.error('[PlayerWindow] player fullscreen failed:', JSON.stringify(err));

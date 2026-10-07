@@ -214,6 +214,7 @@ export struct AppFrame {
         centerX: '50%',
         centerY: '50%'
       })
+      .renderGroup(true)
     }
     .width('100%')
     .height('100%')

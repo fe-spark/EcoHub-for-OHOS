@@ -26,16 +26,41 @@ export class AppOrientation {
     AppOrientation.barsHeld = held;
   }
 
-  /** 全屏只锁定页面角度，不转系统窗口，避免系统旋转动画。横屏视频立刻转到 90°。 */
+  /**
+   * 全屏时窗口改成视频自己的方向，系统状态栏贴在画面顶部并隐藏。页面不再另转 90°。
+   */
   static setFullscreenRotation(full: boolean, landscapeVideo: boolean): void {
-    if (full) {
-      AppOrientation.putBool(AppOrientation.HELD_KEY, true);
-      AppOrientation.putNumber(AppOrientation.FROZEN_KEY, landscapeVideo ? 90 : 0);
-    } else {
-      AppOrientation.putBool(AppOrientation.HELD_KEY, false);
-      AppOrientation.putNumber(AppOrientation.FROZEN_KEY, 0);
-    }
+    AppOrientation.barsHeld = full;
+    AppOrientation.putBool(AppOrientation.HELD_KEY, false);
+    AppOrientation.putNumber(AppOrientation.FROZEN_KEY, 0);
+    AppOrientation.syncBars();
     WindowBar.refresh();
+    const orientation = !full ? window.Orientation.AUTO_ROTATION_RESTRICTED
+      : (landscapeVideo ? window.Orientation.LANDSCAPE : window.Orientation.PORTRAIT);
+    AppOrientation.prefer(orientation);
+  }
+
+  private static prefer(orientation: window.Orientation): void {
+    const ctx = AppOrientation.context;
+    if (!ctx) {
+      return;
+    }
+    window.getLastWindow(ctx).then((win: window.Window) => {
+      let current = window.Orientation.UNSPECIFIED;
+      try {
+        current = win.getPreferredOrientation();
+      } catch (_err) {
+      }
+      if (current === orientation) {
+        return;
+      }
+      console.info(`[AppOrientation] 窗口方向 ${current} -> ${orientation}`);
+      win.setPreferredOrientation(orientation).catch((err: Error) => {
+        console.error(`[AppOrientation] 设置窗口方向失败: ${JSON.stringify(err)}`);
+      });
+    }).catch((err: Error) => {
+      console.error(`[AppOrientation] 获取窗口失败: ${JSON.stringify(err)}`);
+    });
   }
 
   private static putBool(key: string, value: boolean): void {
@@ -97,10 +122,9 @@ export class AppOrientation {
     if (device >= 0) {
       AppOrientation.lastDeviceDegrees = device;
     }
-    const angle = AppOrientation.readAutoRotate()
-      ? AppOrientation.toPageAngle(AppOrientation.lockedDegrees, AppOrientation.lastDeviceDegrees)
-      : 0;
-    AppOrientation.publishAngle(angle);
+    if (AppOrientation.pageAngle !== 0) {
+      AppOrientation.publishAngle(0);
+    }
   }
 
   private static deviceDegrees(x: number, y: number): number {
@@ -175,20 +199,31 @@ export class AppOrientation {
     AppOrientation.pageAngle = angle;
     AppStorage.setOrCreate<number>(AppOrientation.ANGLE_KEY, angle);
     AppStorage.set<number>(AppOrientation.ANGLE_KEY, angle);
-    if (angle !== 0) {
+    AppOrientation.syncBars();
+    WindowBar.refresh();
+  }
+
+  private static syncBars(): void {
+    if (AppOrientation.barsHeld) {
       AppOrientation.hideBars();
-    } else if (!AppOrientation.barsHeld) {
+      return;
+    }
+    const held = AppStorage.get<boolean>(AppOrientation.HELD_KEY) === true;
+    const frozen = AppStorage.get<number>(AppOrientation.FROZEN_KEY) ?? 0;
+    const angle = held ? frozen : AppOrientation.pageAngle;
+    if (AppOrientation.barsHeld || angle !== 0) {
+      AppOrientation.hideBars();
+    } else {
       AppOrientation.restoreBars();
     }
-    WindowBar.refresh();
   }
 
   private static restoreBars(): void {
     WindowBar.requestBars(AppOrientation.context, true);
   }
 
-  private static hideBars(): void {
-    WindowBar.requestBars(AppOrientation.context, false);
+  private static hideBars(onDone?: () => void): void {
+    WindowBar.requestBars(AppOrientation.context, false, onDone);
   }
 
   private static allowSystemRotation(context: common.UIAbilityContext | undefined): void {
@@ -234,10 +269,10 @@ export class AppOrientation {
       return;
     }
     window.getLastWindow(context).then((win: window.Window) => {
-      win.setPreferredOrientation(window.Orientation.LOCKED).then(() => {
-        console.info(`[AppOrientation] 已锁定系统旋转 window=${AppOrientation.lockedDegrees} preferred=${win.getPreferredOrientation()}`);
+      win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED).then(() => {
+        console.info(`[AppOrientation] 窗口跟随手持方向 preferred=${win.getPreferredOrientation()}`);
       }).catch((err: Error) => {
-        console.error(`[AppOrientation] 锁定方向失败: ${JSON.stringify(err)}`);
+        console.error(`[AppOrientation] 设置跟随方向失败: ${JSON.stringify(err)}`);
       });
     }).catch((err: Error) => {
       console.error(`[AppOrientation] 获取窗口失败: ${JSON.stringify(err)}`);

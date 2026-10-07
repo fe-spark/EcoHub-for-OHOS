@@ -157,17 +157,26 @@ export class SiteHeartbeat {
 
     const currentGen = this.generation;
     this.probing = true;
+    let requestUrl = serverUrl;
+    try {
+      requestUrl = ServerConfigManager.getInstance().buildApiUrl('/config/basic');
+    } catch (_e) {
+    }
+    console.info(`[SiteHeartbeat] 心跳请求: ${requestUrl}`);
     try {
       // 探活请求：获取最新站点状态，自动触发 FilmApi.onConfigChange 广播，单次探活超时限制为 8000ms
       const config = await FilmApi.getSiteConfig(true, 8000);
       if (currentGen !== this.generation) {
         return;
       }
+      console.info(`[SiteHeartbeat] 心跳成功: ${requestUrl}`);
       // 明确成功：重置连续故障计数
       this.consecutiveFailures = 0;
       // 站点关闭运行状态检测
       this.checkSiteClosedState(config);
-    } catch (_err) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `${err}`;
+      console.info(`[SiteHeartbeat] 心跳失败: ${requestUrl} ${message}`);
       if (currentGen !== this.generation) {
         return;
       }
