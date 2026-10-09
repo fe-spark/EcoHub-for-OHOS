@@ -12,15 +12,23 @@ export class WindowBar {
   private static onDisplay?: (left: number, right: number, width: number, height: number) => void;
   private static avoidTimer: number = -1;
   private static overlayCount: number = 0;
+  private static barsWanted: boolean = true;
   private static rawW: number = 0;
   private static rawH: number = 0;
 
-  static requestBars(context: common.UIAbilityContext | undefined, show: boolean): void {
+  static requestBars(context: common.UIAbilityContext | undefined, show: boolean, onDone?: () => void): void {
+    WindowBar.barsWanted = show;
     if (!context) {
+      if (onDone) {
+        onDone();
+      }
       return;
     }
     if (show) {
       WindowBar.apply(context);
+      if (onDone) {
+        onDone();
+      }
       return;
     }
     const seq = ++WindowBar.applySeq;
@@ -28,11 +36,50 @@ export class WindowBar {
       if (seq !== WindowBar.applySeq) {
         return;
       }
-      win.setWindowSystemBarEnable([]).catch((err: Error) => {
-        console.error(`[WindowBar] 隐藏系统栏失败: ${JSON.stringify(err)}`);
-      });
+      WindowBar.setSystemBarsVisible(win, onDone);
     }).catch((err: Error) => {
       console.error(`[WindowBar] 获取窗口失败: ${JSON.stringify(err)}`);
+      if (onDone) {
+        onDone();
+      }
+    });
+  }
+
+  private static setSystemBarsVisible(win: window.Window, onDone?: () => void): void {
+    const show = WindowBar.barsWanted;
+    try {
+      win.setWindowLayoutFullScreen(true);
+    } catch (_err) {
+    }
+    const finish = (): void => {
+      if (WindowBar.barsWanted !== show) {
+        WindowBar.setSystemBarsVisible(win, onDone);
+        return;
+      }
+      WindowBar.notifyInsets(win);
+      if (onDone) {
+        onDone();
+      }
+    };
+    win.setSpecificSystemBarEnabled('status', show, false).then(() => {
+      win.setSpecificSystemBarEnabled('navigation', show, false).then(() => {
+        if (!show) {
+          finish();
+          return;
+        }
+        win.setWindowSystemBarEnable(['status', 'navigation']).then(() => {
+          finish();
+        }).catch((err: Error) => {
+          console.error(`[WindowBar] 显示系统栏失败: ${JSON.stringify(err)}`);
+          finish();
+        });
+      }).catch((err: Error) => {
+        console.error(`[WindowBar] 设置导航栏失败: ${JSON.stringify(err)}`);
+        finish();
+      });
+    }).catch((err: Error) => {
+      console.error(`[WindowBar] 设置状态栏失败: ${JSON.stringify(err)}`);
+      finish();
     });
   }
 
@@ -51,9 +98,10 @@ export class WindowBar {
       if (seq !== WindowBar.applySeq) {
         return;
       }
-      win.setWindowSystemBarEnable(['status', 'navigation']);
-      win.setWindowLayoutFullScreen(true);
-      WindowBar.applyBarColors(win);
+      WindowBar.setSystemBarsVisible(win);
+      if (WindowBar.barsWanted) {
+        WindowBar.applyBarColors(win);
+      }
       WindowBar.bindListener(win);
       WindowBar.notifyInsets(win);
       WindowBar.notifySize(win);

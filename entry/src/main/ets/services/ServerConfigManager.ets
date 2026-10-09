@@ -221,6 +221,7 @@ export class ServerConfigManager {
 
   public async setServerUrl(url: string): Promise<void> {
     const cleanUrl = this.normalizeRaw(url);
+    console.info(`[ServerConfig] 切换软件源: ${cleanUrl}`);
     this.cachedUrl = cleanUrl;
     if (!this.pref) {
       return;

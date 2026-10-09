@@ -7,6 +7,7 @@ import { AppSettingsManager } from '../services/AppSettingsManager';
 import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
 import { AppOrientation } from '../common/utils/AppOrientation';
+import { WindowBar } from '../common/utils/WindowBar';
 
 
 const CUSTOM_FONT_FAMILY: string = 'CalligraphyFont';
@@ -67,14 +68,7 @@ export default class EntryAbility extends UIAbility {
             AppOrientation.start(this.context);
           } catch (_e) {
           }
-          win.setWindowSystemBarEnable(['status', 'navigation']);
-          win.setWindowLayoutFullScreen(true);
-          win.setWindowSystemBarProperties({
-            statusBarColor: '#00000000',
-            statusBarContentColor: '#FFFFFF',
-            navigationBarColor: '#12141C',
-            navigationBarContentColor: '#FFFFFF'
-          });
+          WindowBar.apply(this.context);
         });
 
       });

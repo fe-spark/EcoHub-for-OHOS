@@ -8,6 +8,7 @@ import { AppToast } from '../../common/utils/AppToast';
 
 @Component
 export struct PlayerSkin {
+  @Prop reloadToken: number = 0;
   @Prop isFull: boolean = false;
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
@@ -397,6 +398,7 @@ export struct PlayerSkin {
         PlayerTip({ message: this.feedback, kind: this.feedbackKind })
       }
       PlayerLoadingCard({
+        reloadToken: this.reloadToken,
         visible: this.loading(),
         opening: this.opening,
         allowRetry: this.canRetryLoad(),
@@ -409,91 +411,89 @@ export struct PlayerSkin {
   }
 
   build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      PlayerGestureLayer({
-        ignoreHit: !!this.castDeviceName,
-        onPlay: this.onPlay,
-        onToggleHud: this.onToggleHud,
-        onLongPress: this.onLongPress,
-        onLongPressEnd: this.onLongPressEnd,
-        onPanStart: this.onPanStart,
-        onPanMove: this.onPanMove,
-        onPanEnd: this.onPanEnd,
-        onPanCancel: this.onPanCancel
-      })
-        .width('100%')
-        .height('100%')
+    PlayerGestureLayer({
+      ignoreHit: !!this.castDeviceName,
+      onPlay: this.onPlay,
+      onToggleHud: this.onToggleHud,
+      onLongPress: this.onLongPress,
+      onLongPressEnd: this.onLongPressEnd,
+      onPanStart: this.onPanStart,
+      onPanMove: this.onPanMove,
+      onPanEnd: this.onPanEnd,
+      onPanCancel: this.onPanCancel
+    }) {
+      Stack({ alignContent: Alignment.TopStart }) {
+        if (this.showCenterPlay()) {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
+            .hitTestBehavior(HitTestMode.None)
+        }
 
-      if (this.showCenterPlay()) {
-        Column()
-          .width('100%')
-          .height('100%')
-          .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
-          .hitTestBehavior(HitTestMode.None)
-      }
-
-      if (this.errorText && !this.castDeviceName) {
-        PlayerErrorPad({
-          onRetry: () => {
-            if (this.onRetry) {
-              this.onRetry();
+        if (this.errorText && !this.castDeviceName) {
+          PlayerErrorPad({
+            onRetry: () => {
+              if (this.onRetry) {
+                this.onRetry();
+              }
+            },
+            onErrorDetail: () => {
+              if (this.onErrorDetail) {
+                this.onErrorDetail();
+              }
             }
-          },
-          onErrorDetail: () => {
-            if (this.onErrorDetail) {
-              this.onErrorDetail();
-            }
-          }
-        })
-      }
+          })
+        }
 
-      Column() {
-        this.centerGroup()
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(10)
-
-      Column() {
-        this.topBar()
-        Blank().hitTestBehavior(HitTestMode.None)
-        this.bottomBar()
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-      .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(11)
-
-      if (!this.isFull && (this.showBack || this.hasCastAction() || !!this.onPip)) {
-        Row() {
-          if (this.showBack) {
-            PlayerBackBtn({ onTap: this.onBack })
-          }
-          Blank().hitTestBehavior(HitTestMode.None)
-          Row({ space: 4 }) {
-            this.castEntry()
-            this.pipEntry()
-          }
+        Column() {
+          this.centerGroup()
         }
         .width('100%')
-        .justifyContent(FlexAlign.SpaceBetween)
-        .alignItems(VerticalAlign.Center)
-        .padding({
-          left: this.edge(4, this.leftInset),
-          right: this.edge(4, this.rightInset),
-          top: this.edge(4, this.topInset)
-        })
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
-        .zIndex(999)
+        .zIndex(10)
+
+        Column() {
+          this.topBar()
+          Blank().hitTestBehavior(HitTestMode.None)
+          this.bottomBar()
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+        .hitTestBehavior(HitTestMode.Transparent)
+        .zIndex(11)
+
+        if (!this.isFull && (this.showBack || this.hasCastAction() || !!this.onPip)) {
+          Row() {
+            if (this.showBack) {
+              PlayerBackBtn({ onTap: this.onBack })
+            }
+            Blank().hitTestBehavior(HitTestMode.None)
+            Row({ space: 4 }) {
+              this.castEntry()
+              this.pipEntry()
+            }
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+          .alignItems(VerticalAlign.Center)
+          .padding({
+            left: this.edge(4, this.leftInset),
+            right: this.edge(4, this.rightInset),
+            top: this.edge(4, this.topInset)
+          })
+          .hitTestBehavior(HitTestMode.Transparent)
+          .zIndex(999)
+        }
       }
+      .width('100%')
+      .height('100%')
+      .clip(true)
+      .hitTestBehavior(HitTestMode.Transparent)
     }
-    .width('100%')
-    .height('100%')
-    .clip(true)
-    .hitTestBehavior(HitTestMode.Transparent)
   }
 }

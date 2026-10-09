@@ -37,7 +37,8 @@ struct PlayPage {
   @State private playingSourceId: string = '';
   @State private viewingSourceId: string = '';
   @State private episodeIndex: number = 0;
-  @State private playUrl: string = '';
+  @State @Watch('onPlayUrlChange') private playUrl: string = '';
+  @State private frameRatio: number = 16 / 9;
   @State private playToken: number = 0;
   @State private playTitle: string = '';
   @State private initialTime: number = 0;
@@ -78,6 +79,10 @@ struct PlayPage {
         this.viewW = width;
         this.viewH = height;
       });
+  }
+
+  private onPlayUrlChange(): void {
+    this.frameRatio = 16 / 9;
   }
 
   async aboutToAppear(): Promise<void> {
@@ -139,12 +144,12 @@ struct PlayPage {
     SourceGuard.offReconnect(this.reconnectCb);
   }
 
-  private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
+  private setPlayerFull(full: boolean, isPortrait: boolean = false, isLandscape: boolean = false): void {
     if (full === this.playerFull) {
       return;
     }
     this.playerFull = full;
-    AppOrientation.setFullscreenRotation(full, !isPortrait);
+    AppOrientation.setFullscreenRotation(full, isLandscape);
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
@@ -173,7 +178,8 @@ struct PlayPage {
           'PlayPage',
           '',
           detail.descriptor?.cName || '',
-          detail.name || ''
+          detail.name || '',
+          sourceId || info.currentPlayFrom
         );
       }
       this.name = detail.name;
@@ -385,7 +391,16 @@ struct PlayPage {
       onEnded: () => { if (this.settingAutoPlayNext && this.hasNext()) this.playNext(); },
       onPrev: () => this.playPrev(),
       onNext: () => this.playNext(),
-      onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
+      onFullscreenChange: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => {
+        this.setPlayerFull(full, isPortrait === true, isLandscape === true);
+      },
+      onVideoSize: (width: number, height: number) => {
+        if (width > height && height > 0) {
+          this.frameRatio = width / height;
+        } else {
+          this.frameRatio = 16 / 9;
+        }
+      },
       onProgress: (current: number, duration: number) => {
         this.lastCurrentTime = current;
         this.lastDuration = duration;
@@ -394,7 +409,7 @@ struct PlayPage {
     })
       .width('100%')
       .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
-      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
+      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : this.frameRatio)
       .constraintSize({ maxHeight: '100%' })
   }
 

@@ -220,13 +220,10 @@ export class PlayerAv {
       } else if (state === 'prepared') {
         const durationMs = player.duration;
         const duration = durationMs > 0 ? durationMs / PlayerAv.MS_PER_SEC : 0;
-        console.info(`[PlayerAv] prepared 完成! duration: ${duration}s, size: ${player.width}x${player.height}`);
+        console.info(`[PlayerAv] prepared 完成! duration: ${duration}s, 容器尺寸: ${player.width}x${player.height}`);
         this.applyVolume();
         this.applySpeed();
         this.applyScale();
-        if (player.width > 0 && player.height > 0) {
-          this.listener.onVideoSize(player.width, player.height);
-        }
         this.listener.onPrepared(duration);
       } else if (state === 'playing') {
         console.info(`[PlayerAv] playing 状态开始`);

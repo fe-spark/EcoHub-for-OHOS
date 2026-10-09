@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "/Users/spark/.ohos/config/default_app-for-ohos_7RBvNqrNl3EoIVdOXfkxbs123iqpg6Ej5vuc9gBrFZI=.cer",
+          "certpath": "/Users/spark/.ohos/config/default_app-for-ohos_CJ4IUO3N-R8rD41cyiN8OU8VogqqnZyUo1oVYi_QbXc=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001B3F65132B9D5EC7955408E0320C2033F0298E74CC66953AD1055C3895C607D2BCDDC5D0A28E32BA",
-          "profile": "/Users/spark/.ohos/config/default_app-for-ohos_7RBvNqrNl3EoIVdOXfkxbs123iqpg6Ej5vuc9gBrFZI=.p7b",
+          "keyPassword": "0000001B0EE525148DC250D4C96EB1089269F304A73F5934FE1F7E0417E75D2ADED89B74F9D7B094960665",
+          "profile": "/Users/spark/.ohos/config/default_app-for-ohos_CJ4IUO3N-R8rD41cyiN8OU8VogqqnZyUo1oVYi_QbXc=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/spark/.ohos/config/default_app-for-ohos_7RBvNqrNl3EoIVdOXfkxbs123iqpg6Ej5vuc9gBrFZI=.p12",
-          "storePassword": "0000001B3AE2FD223B507D4B606936DA52EBDD6BF7455109571CA857B44B1B1EA4CEE27406A80AAC96AE3B"
+          "storeFile": "/Users/spark/.ohos/config/default_app-for-ohos_CJ4IUO3N-R8rD41cyiN8OU8VogqqnZyUo1oVYi_QbXc=.p12",
+          "storePassword": "0000001B1B3CF6F66ECFBAEFC9C392D2F58FF4050FD246646BA2F8765A01A08DA16890A40977EEDAA674F9"
         }
       }
     ],
