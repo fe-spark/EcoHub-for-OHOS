@@ -30,6 +30,7 @@ export interface PlayerSkinEvents {
 
 @Component
 export struct PlayerSkinView {
+  @Prop reloadToken: number = 0;
   @Prop isFull: boolean = false;
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
@@ -64,6 +65,7 @@ export struct PlayerSkinView {
 
   build() {
     PlayerSkin({
+      reloadToken: this.reloadToken,
       isFull: this.isFull,
       showHud: this.showHud,
       showBack: this.showBack,

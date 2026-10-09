@@ -74,9 +74,10 @@ export struct PlayerLoadingCard {
   private static readonly CARD_PADDING_H: number = 18;
   private static readonly CARD_PADDING_V: number = 14;
 
+  @Prop @Watch('onReloadTokenChange') reloadToken: number = 0;
   @Prop @Watch('onVisibleChange') visible: boolean = false;
   @Prop @Watch('onAllowRetryChange') allowRetry: boolean = false;
-  @Prop opening: boolean = false;
+  @Prop @Watch('onOpeningChange') opening: boolean = false;
   onRetry?: () => void;
 
   @State private showCard: boolean = false;
@@ -92,6 +93,22 @@ export struct PlayerLoadingCard {
 
   aboutToDisappear(): void {
     this.clearAllTimers();
+  }
+
+  private onReloadTokenChange(): void {
+    this.hideRetry();
+    this.clearAllTimers();
+    this.showCard = false;
+    this.shownAt = 0;
+    this.syncGates();
+  }
+
+  private onOpeningChange(): void {
+    this.hideRetry();
+    this.clearAllTimers();
+    this.showCard = false;
+    this.shownAt = 0;
+    this.syncGates();
   }
 
   private clearShowTimer(): void {

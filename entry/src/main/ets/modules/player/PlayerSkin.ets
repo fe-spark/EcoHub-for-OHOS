@@ -8,6 +8,7 @@ import { AppToast } from '../../common/utils/AppToast';
 
 @Component
 export struct PlayerSkin {
+  @Prop reloadToken: number = 0;
   @Prop isFull: boolean = false;
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
@@ -397,6 +398,7 @@ export struct PlayerSkin {
         PlayerTip({ message: this.feedback, kind: this.feedbackKind })
       }
       PlayerLoadingCard({
+        reloadToken: this.reloadToken,
         visible: this.loading(),
         opening: this.opening,
         allowRetry: this.canRetryLoad(),

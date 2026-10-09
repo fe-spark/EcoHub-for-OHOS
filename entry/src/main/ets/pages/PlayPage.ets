@@ -178,7 +178,8 @@ struct PlayPage {
           'PlayPage',
           '',
           detail.descriptor?.cName || '',
-          detail.name || ''
+          detail.name || '',
+          sourceId || info.currentPlayFrom
         );
       }
       this.name = detail.name;

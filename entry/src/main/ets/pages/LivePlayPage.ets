@@ -95,7 +95,7 @@ struct LivePlayPage {
     if (paramTitle) this.name = paramTitle;
     const historyKey = this.historyId();
     if (historyKey) {
-      HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage');
+      HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage', '', '', '', this.sourceId);
       this.syncFavoriteState();
       try {
         const fav = await FavoriteManager.find(historyKey);
@@ -282,7 +282,7 @@ struct LivePlayPage {
     if (!newSid || newSid === this.sourceMid) return;
     this.sourceMid = newSid;
     const historyKey = this.historyId();
-    if (historyKey) HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage');
+    if (historyKey) HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage', '', '', '', this.sourceId);
     this.name = film.name || '';
     this.sources = [];
     this.playUrl = '';

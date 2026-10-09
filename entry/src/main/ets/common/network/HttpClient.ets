@@ -14,6 +14,7 @@ export interface ApiResponse {
 
 interface TrackViewPayload {
   source: string;
+  collect_source?: string;
   action: string;
   resource: string;
   page: string;
@@ -148,8 +149,8 @@ export class HttpClient {
     }
   }
 
-  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = '', resourceCat: string = '', resourceTitle: string = ''): void {
-    this.sendTrack(action, resource, page, deviceModel, resourceCat, resourceTitle).catch(() => {});
+  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = '', resourceCat: string = '', resourceTitle: string = '', collectSource: string = ''): void {
+    this.sendTrack(action, resource, page, deviceModel, resourceCat, resourceTitle, collectSource).catch(() => {});
   }
 
   private resolveDeviceModel(customModel: string = ''): string {
@@ -168,7 +169,7 @@ export class HttpClient {
     }
   }
 
-  private async sendTrack(action: string, resource: string, page: string, deviceModel: string, resourceCat: string = '', resourceTitle: string = ''): Promise<void> {
+  private async sendTrack(action: string, resource: string, page: string, deviceModel: string, resourceCat: string = '', resourceTitle: string = '', collectSource: string = ''): Promise<void> {
     const manager = ServerConfigManager.getInstance();
     let url = '';
     try {
@@ -201,6 +202,10 @@ export class HttpClient {
       device_model: resolvedModel,
       device_id: deviceId
     };
+    const station = collectSource.trim();
+    if (station.length > 0) {
+      payload.collect_source = station;
+    }
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
