@@ -1,6 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { ServerConfigManager } from '../../services/ServerConfigManager';
+import { ApiEndpoint, ServerCompat } from '../../services/ServerCompat';
 import { QueryParams } from '../utils/QueryParams';
 import { SourceGuard } from '../../services/SourceGuard';
 import { SiteHeartbeat } from '../../services/SiteHeartbeat';
@@ -173,7 +174,7 @@ export class HttpClient {
     const manager = ServerConfigManager.getInstance();
     let url = '';
     try {
-      url = manager.buildApiUrl('/stat/view');
+      url = manager.buildApiUrl(ServerCompat.getInstance().endpoint(ApiEndpoint.STATS_VIEW));
     } catch (_err) {
       return;
     }
@@ -283,6 +284,7 @@ export class HttpClient {
       try {
         const res = await this.send(`${origin}/api/provide/app${query}`, 5000, key);
         if (res.code === 1 || res.code === 0) {
+          await ServerCompat.getInstance().updateFromProvideApp(res.data as Object, ServerConfigManager.hostScope(origin));
           return { ok: true };
         }
       } catch (appErr) {
@@ -311,6 +313,7 @@ export class HttpClient {
         if (msg.indexOf('404') >= 0) {
           const healthRes = await this.send(`${origin}/api/health${query}`, 5000, key);
           if (healthRes.code === 0) {
+            await ServerCompat.getInstance().markFallbackV2(ServerConfigManager.hostScope(origin));
             return { ok: true };
           }
         }
