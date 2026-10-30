@@ -31,7 +31,7 @@ export class AppOrientation {
    */
   static setFullscreenRotation(full: boolean, landscapeVideo: boolean): void {
     AppOrientation.barsHeld = full;
-    AppOrientation.putBool(AppOrientation.HELD_KEY, false);
+    AppOrientation.putBool(AppOrientation.HELD_KEY, full);
     AppOrientation.putNumber(AppOrientation.FROZEN_KEY, 0);
     AppOrientation.syncBars();
     WindowBar.refresh();

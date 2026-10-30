@@ -6,6 +6,7 @@ import {
   OnVideoSizeChangedListener,
   OnBufferingUpdateListener,
   OnSeekCompleteListener,
+  VideoCodecMode,
 } from '@ohos/ijkplayer';
 import { PlayerSpeed } from './PlayerSpeed';
 import { PlayerPlayableUrl } from './PlayerPlayableUrl';
@@ -39,31 +40,31 @@ export class PlayerAv {
   private muted: boolean = false;
   private seekGen: number = 0;
   private progressTimer: number = -1;
+  private pendingUrl: string = '';
+  private pendingGen: number = 0;
 
   setXComponentContext(context: object, surfaceId: string): void {
     console.info(`[PlayerAv] setXComponentContext: ${surfaceId}`);
     this.xContext = context;
     this.surfaceId = surfaceId;
-    if (this.ijk && context && surfaceId) {
-      try {
-        this.ijk.setContext(context, surfaceId);
-        this.ijk.native_setup();
-      } catch (err) {
-        console.error(`[PlayerAv] setXComponentContext 异常: ${JSON.stringify(err)}`);
-      }
+    if (this.pendingUrl) {
+      const url = this.pendingUrl;
+      const gen = this.pendingGen;
+      this.pendingUrl = '';
+      this.pendingGen = 0;
+      this.startPlayInternal(url, gen);
     }
   }
 
   setSurface(id: string): void {
     console.info(`[PlayerAv] setSurface: ${id}`);
     this.surfaceId = id;
-    if (this.ijk && this.xContext && id) {
-      try {
-        this.ijk.setContext(this.xContext, id);
-        this.ijk.native_setup();
-      } catch (err) {
-        console.error(`[PlayerAv] setSurface 异常: ${JSON.stringify(err)}`);
-      }
+    if (this.pendingUrl && this.xContext) {
+      const url = this.pendingUrl;
+      const gen = this.pendingGen;
+      this.pendingUrl = '';
+      this.pendingGen = 0;
+      this.startPlayInternal(url, gen);
     }
   }
 
@@ -85,6 +86,8 @@ export class PlayerAv {
     const gen = ++this.gen;
     console.info(`[PlayerAv] ijkplayer 开始打开: ${url}`);
     this.stopProgressTimer();
+    this.pendingUrl = '';
+    this.pendingGen = 0;
     await this.resetPlayer();
     if (gen !== this.gen || !url) {
       return;
@@ -100,33 +103,49 @@ export class PlayerAv {
     }
     this.url = playable;
 
+    // 若 XComponent 尚未完成 onLoad，暂存等待 onLoad 触发
+    if (!this.xContext || !this.surfaceId) {
+      console.info(`[PlayerAv] xComponentContext 尚未就绪，暂存播放地址等待加载: ${playable}`);
+      this.pendingUrl = playable;
+      this.pendingGen = gen;
+      return;
+    }
+
+    await this.startPlayInternal(playable, gen);
+  }
+
+  private async startPlayInternal(playable: string, gen: number): Promise<void> {
+    if (gen !== this.gen || !playable || !this.xContext || !this.surfaceId) {
+      return;
+    }
     try {
+      console.info(`[PlayerAv] startPlayInternal: ${playable}, surfaceId: ${this.surfaceId}`);
       const ijk = IjkMediaPlayer.getInstance();
       this.ijk = ijk;
 
-      if (this.xContext && this.surfaceId) {
-        ijk.setContext(this.xContext, this.surfaceId);
-        ijk.native_setup();
-      }
+      // 1. 绑定 XComponent 上下文并指定 SURFACE 硬件渲染模式（核心！必须为 SURFACE 才能渲染画面）
+      ijk.setContext(this.xContext, this.surfaceId);
+      ijk.native_setup(VideoCodecMode.SURFACE);
 
-      // 1. 配置 FFmpeg / ijkplayer 网络流与解码选项
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "1"); // 优先硬件加速
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", "1");   // 底层音频驱动
+      // 2. 配置 FFmpeg / ijkplayer 选项
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "1"); // 硬件解码
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", "1");   // 音频驱动
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "soundtouch", "1"); // 倍速变调补偿
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", "1");  // 弱网平滑丢帧防音画脱节
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", "1");  // 网络断线自愈
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", "1");  // 丢帧保同步
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", "1");  // 网络断线重连
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", "15000000"); // 15s 超时
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", "1");
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", "EcoHub-OHOS");
 
-      // 2. 绑定事件监听
+      // 3. 绑定事件监听
       this.bindListeners(ijk, gen);
 
-      // 3. 设置播放源并预加载
+      // 4. 设置播放源并预加载
       ijk.setDataSource(playable);
+      ijk.setMessageListener();
       ijk.prepareAsync();
     } catch (err) {
-      console.error(`[PlayerAv] 创建 ijkplayer 异常: ${JSON.stringify(err)}`);
+      console.error(`[PlayerAv] startPlayInternal 异常: ${JSON.stringify(err)}`);
       if (gen === this.gen) {
         const msg = err instanceof Error ? (err.message || String(err)) : String(err);
         this.listener.onError(msg || 'ijkplayer open error');
@@ -180,14 +199,14 @@ export class PlayerAv {
   }
 
   abandonSeeksUpTo(_seq: number): void {
-    // ijkplayer 内部维护精准 seek 队列
   }
 
   async release(): Promise<void> {
     this.gen++;
     this.url = '';
+    this.pendingUrl = '';
     this.stopProgressTimer();
-    await this.resetPlayer();
+    await this.resetPlayer(true);
   }
 
   private bindListeners(ijk: IjkMediaPlayer, gen: number): void {
@@ -297,14 +316,16 @@ export class PlayerAv {
     } catch (_e) {}
   }
 
-  private async resetPlayer(): Promise<void> {
+  private async resetPlayer(fullRelease: boolean = false): Promise<void> {
     const ijk = this.ijk;
     this.ijk = undefined;
     if (!ijk) return;
     try {
       ijk.stop();
       ijk.reset();
-      ijk.release();
+      if (fullRelease) {
+        ijk.release();
+      }
     } catch (_err) {}
   }
 }
