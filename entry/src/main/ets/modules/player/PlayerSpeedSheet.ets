@@ -20,7 +20,14 @@ export struct PlayerSpeedSheet {
     this.open();
   }
 
+  private isLandscape(): boolean {
+    const w = AppStorage.get<number>('WINDOW_WIDTH') || 0;
+    const h = AppStorage.get<number>('WINDOW_HEIGHT') || 0;
+    return w > h && h > 0;
+  }
+
   private open(): void {
+    const isLand = this.isLandscape();
     this.dialog = new CustomDialogController({
       builder: PlayerSpeedDialog({
         speedLabel: this.speedLabel,
@@ -30,10 +37,10 @@ export struct PlayerSpeedSheet {
         }
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Center,
+      alignment: isLand ? DialogAlignment.BottomEnd : DialogAlignment.Bottom,
       customStyle: true,
       backgroundColor: Color.Transparent,
-      maskColor: 'rgba(0,0,0,0.52)',
+      maskColor: isLand ? 'rgba(0,0,0,0.36)' : 'rgba(0,0,0,0.50)',
       cancel: () => {
         this.dialog = null;
         this.onClosed();

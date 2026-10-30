@@ -68,6 +68,46 @@
 | DOVE |  | [前往注册](https://dovee.cc/a.php?asbcbO1PCgTx2JM66) |
 
 ---
+## 💡 开发避坑指南（屏幕旋转与渲染性能最佳实践）
+
+### 🚨 典型问题：手机旋转卡出系统桌面壁纸、延迟后才变全屏
+
+#### 1. 现象描述
+在控制中心关闭系统旋转锁定后，手机在应用内进行横竖屏旋转时，应用画面被卡在旧尺寸的正方形区域（如 `727×727`），其余未铺满区域直接**卡出系统底层的桌面壁纸**，持续约 300~500ms 后才突然展开为全屏。
+> **特征**：数据加载中（仅 Loading 指示器）时旋转完全正常顺滑，一旦影视列表加载完成并渲染海报后，旋转必定卡出桌面背景。
+
+#### 2. 原因剖析
+1. **页面根节点严禁挂载 `.renderGroup(true)` 与根级 `.clip(true)`**：
+   - ArkUI 的 `renderGroup(true)` 会强制将整页所有子组件渲染到一块**离屏纹理缓冲区（Offscreen Buffer）**。
+   - 在系统窗口旋转转场动画期间，ArkUI **不会逐帧重绘/重建这个全屏离屏纹理**，而是直接复用旧尺寸纹理进行旋转变换；若同时配合根级 `.clip(true)`，超出旧尺寸的部分被硬件硬截断，导致多余区域透明，直接漏出下层的 Launcher 桌面壁纸；直到动画结束、离屏缓存失效后才重新测量重绘成全屏。
+2. **卡片组件严禁挂载全局隐式动画 `.animation()`**：
+   - 在 `FilmCard` 外层挂载 `.animation()` 会捕获组件的所有属性变更。旋转时断点宽度 `WINDOW_WIDTH` 变化，触发所有 `FilmRow` 内成百上千个卡片的 `cardWidth` 同步突变。
+   - 这导致上百张海报同时启动 `120ms` 宽度插值动画，瞬间阻塞 UI 线程，导致应用无法在垂直同步周期内及时向 WMS 提交新方向的画面 Buffer，最终触发系统的**旋转转场超时兜底**（强制以旧画面 Buffer 旋转，未铺满区域透出壁纸）。
+3. **窗口尺寸监听 `on('windowSizeChange')` 严禁同步发起跨进程 IPC**：
+   - `windowSizeChange` 触发时正值旋转过渡首帧的关键期，如果在回调中同步调用 `win.getWindowAvoidArea()`（跨进程 IPC 调用），会进一步加剧主线程卡顿。避让区必须通过独立的 `avoidAreaChange` 监听负责。
+4. **列表项慎用实时毛玻璃 `.backdropBlur`**：
+   - 在大批量渲染的列表或横向滚动胶囊上批量使用 `backdropBlur`，会导致旋转重绘时 GPU 需频繁执行多通道离屏模糊 pass，严重争抢图形资源。
+
+#### 3. 规范要求（防错准则）
+- ❌ **禁止在任何页面根容器上使用 `.renderGroup(true)` 和根级 `.clip(true)`**。
+- ❌ **禁止在列表卡片根节点上挂载全局 `.animation()`**。按压缩放等局部交互动效必须在 `onTouch` 中使用 `this.getUIContext().animateTo` 显式驱动。
+- ❌ **禁止在 `windowSizeChange` 中同步调用 `getWindowAvoidArea`**，尺寸回调只负责更新尺寸与断点，避免主线程 IPC 阻塞。
+- ❌ **避免在滚动列表项中滥用 `backdropBlur`**，尽量使用半透明纯色背景替代。
+- ✅ **保持底层纯色兜底**：在 `WindowBar.applyBarColors()` 中始终保证 `target.setWindowBackgroundColor(AppTheme.BG)`，确保窗口层与页面底色始终一致。
+
+### 🎬 播放器与分栏模式规范
+
+#### 1. 规范设计
+- **横屏保持分栏（`splitPlay`）**：在横屏模式下，播放详情页默认保持 **7:5 分栏模式**（左侧视频流，右侧剧集选集与相关推荐），**不要在横屏时强行自动全屏**，为用户留出横向边看边选集的交互空间。
+- **全屏显式触发与退出**：
+  - 仅在用户主动点击全屏按钮时才进入沉浸式全屏；
+  - 进入全屏使用 `window.Orientation.USER_ROTATION_LANDSCAPE`，退出全屏恢复系统自动旋转策略 `AUTO_ROTATION_RESTRICTED`，使退出全屏后在横屏下自然回落至 7:5 分栏，竖屏下自然回落至半屏。
+- **播放器比例与防拉伸规范**：
+  - `VideoPlayer` 内维护容器宽高的 `playerW / playerH` 必须声明为 `@State` 响应式状态，在 `.onAreaChange` 尺寸变更时自动下发最新的 `containerWidth / containerHeight` 给 `PlayerVideoLayer`。
+  - `PlayerVideoLayer` 在自身 `onAreaChange` 与父级传参双重保底下，实时根据 `videoRatio` 与 `containerRatio` 计算 `XComponent` 的适应比例（FIT 模式），杜绝退化为 100%×100% 导致画面随分栏/横竖屏被强行拉伸变扁。
+  - 播放器与视频渲染层严禁使用 `.clip(true)`。
+  - **宽屏分栏判定使用同步断点**：`isWideScreen()` 必须直接依赖 `@StorageLink` 绑定的 `WINDOW_WIDTH / WINDOW_HEIGHT`，**严禁使用异步 `onAreaChange` 回调赋值的临时 `@State` 变量**，否则在横转竖时第一帧会使用横屏分栏旧尺寸排版（导致视频被压缩在 210vp 狭窄区域，高度仅 118vp），下一帧才恢复 202.5vp，产生视觉上“高度从小变大”的二阶段跳变。
+---
 
 ## 🛠️ 本地开发
 

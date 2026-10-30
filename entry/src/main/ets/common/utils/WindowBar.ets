@@ -132,7 +132,6 @@ export class WindowBar {
         WindowBar.avoidTimer = -1;
       }
       if (WindowBar.listenedWin) {
-        WindowBar.notifyInsets(WindowBar.listenedWin);
         WindowBar.notifySize(WindowBar.listenedWin, size);
       }
     };
@@ -188,9 +187,7 @@ export class WindowBar {
       WindowBar.rawW = uiContext.px2vp(widthPx);
       WindowBar.rawH = uiContext.px2vp(heightPx);
       AppStorage.setOrCreate<number>('WINDOW_RAW_W', WindowBar.rawW);
-      AppStorage.set<number>('WINDOW_RAW_W', WindowBar.rawW);
       AppStorage.setOrCreate<number>('WINDOW_RAW_H', WindowBar.rawH);
-      AppStorage.set<number>('WINDOW_RAW_H', WindowBar.rawH);
       WindowBar.republish();
     } catch (err) {
       console.error('notifySize failed:', JSON.stringify(err));
@@ -211,6 +208,10 @@ export class WindowBar {
     const target = win || WindowBar.listenedWin;
     if (!target) {
       return;
+    }
+    try {
+      target.setWindowBackgroundColor(AppTheme.BG);
+    } catch (_err) {
     }
     try {
       target.setWindowSystemBarProperties({

@@ -495,7 +495,5 @@ struct SearchPage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
   }
 }

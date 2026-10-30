@@ -134,10 +134,13 @@ export struct PlayerVideoLayer {
     .width(PlayerVideoLayer.FULL_PERCENT)
     .height(PlayerVideoLayer.FULL_PERCENT)
     .backgroundColor(PlayerVideoLayer.BG_COLOR)
-    .clip(true)
     .onAreaChange((_old: Area, area: Area) => {
-      this.layerW = Number(area.width);
-      this.layerH = Number(area.height);
+      const w = Number(area.width);
+      const h = Number(area.height);
+      if (w > 0 && h > 0 && (this.layerW !== w || this.layerH !== h)) {
+        this.layerW = w;
+        this.layerH = h;
+      }
     })
   }
 }

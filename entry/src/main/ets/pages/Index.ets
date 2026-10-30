@@ -464,7 +464,6 @@ struct Index {
       .width('100%')
       .height('100%')
       .backgroundColor(AppTheme.BG)
-      .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
 
       if (this.showNotice && this.ready && this.siteOpen) {
         NoticeDialog({
@@ -493,8 +492,6 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
     .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }
 }

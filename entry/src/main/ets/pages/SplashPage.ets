@@ -184,8 +184,6 @@ struct SplashPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
     .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
       [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }

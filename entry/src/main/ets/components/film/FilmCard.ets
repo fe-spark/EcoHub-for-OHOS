@@ -171,13 +171,16 @@ export struct FilmCard {
     }
     .alignItems(HorizontalAlign.Start)
     .scale({ x: this.pressed ? 0.96 : 1, y: this.pressed ? 0.96 : 1 })
-    .animation({ duration: 120, curve: Curve.EaseOut })
     .width(this.cardSize())
     .onTouch((event: TouchEvent) => {
       if (event.type === TouchType.Down) {
-        this.pressed = true;
+        this.getUIContext()?.animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+          this.pressed = true;
+        });
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.pressed = false;
+        this.getUIContext()?.animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+          this.pressed = false;
+        });
       }
     })
     .onClick(() => this.handleClick())

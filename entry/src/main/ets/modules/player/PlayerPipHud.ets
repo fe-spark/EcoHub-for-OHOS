@@ -88,9 +88,9 @@ export struct PlayerPipHud {
         .width('100%')
         .alignItems(VerticalAlign.Center)
         .padding({
-          left: this.edge(4, this.leftInset),
-          right: this.edge(4, this.rightInset),
-          top: this.edge(4, this.topInset)
+          left: Math.max(12, this.leftInset + 8),
+          right: Math.max(12, this.rightInset + 8),
+          top: Math.max(10, this.topInset + 6)
         })
         .position({ x: 0, y: 0 })
         .zIndex(100)

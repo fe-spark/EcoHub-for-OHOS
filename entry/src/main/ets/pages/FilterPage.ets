@@ -491,8 +491,6 @@ struct FilterPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
     .onTouch((event: TouchEvent) => {
       this.handleTouch(event);
     })

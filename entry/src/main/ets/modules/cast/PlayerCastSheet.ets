@@ -33,6 +33,7 @@ struct PlayerCastPicker {
   @State private errorText: string = '';
   @State private casting: boolean = false;
 
+  @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
   @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
   @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
   @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
@@ -159,6 +160,14 @@ struct PlayerCastPicker {
 
   build() {
     Column() {
+      if (!this.isLandscape()) {
+        Row()
+          .width(36)
+          .height(4)
+          .borderRadius(2)
+          .backgroundColor('rgba(255, 255, 255, 0.22)')
+          .margin({ top: 8, bottom: 14 })
+      }
       Row() {
         Text('投屏到电视')
           .fontSize(16)
@@ -252,20 +261,22 @@ struct PlayerCastPicker {
           }, (device: DlnaDevice) => device.usn)
         }
         .width('100%')
-        .constraintSize({ maxHeight: this.isLandscape() ? 140 : 280 })
+        .constraintSize({ maxHeight: this.isLandscape() ? '100%' : 280 })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.None)
       }
     }
-    .width('100%')
+    .width(this.isLandscape() ? 320 : '100%')
+    .height(this.isLandscape() ? '100%' : undefined)
     .padding({
-      left: AppTheme.SPACE_LG + this.leftInset,
-      right: AppTheme.SPACE_LG + this.rightInset,
-      top: 16,
+      left: 20 + this.leftInset,
+      right: 20 + this.rightInset,
+      top: this.isLandscape() ? Math.max(16, this.topInset + 12) : 4,
       bottom: Math.max(24, this.bottomInset + 12)
     })
-    .backgroundColor('#191B20')
-    .borderRadius({ topLeft: 20, topRight: 20 })
+    .backgroundColor(this.isLandscape() ? 'rgba(20, 22, 28, 0.96)' : '#1A1C23')
+    .borderRadius(this.isLandscape() ? { topLeft: 16, bottomLeft: 16 } : { topLeft: 24, topRight: 24 })
+    .border(this.isLandscape() ? { width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' } : { width: { top: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
   }
 }
 
@@ -296,7 +307,14 @@ export struct PlayerCastSheet {
     this.open();
   }
 
+  private isLandscape(): boolean {
+    const w = AppStorage.get<number>('WINDOW_WIDTH') || 0;
+    const h = AppStorage.get<number>('WINDOW_HEIGHT') || 0;
+    return w > h && h > 0;
+  }
+
   private open(): void {
+    const isLand = this.isLandscape();
     this.dialog = new CustomDialogController({
       builder: PlayerCastPicker({
         mediaUrl: this.mediaUrl,
@@ -313,10 +331,10 @@ export struct PlayerCastSheet {
         }
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Center,
+      alignment: isLand ? DialogAlignment.BottomEnd : DialogAlignment.Bottom,
       customStyle: true,
       backgroundColor: Color.Transparent,
-      maskColor: 'rgba(0,0,0,0.52)',
+      maskColor: isLand ? 'rgba(0, 0, 0, 0.36)' : 'rgba(0, 0, 0, 0.50)',
       cancel: () => {
         this.dialog = null;
         this.onClosed();

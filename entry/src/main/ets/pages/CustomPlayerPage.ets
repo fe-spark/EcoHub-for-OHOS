@@ -261,8 +261,6 @@ struct CustomPlayerPage {
     }
     .width('100%')
     .height('100%')
-    .clip(true)
-    .renderGroup(true)
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
   }
 }

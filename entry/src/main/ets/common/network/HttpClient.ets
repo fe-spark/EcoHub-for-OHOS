@@ -287,6 +287,7 @@ export class HttpClient {
           await ServerCompat.getInstance().updateFromProvideApp(res.data as Object, ServerConfigManager.hostScope(origin));
           return { ok: true };
         }
+        throw new Error(res.msg || '软件源响应异常');
       } catch (appErr) {
         const msg = (appErr instanceof Error) ? appErr.message : '';
         const lower = msg.toLowerCase();

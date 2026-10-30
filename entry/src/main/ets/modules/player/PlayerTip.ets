@@ -78,6 +78,7 @@ export struct PlayerLoadingCard {
   @Prop @Watch('onVisibleChange') visible: boolean = false;
   @Prop @Watch('onAllowRetryChange') allowRetry: boolean = false;
   @Prop @Watch('onOpeningChange') opening: boolean = false;
+  @Prop seeking: boolean = false;
   onRetry?: () => void;
 
   @State private showCard: boolean = false;
@@ -191,7 +192,7 @@ export struct PlayerLoadingCard {
       if (this.showCard) {
         return;
       }
-      const delay = this.opening ? 0 : PlayerLoadingCard.DEBOUNCE_DELAY_MS;
+      const delay = (this.opening || this.seeking) ? 0 : PlayerLoadingCard.DEBOUNCE_DELAY_MS;
       if (delay === 0) {
         this.doShow();
         return;
@@ -232,7 +233,7 @@ export struct PlayerLoadingCard {
             .width(PlayerLoadingCard.PROGRESS_SIZE)
             .height(PlayerLoadingCard.PROGRESS_SIZE)
             .color(AppTheme.TEXT_PRIMARY)
-          Text(this.opening ? '正在打开...' : '加载中...')
+          Text('加载中...')
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(AppTheme.TEXT_PRIMARY)
@@ -336,126 +337,322 @@ export struct PlayerSpeedDialog {
   controller?: CustomDialogController
   speedLabel: string = '1.0x'
   onPickSpeed: (index: number) => void = (_index: number) => {}
+  @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
+  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
+  @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
+
+  private isLandscape(): boolean {
+    return this.windowWidth > this.windowHeight && this.windowHeight > 0;
+  }
 
   build() {
-    Column() {
-      Row() {
-        Text('播放速度')
-          .fontSize(16)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-        Blank()
-        Text(`当前 ${this.speedLabel}`)
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.ACCENT)
-      }
-      .width('100%')
-      Text('点击后立即生效')
-        .fontSize(12)
-        .fontColor('rgba(255,255,255,0.55)')
-        .margin({ top: 6, bottom: 12 })
-        .width('100%')
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
-          Text(label)
-            .fontSize(14)
+    if (this.isLandscape()) {
+      // 横屏/全屏：移动端最流行的右侧浮层面板 (Right Drawer)
+      Column() {
+        Row() {
+          Text('播放速度')
+            .fontSize(16)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-            .width(80)
-            .height(40)
-            .textAlign(TextAlign.Center)
-            .margin({ right: 8, bottom: 8 })
-            .backgroundColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255,255,255,0.08)')
-            .borderRadius(12)
-            .onClick(() => {
-              this.onPickSpeed(index)
-              if (this.controller) {
-                this.controller.close()
+            .fontColor(AppTheme.TEXT_PRIMARY)
+          Blank()
+          Row() {
+            Text(this.speedLabel)
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.ACCENT)
+          }
+          .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+          .backgroundColor(AppTheme.ACCENT_SOFT)
+          .borderRadius(AppTheme.RADIUS_PILL)
+        }
+        .width('100%')
+        .padding({ bottom: 16 })
+
+        List({ space: 6 }) {
+          ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
+            ListItem() {
+              Row() {
+                Text(label === '1.0x' ? '1.0x (正常)' : label)
+                  .fontSize(14)
+                  .fontWeight(this.speedLabel === label ? FontWeight.Bold : FontWeight.Medium)
+                  .fontColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.90)')
+                Blank()
+                if (this.speedLabel === label) {
+                  SymbolGlyph($r('sys.symbol.checkmark'))
+                    .fontSize(16)
+                    .fontColor([AppTheme.ACCENT])
+                    .fontWeight(FontWeight.Bold)
+                }
               }
-            })
-        }, (label: string) => `spd_${label}`)
+              .width('100%')
+              .height(44)
+              .padding({ left: 16, right: 16 })
+              .backgroundColor(this.speedLabel === label ? 'rgba(250, 140, 22, 0.12)' : 'rgba(255, 255, 255, 0.05)')
+              .borderRadius(AppTheme.RADIUS_MD)
+              .border({
+                width: 1,
+                color: this.speedLabel === label ? 'rgba(250, 140, 22, 0.36)' : 'rgba(255, 255, 255, 0.06)'
+              })
+              .onClick(() => {
+                this.onPickSpeed(index);
+                if (this.controller) {
+                  this.controller.close();
+                }
+              })
+            }
+          }, (label: string) => `spd_l_${label}`)
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
+      }
+      .width(280)
+      .height('100%')
+      .padding({
+        top: Math.max(16, this.topInset + 12),
+        bottom: Math.max(16, this.bottomInset + 12),
+        left: 20,
+        right: Math.max(20, this.rightInset + 12)
+      })
+      .backgroundColor('rgba(20, 22, 28, 0.96)')
+      .borderRadius({ topLeft: 16, bottomLeft: 16 })
+      .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
+    } else {
+      // 竖屏/半屏：移动端标准的底部平滑抽屉 (Bottom Sheet)
+      Column() {
+        Row()
+          .width(36)
+          .height(4)
+          .borderRadius(2)
+          .backgroundColor('rgba(255, 255, 255, 0.22)')
+          .margin({ top: 8, bottom: 14 })
+
+        Row() {
+          Text('播放速度')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+          Blank()
+          Row() {
+            Text(`当前 ${this.speedLabel}`)
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.ACCENT)
+          }
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .backgroundColor(AppTheme.ACCENT_SOFT)
+          .borderRadius(AppTheme.RADIUS_PILL)
+        }
+        .width('100%')
+        .margin({ bottom: 16 })
+
+        GridRow({ columns: 4, gutter: { x: 8, y: 8 } }) {
+          ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
+            GridCol() {
+              Row() {
+                Text(label)
+                  .fontSize(14)
+                  .fontWeight(this.speedLabel === label ? FontWeight.Bold : FontWeight.Medium)
+                  .fontColor(this.speedLabel === label ? '#FFFFFF' : AppTheme.TEXT_PRIMARY)
+              }
+              .width('100%')
+              .height(40)
+              .justifyContent(FlexAlign.Center)
+              .backgroundColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.07)')
+              .borderRadius(AppTheme.RADIUS_MD)
+              .border({
+                width: 1,
+                color: this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
+              })
+              .onClick(() => {
+                this.onPickSpeed(index);
+                if (this.controller) {
+                  this.controller.close();
+                }
+              })
+            }
+          }, (label: string) => `spd_p_${label}`)
+        }
+        .width('100%')
       }
       .width('100%')
+      .padding({
+        left: 20,
+        right: 20,
+        bottom: Math.max(24, this.bottomInset + 12)
+      })
+      .backgroundColor('#1A1C23')
+      .borderRadius({ topLeft: 24, topRight: 24 })
+      .border({ width: { top: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
     }
-    .width('100%')
-    .padding({ left: 16, right: 16, top: 16, bottom: 24 })
-    .backgroundColor('#191B20')
-    .borderRadius({ topLeft: 20, topRight: 20 })
   }
 }
 
 @CustomDialog
 export struct PlayerScaleDialog {
-  private static readonly ITEM_WIDTH: number = 96;
-  private static readonly ITEM_HEIGHT: number = 48;
-  private static readonly ITEM_SPACE: number = 2;
-  private static readonly TITLE_SIZE: number = 16;
-  private static readonly SUBTITLE_SIZE: number = 12;
-  private static readonly LABEL_SIZE: number = 14;
-  private static readonly DESC_SIZE: number = 11;
-  private static readonly CURRENT_LABEL_SIZE: number = 13;
-  private static readonly DIALOG_RADIUS_TOP: number = 20;
-  private static readonly DIALOG_BG_COLOR: string = '#191B20';
-  private static readonly DESC_COLOR_ACTIVE: string = 'rgba(255, 255, 255, 0.85)';
-  private static readonly DESC_COLOR_INACTIVE: string = 'rgba(255, 255, 255, 0.45)';
-  private static readonly ITEM_BG_INACTIVE: string = 'rgba(255, 255, 255, 0.08)';
-
   controller?: CustomDialogController
   scaleMode: number = PlayerScaleMode.FIT
   isPortrait: boolean = false
   onPickScale: (mode: number) => void = (_mode: number) => {}
+  @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
+  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
+  @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
+
+  private isLandscape(): boolean {
+    return this.windowWidth > this.windowHeight && this.windowHeight > 0;
+  }
 
   build() {
-    Column() {
-      Row() {
-        Text('画面填充')
-          .fontSize(PlayerScaleDialog.TITLE_SIZE)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.TEXT_PRIMARY)
-        Blank()
-        Text(`当前 ${PlayerScale.label(this.scaleMode, this.isPortrait)}`)
-          .fontSize(PlayerScaleDialog.CURRENT_LABEL_SIZE)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.ACCENT)
-      }
-      .width('100%')
-      Text('播放画面比例与填充方式')
-        .fontSize(PlayerScaleDialog.SUBTITLE_SIZE)
-        .fontColor(AppTheme.TEXT_SECONDARY)
-        .margin({ top: AppTheme.SPACE_XS, bottom: AppTheme.SPACE_MD })
-        .width('100%')
-      Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(PlayerScale.items(this.isPortrait), (item: PlayerScaleItem) => {
-          Column({ space: PlayerScaleDialog.ITEM_SPACE }) {
-            Text(item.label)
-              .fontSize(PlayerScaleDialog.LABEL_SIZE)
+    if (this.isLandscape()) {
+      // 横屏/全屏：移动端最流行的右侧浮层面板 (Right Drawer)
+      Column() {
+        Row() {
+          Text('画面填充')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+          Blank()
+          Row() {
+            Text(PlayerScale.label(this.scaleMode, this.isPortrait))
+              .fontSize(12)
               .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_PRIMARY)
-            Text(item.desc)
-              .fontSize(PlayerScaleDialog.DESC_SIZE)
-              .fontColor(this.scaleMode === item.mode ? PlayerScaleDialog.DESC_COLOR_ACTIVE : PlayerScaleDialog.DESC_COLOR_INACTIVE)
+              .fontColor(AppTheme.ACCENT)
           }
-          .width(PlayerScaleDialog.ITEM_WIDTH)
-          .height(PlayerScaleDialog.ITEM_HEIGHT)
-          .justifyContent(FlexAlign.Center)
-          .alignItems(HorizontalAlign.Center)
-          .margin({ right: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_SM })
-          .backgroundColor(this.scaleMode === item.mode ? AppTheme.ACCENT : PlayerScaleDialog.ITEM_BG_INACTIVE)
-          .borderRadius(AppTheme.RADIUS_LG)
-          .onClick(() => {
-            this.onPickScale(item.mode);
-            if (this.controller) {
-              this.controller.close();
+          .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+          .backgroundColor(AppTheme.ACCENT_SOFT)
+          .borderRadius(AppTheme.RADIUS_PILL)
+        }
+        .width('100%')
+        .padding({ bottom: 16 })
+
+        List({ space: 10 }) {
+          ForEach(PlayerScale.items(this.isPortrait), (item: PlayerScaleItem) => {
+            ListItem() {
+              Row() {
+                Column({ space: 3 }) {
+                  Text(item.label)
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(this.scaleMode === item.mode ? AppTheme.ACCENT : AppTheme.TEXT_PRIMARY)
+                  Text(item.desc)
+                    .fontSize(11)
+                    .fontColor(this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.85)' : AppTheme.TEXT_MUTED)
+                }
+                .alignItems(HorizontalAlign.Start)
+
+                Blank()
+                if (this.scaleMode === item.mode) {
+                  SymbolGlyph($r('sys.symbol.checkmark'))
+                    .fontSize(16)
+                    .fontColor([AppTheme.ACCENT])
+                    .fontWeight(FontWeight.Bold)
+                }
+              }
+              .width('100%')
+              .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+              .backgroundColor(this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.12)' : 'rgba(255, 255, 255, 0.05)')
+              .borderRadius(AppTheme.RADIUS_MD)
+              .border({
+                width: 1,
+                color: this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.36)' : 'rgba(255, 255, 255, 0.06)'
+              })
+              .onClick(() => {
+                this.onPickScale(item.mode);
+                if (this.controller) {
+                  this.controller.close();
+                }
+              })
             }
-          })
-        }, (item: PlayerScaleItem) => `scale_${item.mode}_${item.label}_${this.scaleMode === item.mode ? '1' : '0'}`)
+          }, (item: PlayerScaleItem) => `scale_l_${item.mode}`)
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
+      }
+      .width(280)
+      .height('100%')
+      .padding({
+        top: Math.max(16, this.topInset + 12),
+        bottom: Math.max(16, this.bottomInset + 12),
+        left: 20,
+        right: Math.max(20, this.rightInset + 12)
+      })
+      .backgroundColor('rgba(20, 22, 28, 0.96)')
+      .borderRadius({ topLeft: 16, bottomLeft: 16 })
+      .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
+    } else {
+      // 竖屏/半屏：移动端标准的底部平滑抽屉 (Bottom Sheet)
+      Column() {
+        Row()
+          .width(36)
+          .height(4)
+          .borderRadius(2)
+          .backgroundColor('rgba(255, 255, 255, 0.22)')
+          .margin({ top: 8, bottom: 14 })
+
+        Row() {
+          Text('画面填充')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.TEXT_PRIMARY)
+          Blank()
+          Row() {
+            Text(`当前 ${PlayerScale.label(this.scaleMode, this.isPortrait)}`)
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.ACCENT)
+          }
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .backgroundColor(AppTheme.ACCENT_SOFT)
+          .borderRadius(AppTheme.RADIUS_PILL)
+        }
+        .width('100%')
+        .margin({ bottom: 16 })
+
+        Row({ space: 10 }) {
+          ForEach(PlayerScale.items(this.isPortrait), (item: PlayerScaleItem) => {
+            Column({ space: 4 }) {
+              Text(item.label)
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.scaleMode === item.mode ? AppTheme.ACCENT : AppTheme.TEXT_PRIMARY)
+              Text(item.desc)
+                .fontSize(11)
+                .fontColor(this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.85)' : AppTheme.TEXT_MUTED)
+            }
+            .layoutWeight(1)
+            .height(56)
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .backgroundColor(this.scaleMode === item.mode ? AppTheme.ACCENT_SOFT : 'rgba(255, 255, 255, 0.07)')
+            .borderRadius(AppTheme.RADIUS_MD)
+            .border({
+              width: 1,
+              color: this.scaleMode === item.mode ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
+            })
+            .onClick(() => {
+              this.onPickScale(item.mode);
+              if (this.controller) {
+                this.controller.close();
+              }
+            })
+          }, (item: PlayerScaleItem) => `scale_p_${item.mode}`)
+        }
+        .width('100%')
       }
       .width('100%')
+      .padding({
+        left: 20,
+        right: 20,
+        bottom: Math.max(24, this.bottomInset + 12)
+      })
+      .backgroundColor('#1A1C23')
+      .borderRadius({ topLeft: 24, topRight: 24 })
+      .border({ width: { top: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
     }
-    .width('100%')
-    .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG, top: AppTheme.SPACE_LG, bottom: AppTheme.SPACE_XL })
-    .backgroundColor(PlayerScaleDialog.DIALOG_BG_COLOR)
-    .borderRadius({ topLeft: PlayerScaleDialog.DIALOG_RADIUS_TOP, topRight: PlayerScaleDialog.DIALOG_RADIUS_TOP })
   }
 }

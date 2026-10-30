@@ -197,14 +197,17 @@ export struct PlayerSkin {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
           .margin({ left: 4, right: 8 })
-        this.skipBtns()
-        this.pipEntry()
+        Row({ space: 4 }) {
+          this.skipBtns()
+          this.castEntry()
+          this.pipEntry()
+        }
       }
       .width('100%')
       .padding({
-        left: this.edge(8, this.leftInset),
-        right: this.edge(8, this.rightInset),
-        top: this.edge(8, this.topInset),
+        left: Math.max(8, this.leftInset + 4),
+        right: Math.max(8, this.rightInset + 4),
+        top: Math.max(8, this.topInset + 4),
         bottom: 8
       })
       .alignItems(VerticalAlign.Center)
@@ -219,8 +222,8 @@ export struct PlayerSkin {
   playToggle() {
     PlayerIconBtn({
       src: this.continuing() ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'),
-      iconSize: 22,
-      boxSize: 44,
+      iconSize: 20,
+      boxSize: 40,
       onTap: this.onPlay
     })
   }
@@ -230,7 +233,7 @@ export struct PlayerSkin {
     if (this.castDeviceName) {
       PlayerIconBtn({
         src: $r('sys.symbol.power'),
-        iconSize: 18,
+        iconSize: 20,
         boxSize: 40,
         iconColor: AppTheme.DANGER,
         onTap: this.onStopCast
@@ -294,15 +297,15 @@ export struct PlayerSkin {
             PlayerIconBtn({
               src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
               iconSize: 20,
-              boxSize: 44,
+              boxSize: 40,
               onTap: this.onMute
             })
             if (!this.castDeviceName) {
               PlayerIconBtn({
                 src: this.isFull ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') :
                   $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-                iconSize: 18,
-                boxSize: 44,
+                iconSize: 20,
+                boxSize: 40,
                 onTap: this.onFull
               })
             }
@@ -313,10 +316,10 @@ export struct PlayerSkin {
         }
         .width('100%')
         .padding({
-          left: this.edge(4, this.leftInset),
-          right: this.edge(4, this.rightInset),
-          bottom: this.edge(8, this.bottomInset),
-          top: 4
+          left: Math.max(14, this.leftInset + 10),
+          right: Math.max(14, this.rightInset + 10),
+          bottom: Math.max(12, this.bottomInset + 8),
+          top: 6
         })
         .linearGradient({
           angle: 180,
@@ -338,16 +341,20 @@ export struct PlayerSkin {
           if (!this.castDeviceName) {
             PlayerIconBtn({
               src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-              iconSize: 18,
-              boxSize: 44,
+              iconSize: 20,
+              boxSize: 40,
               onTap: this.onFull
             })
           }
         }
         .width('100%')
         .height(44)
-        .padding({ left: 2, right: 2 })
         .alignItems(VerticalAlign.Center)
+        .padding({
+          left: Math.max(10, this.leftInset + 6),
+          right: Math.max(10, this.rightInset + 6),
+          bottom: 6
+        })
         .linearGradient({
           angle: 180,
           colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
@@ -401,6 +408,7 @@ export struct PlayerSkin {
         reloadToken: this.reloadToken,
         visible: this.loading(),
         opening: this.opening,
+        seeking: this.seeking,
         allowRetry: this.canRetryLoad(),
         onRetry: this.onRetry
       })
@@ -479,13 +487,20 @@ export struct PlayerSkin {
             }
           }
           .width('100%')
+          .height(44 + this.topInset)
           .justifyContent(FlexAlign.SpaceBetween)
           .alignItems(VerticalAlign.Center)
           .padding({
-            left: this.edge(4, this.leftInset),
-            right: this.edge(4, this.rightInset),
-            top: this.edge(4, this.topInset)
+            left: Math.max(8, this.leftInset + 4),
+            right: Math.max(8, this.rightInset + 4),
+            top: this.topInset
           })
+          .linearGradient({
+            angle: 180,
+            colors: [['rgba(0,0,0,0.60)', 0], ['rgba(0,0,0,0.20)', 0.6], ['rgba(0,0,0,0)', 1]]
+          })
+          .opacity(this.showHud ? 1 : 0)
+          .animation({ duration: 200, curve: Curve.EaseInOut })
           .hitTestBehavior(HitTestMode.Transparent)
           .zIndex(999)
         }

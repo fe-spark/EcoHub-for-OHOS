@@ -139,9 +139,8 @@ export struct RecommendTab {
     .height(this.isWide() ? 35 : 32)
     .padding({ left: this.isWide() ? 8 : (AppTheme.SPACE_SM - 2), right: this.isWide() ? 13 : (AppTheme.SPACE_MD - 1) })
     .justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Center)
-    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.06)' : CAT_CHIP_BG)
-    .backdropBlur(20)
-    .borderRadius(AppTheme.RADIUS_PILL).clip(true)
+    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.05)')
+    .borderRadius(AppTheme.RADIUS_PILL)
     .border({ width: this.isWide() ? 0.8 : 0.8, color: this.isWide() ? 'rgba(255, 255, 255, 0.12)' : CAT_CHIP_BORDER })
     .onClick(() => { NavUtil.openFilter(section.nav.id); })
   }
@@ -456,7 +455,6 @@ export struct RecommendTab {
         })
         .width('100%')
         .height('100%')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
       }
 
       // 2. 状态栏安全区悬浮刷新指示器（位于内容之上，Header 之下）
@@ -468,8 +466,6 @@ export struct RecommendTab {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
     .onTouch((event: TouchEvent) => {
       this.handleTouch(event);

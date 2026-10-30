@@ -343,8 +343,6 @@ export struct DailyUpdatesTab {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
   }
 }

@@ -185,7 +185,5 @@ struct TipPage {
     })
     .alignItems(HorizontalAlign.Center)
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
   }
 }

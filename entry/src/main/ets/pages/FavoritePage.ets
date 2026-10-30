@@ -284,7 +284,5 @@ struct FavoritePage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
   }
 }

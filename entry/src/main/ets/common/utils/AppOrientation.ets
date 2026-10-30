@@ -34,7 +34,7 @@ export class AppOrientation {
     window.getLastWindow(ctx).then((win: window.Window) => {
       if (full) {
         WindowBar.requestBars(ctx, false);
-        const orientation = landscapeVideo ? window.Orientation.LANDSCAPE : window.Orientation.PORTRAIT;
+        const orientation = landscapeVideo ? window.Orientation.USER_ROTATION_LANDSCAPE : window.Orientation.USER_ROTATION_PORTRAIT;
         win.setPreferredOrientation(orientation).catch((err: Error) => {
           console.error(`[AppOrientation] 设置全屏横屏失败: ${JSON.stringify(err)}`);
         });

@@ -100,8 +100,8 @@ export struct VideoPlayer {
   private pageWasHidden: boolean = false;
   private sentW: number = 0;
   private sentH: number = 0;
-  private playerW: number = 1;
-  private playerH: number = 1;
+  @State private playerW: number = 0;
+  @State private playerH: number = 0;
 
   aboutToAppear() {
     this.castBridge.init(this.castHost());
@@ -156,6 +156,10 @@ export struct VideoPlayer {
       this.pipCoord.updateSize(w, h);
       if (this.observer) this.observer.handleVideoSize(w, h);
       this.scaleLabel = this.actions.scaleCtrl.label(this.state.isPortrait());
+      if (w > 0 && h > 0 && (this.videoWidth !== w || this.videoHeight !== h)) {
+        this.videoWidth = w;
+        this.videoHeight = h;
+      }
     };
     l.onStalled = (s) => { if (this.state.live()) { this.state.stalled = s; this.syncFromState(); } };
   }
@@ -474,9 +478,14 @@ export struct VideoPlayer {
         onClosed: () => this.closeCastDialog()
       })
     }
-    .width('100%').height('100%').backgroundColor('#000000').clip(true)
+    .width('100%').height('100%').backgroundColor('#000000')
     .onAreaChange((_old: Area, area: Area) => {
-      this.playerW = Number(area.width); this.playerH = Number(area.height);
+      const w = Number(area.width);
+      const h = Number(area.height);
+      if (w > 0 && h > 0 && (this.playerW !== w || this.playerH !== h)) {
+        this.playerW = w;
+        this.playerH = h;
+      }
       this.scaleLabel = this.actions.scaleCtrl.label(this.state.isPortrait());
     })
   }

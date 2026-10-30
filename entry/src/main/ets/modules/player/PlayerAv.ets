@@ -6,6 +6,7 @@ import {
   OnVideoSizeChangedListener,
   OnBufferingUpdateListener,
   OnSeekCompleteListener,
+  OnInfoListener,
   VideoCodecMode,
 } from '@ohos/ijkplayer';
 import { PlayerSpeed } from './PlayerSpeed';
@@ -263,6 +264,18 @@ export class PlayerAv {
       }
     };
     ijk.setOnSeekCompleteListener(onSeek);
+
+    const onInfo: OnInfoListener = {
+      onInfo: (what: number, _extra: number) => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        if (what === 701) {
+          this.listener.onStalled(true);
+        } else if (what === 702 || what === 3) {
+          this.listener.onStalled(false);
+        }
+      }
+    };
+    ijk.setOnInfoListener(onInfo);
 
     ijk.setMessageListener();
   }

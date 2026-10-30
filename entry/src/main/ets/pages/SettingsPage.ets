@@ -264,8 +264,6 @@ struct SettingsPage {
     .height('100%')
     .justifyContent(FlexAlign.Start)
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
     .padding({
       top: this.topInset,
       bottom: this.bottomInset,

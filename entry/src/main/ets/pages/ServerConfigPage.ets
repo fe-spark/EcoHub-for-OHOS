@@ -18,6 +18,7 @@ import { AppToast } from '../common/utils/AppToast';
 struct ServerConfigPage {
   @State serverUrl: string = '';
   @State isLoading: boolean = false;
+  @State private errorTip: string = '';
   @State private reconnect: boolean = false;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
@@ -126,14 +127,16 @@ struct ServerConfigPage {
 
   private async saveAndConnect() {
     this.showHistoryDialog = false;
+    this.errorTip = '';
     try {
       this.inputController.stopEditing();
     } catch (_e) {
     }
     const finalUrl = this.serverUrl.trim();
     if (!finalUrl) {
+      this.errorTip = '请输入软件源地址';
       try {
-        AppToast.show('请输入软件源地址');
+        AppToast.show(this.errorTip);
       } catch (_e) {
       }
       return;
@@ -142,8 +145,9 @@ struct ServerConfigPage {
     const res = await HttpClient.getInstance().testConnection(finalUrl);
     this.isLoading = false;
     if (!res.ok) {
+      this.errorTip = res.message || '无法连接该源，请检查地址';
       try {
-        AppToast.show(res.message || '无法连接该源，请检查地址');
+        AppToast.show(this.errorTip);
       } catch (_e) {
       }
       return;
@@ -162,16 +166,23 @@ struct ServerConfigPage {
     } catch (_e) {
     }
 
+    SourceGuard.notifyReconnected();
     const r = this.getUIContext().getRouter();
     try {
-      r.clear();
-    } catch (_e) {
+      await r.replaceUrl({ url: 'pages/Index' });
+      try {
+        r.clear();
+      } catch (_c) {}
+    } catch (routeErr) {
+      console.error('[ServerConfigPage] replaceUrl to Index failed:', JSON.stringify(routeErr));
+      try {
+        r.back();
+      } catch (_backErr) {
+        try {
+          await r.pushUrl({ url: 'pages/Index' });
+        } catch (_pushErr) {}
+      }
     }
-    try {
-      r.replaceUrl({ url: 'pages/Index' });
-    } catch (_e) {
-    }
-    SourceGuard.notifyReconnected();
   }
 
   build() {
@@ -274,6 +285,7 @@ struct ServerConfigPage {
                     .enterKeyType(EnterKeyType.Done)
                     .onChange((val: string) => {
                       this.serverUrl = val;
+                      this.errorTip = '';
                     })
                     .onSubmit(() => {
                       this.saveAndConnect();
@@ -292,6 +304,7 @@ struct ServerConfigPage {
                     .justifyContent(FlexAlign.Center)
                     .onClick(() => {
                       this.serverUrl = '';
+                      this.errorTip = '';
                     })
                   }
                 }
@@ -301,6 +314,14 @@ struct ServerConfigPage {
                 .backgroundColor(AppTheme.BG_CARD)
                 .borderRadius(AppTheme.RADIUS_MD)
 
+                if (this.errorTip) {
+                  Text(this.errorTip)
+                    .fontSize(11)
+                    .fontColor(AppTheme.DANGER)
+                    .margin({ top: 4 })
+                    .maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
                 Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
                   .width('100%')
                   .height(42)
@@ -393,6 +414,7 @@ struct ServerConfigPage {
                     .enterKeyType(EnterKeyType.Done)
                     .onChange((val: string) => {
                       this.serverUrl = val;
+                      this.errorTip = '';
                     })
                     .onSubmit(() => {
                       this.saveAndConnect();
@@ -411,6 +433,7 @@ struct ServerConfigPage {
                     .justifyContent(FlexAlign.Center)
                     .onClick(() => {
                       this.serverUrl = '';
+                      this.errorTip = '';
                     })
                   }
                 }
@@ -420,6 +443,14 @@ struct ServerConfigPage {
                 .backgroundColor(AppTheme.BG_CARD)
                 .borderRadius(AppTheme.RADIUS_MD)
                 .margin({ bottom: 14 })
+                if (this.errorTip) {
+                  Text(this.errorTip)
+                    .fontSize(12)
+                    .fontColor(AppTheme.DANGER)
+                    .margin({ bottom: 8 })
+                    .maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
 
                 Button(this.isLoading ? '正在连接...' : (this.reconnect ? '重新接入' : '开始观影'))
                   .width('100%')
@@ -578,6 +609,7 @@ struct ServerConfigPage {
                       .alignItems(VerticalAlign.Center)
                       .onClick(() => {
                         this.serverUrl = item;
+                        this.errorTip = '';
                         this.showHistoryDialog = false;
                       })
 
@@ -638,7 +670,5 @@ struct ServerConfigPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    .clip(true)
-    .renderGroup(true)
   }
 }

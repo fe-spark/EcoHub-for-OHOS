@@ -53,8 +53,8 @@ struct PlayPage {
   @State private viewH: number = 9;
   @State private playerFull: boolean = false;
   @State private playerActive: boolean = true;
-  @State private pageW: number = 0;
-  @State private pageH: number = 0;
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
   @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
   @StorageLink('SETTING_AUTO_PLAY_NEXT') private settingAutoPlayNext: boolean = true;
   private sourceName: string = '';
@@ -335,12 +335,9 @@ struct PlayPage {
   }
 
   private isWideScreen(): boolean {
-    if (this.pageW > 0 && this.pageH > 0) {
-      return this.pageW >= 600 && this.pageW > this.pageH;
-    }
-    const winW = Breakpoint.windowWidth();
-    const winH = Breakpoint.windowHeight();
-    return Breakpoint.isWide(this.widthBp) && winW > winH;
+    const w = this.windowWidth > 0 ? this.windowWidth : Breakpoint.windowWidth();
+    const h = this.windowHeight > 0 ? this.windowHeight : Breakpoint.windowHeight();
+    return w >= 600 && w > h;
   }
 
   private splitPlay(): boolean {
@@ -517,14 +514,6 @@ struct PlayPage {
       }
       .width('100%')
       .height('100%')
-      .onAreaChange((_old: Area, newArea: Area) => {
-        const w = Number(newArea.width);
-        const h = Number(newArea.height);
-        if (w > 0 && h > 0) {
-          this.pageW = w;
-          this.pageH = h;
-        }
-      })
       .padding({
         top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
         bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
@@ -535,8 +524,6 @@ struct PlayPage {
     }
     .width('100%')
     .height('100%')
-    .clip(true)
-    .renderGroup(true)
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
   }
 }
