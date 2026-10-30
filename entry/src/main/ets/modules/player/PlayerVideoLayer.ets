@@ -24,6 +24,7 @@ export struct PlayerVideoLayer {
   @Prop containerWidth: number = 0;
   @Prop containerHeight: number = 0;
   onSurfaceCreated?: (surfaceId: string) => void;
+  onXComponentLoad?: (context: object, surfaceId: string) => void;
   xComponentController: XComponentController = new XComponentController();
   @State private layerW: number = 0;
   @State private layerH: number = 0;
@@ -77,22 +78,26 @@ export struct PlayerVideoLayer {
       XComponent({
         id: PlayerVideoLayer.SURFACE_ID,
         type: XComponentType.SURFACE,
+        libraryname: 'ijkplayer_napi',
         controller: this.xComponentController
       })
         .width(this.letterbox() ? this.calcTargetWidth() : PlayerVideoLayer.FULL_PERCENT)
         .height(this.letterbox() ? this.calcTargetHeight() : PlayerVideoLayer.FULL_PERCENT)
         .hitTestBehavior(HitTestMode.None)
-        .onLoad(() => {
-            try {
-              const sId = this.xComponentController.getXComponentSurfaceId();
-              console.info(`[PlayerVideoLayer] XComponent onLoad 成功获取 surfaceId: ${sId}`);
-              if (sId && this.onSurfaceCreated) {
-                this.onSurfaceCreated(sId);
-              }
-            } catch (e) {
-              console.error(`[PlayerVideoLayer] 获取 surfaceId 异常: ${JSON.stringify(e)}`);
+        .onLoad((context) => {
+          if (this.onXComponentLoad && context) {
+            this.onXComponentLoad(context, PlayerVideoLayer.SURFACE_ID);
+          }
+          try {
+            const sId = this.xComponentController.getXComponentSurfaceId();
+            console.info(`[PlayerVideoLayer] XComponent onLoad 成功获取 surfaceId: ${sId}`);
+            if (sId && this.onSurfaceCreated) {
+              this.onSurfaceCreated(sId);
             }
-          })
+          } catch (e) {
+            console.error(`[PlayerVideoLayer] 获取 surfaceId 异常: ${JSON.stringify(e)}`);
+          }
+        })
 
       if (this.poster && (!this.ready || this.opening)) {
         Image(this.poster)

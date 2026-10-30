@@ -410,6 +410,7 @@ export struct VideoPlayer {
         poster: this.poster, ready: this.ready, opening: this.opening,
         videoWidth: this.videoWidth, videoHeight: this.videoHeight, scaleMode: this.scaleMode,
         containerWidth: this.playerW, containerHeight: this.playerH,
+        onXComponentLoad: (ctx: object, sId: string) => this.playerAv.setXComponentContext(ctx, sId),
         onSurfaceCreated: (sId: string) => this.playerAv.setSurface(sId)
       })
 

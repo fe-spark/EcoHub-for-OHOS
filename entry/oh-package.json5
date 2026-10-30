@@ -5,5 +5,10 @@
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {}
+  "dependencies": {
+    "@ohos/ijkplayer": "^2.0.13",
+    "@ohos/danmakuflamemaster": "^2.1.3"
+  },
+  "devDependencies": {},
+  "dynamicDependencies": {}
 }

@@ -1,8 +1,14 @@
-import { media } from '@kit.MediaKit';
-import { audio } from '@kit.AudioKit';
+import {
+  IjkMediaPlayer,
+  OnPreparedListener,
+  OnCompletionListener,
+  OnErrorListener,
+  OnVideoSizeChangedListener,
+  OnBufferingUpdateListener,
+  OnSeekCompleteListener,
+} from '@ohos/ijkplayer';
 import { PlayerSpeed } from './PlayerSpeed';
 import { PlayerPlayableUrl } from './PlayerPlayableUrl';
-import { PlayerScale, PlayerScaleMode } from './PlayerScale';
 
 export class PlayerAvListener {
   onPrepared: (duration: number) => void = (_duration: number) => {};
@@ -17,47 +23,47 @@ export class PlayerAvListener {
   onVideoSize: (width: number, height: number) => void = (_width: number, _height: number) => {};
 }
 
-class PendingSeek {
-  seq: number = 0;
-  timeSec: number = 0;
-
-  constructor(seq: number, timeSec: number) {
-    this.seq = seq;
-    this.timeSec = timeSec;
-  }
-}
-
+/**
+ * 基于 ijkplayer (FFmpeg 内核) 的高性能音视频播放驱动
+ */
 export class PlayerAv {
   static readonly MS_PER_SEC: number = 1000;
 
   readonly listener: PlayerAvListener = new PlayerAvListener();
-  private player: media.AVPlayer | undefined = undefined;
+  private ijk: IjkMediaPlayer | undefined = undefined;
+  private xContext: object | undefined = undefined;
   private surfaceId: string = '';
   private url: string = '';
   private gen: number = 0;
-  private speedIndex: number = 1;
-  private scaleMode: number = PlayerScaleMode.FIT;
+  private speedIndex: number = PlayerSpeed.DEFAULT_INDEX;
   private muted: boolean = false;
-  private pendingPrepare: boolean = false;
   private seekGen: number = 0;
-  private pendingSeeks: PendingSeek[] = [];
+  private progressTimer: number = -1;
+
+  setXComponentContext(context: object, surfaceId: string): void {
+    console.info(`[PlayerAv] setXComponentContext: ${surfaceId}`);
+    this.xContext = context;
+    this.surfaceId = surfaceId;
+    if (this.ijk && context && surfaceId) {
+      try {
+        this.ijk.setContext(context, surfaceId);
+        this.ijk.native_setup();
+      } catch (err) {
+        console.error(`[PlayerAv] setXComponentContext 异常: ${JSON.stringify(err)}`);
+      }
+    }
+  }
 
   setSurface(id: string): void {
-    console.info(`[PlayerAv] setSurface id: ${id}, hasPlayer: ${!!this.player}, pending: ${this.pendingPrepare}`);
+    console.info(`[PlayerAv] setSurface: ${id}`);
     this.surfaceId = id;
-    const player = this.player;
-    if (!player || !id) {
-      return;
-    }
-    if (this.pendingPrepare) {
-      this.pendingPrepare = false;
-      this.prepareWithSurface(player, id);
-      return;
-    }
-    try {
-      player.surfaceId = id;
-    } catch (err) {
-      console.error(`[PlayerAv] 重新绑定 surface 失败: ${JSON.stringify(err)}`);
+    if (this.ijk && this.xContext && id) {
+      try {
+        this.ijk.setContext(this.xContext, id);
+        this.ijk.native_setup();
+      } catch (err) {
+        console.error(`[PlayerAv] setSurface 异常: ${JSON.stringify(err)}`);
+      }
     }
   }
 
@@ -71,303 +77,234 @@ export class PlayerAv {
     this.applyVolume();
   }
 
-  setScaleMode(mode: number): void {
-    this.scaleMode = mode;
-    this.applyScale();
-  }
-
-  private applyScale(): void {
-    const player = this.player;
-    if (!player) {
-      return;
-    }
-    try {
-      if (this.scaleMode === PlayerScaleMode.COVER) {
-        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT_CROP;
-      } else if (this.scaleMode === PlayerScaleMode.STRETCH) {
-        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
-      } else if (PlayerScale.useNativeAspect()) {
-        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_SCALED_ASPECT;
-      } else {
-        player.videoScaleType = media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
-      }
-    } catch (_err) {
-      try {
-        player.videoScaleType = this.scaleMode === PlayerScaleMode.COVER ?
-          media.VideoScaleType.VIDEO_SCALE_TYPE_FIT_CROP : media.VideoScaleType.VIDEO_SCALE_TYPE_FIT;
-      } catch (_again) {
-      }
-    }
+  setScaleMode(_mode: number): void {
+    // 画面比例由 PlayerVideoLayer 外层容器与 XComponent 布局自适应控制
   }
 
   async open(url: string): Promise<void> {
     const gen = ++this.gen;
-    console.info(`[VideoLink] 原始地址: ${url}`);
+    console.info(`[PlayerAv] ijkplayer 开始打开: ${url}`);
+    this.stopProgressTimer();
     await this.resetPlayer();
-    if (gen !== this.gen) {
-      console.info(`[PlayerAv] open 时序被覆盖，丢弃: gen=${gen}, curGen=${this.gen}`);
+    if (gen !== this.gen || !url) {
       return;
     }
-    this.url = url;
-    if (!url) {
-      return;
-    }
+
+    let playable = url;
     try {
-      console.info(`[PlayerAv] 创建 media.createAVPlayer() ...`);
-      const player = await media.createAVPlayer();
-      if (gen !== this.gen) {
-        console.info(`[PlayerAv] 创建后已过期，释放`);
-        player.release();
-        return;
+      playable = await PlayerPlayableUrl.normalize(url);
+    } catch (_normErr) {}
+
+    if (gen !== this.gen) {
+      return;
+    }
+    this.url = playable;
+
+    try {
+      const ijk = IjkMediaPlayer.getInstance();
+      this.ijk = ijk;
+
+      if (this.xContext && this.surfaceId) {
+        ijk.setContext(this.xContext, this.surfaceId);
+        ijk.native_setup();
       }
-      this.player = player;
-      this.bind(player, gen);
-      let playable = url;
-      try {
-        playable = await PlayerPlayableUrl.normalize(url);
-      } catch (normErr) {
-        console.error(`[PlayerAv] 解析播放地址失败，使用原始地址: ${JSON.stringify(normErr)}`);
-      }
-      if (gen !== this.gen) {
-        console.info(`[PlayerAv] 地址解析期间已过期，交给新的 open 释放`);
-        return;
-      }
-      console.info(`[VideoLink] 实际播放: ${playable}`);
-      this.url = playable;
-      player.url = playable;
+
+      // 1. 配置 FFmpeg / ijkplayer 网络流与解码选项
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "1"); // 优先硬件加速
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", "1");   // 底层音频驱动
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "soundtouch", "1"); // 倍速变调补偿
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", "1");  // 弱网平滑丢帧防音画脱节
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", "1");  // 网络断线自愈
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", "15000000"); // 15s 超时
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", "1");
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", "EcoHub-OHOS");
+
+      // 2. 绑定事件监听
+      this.bindListeners(ijk, gen);
+
+      // 3. 设置播放源并预加载
+      ijk.setDataSource(playable);
+      ijk.prepareAsync();
     } catch (err) {
-      console.error(`[PlayerAv] 创建 AVPlayer 异常: ${JSON.stringify(err)}`);
+      console.error(`[PlayerAv] 创建 ijkplayer 异常: ${JSON.stringify(err)}`);
       if (gen === this.gen) {
         const msg = err instanceof Error ? (err.message || String(err)) : String(err);
-        this.listener.onError(msg || 'Unknown error');
+        this.listener.onError(msg || 'ijkplayer open error');
       }
     }
   }
 
   play(): void {
-    const player = this.player;
-    if (player && (player.state === 'prepared' || player.state === 'paused' || player.state === 'completed')) {
-      console.info(`[PlayerAv] 调用 player.play()`);
-      player.play();
+    const ijk = this.ijk;
+    if (ijk) {
+      console.info(`[PlayerAv] ijkplayer.start()`);
+      try {
+        ijk.start();
+        this.startProgressTimer();
+        this.listener.onStart();
+      } catch (err) {
+        console.error(`[PlayerAv] ijk.start 失败: ${JSON.stringify(err)}`);
+      }
     }
   }
 
   pause(): void {
-    const player = this.player;
-    if (player && player.state === 'playing') {
-      console.info(`[PlayerAv] 调用 player.pause()`);
-      player.pause();
+    const ijk = this.ijk;
+    if (ijk) {
+      console.info(`[PlayerAv] ijkplayer.pause()`);
+      try {
+        ijk.pause();
+        this.stopProgressTimer();
+        this.listener.onPause();
+      } catch (err) {
+        console.error(`[PlayerAv] ijk.pause 失败: ${JSON.stringify(err)}`);
+      }
     }
   }
 
   seek(timeSec: number): number {
-    const player = this.player;
-    if (!player) {
+    const ijk = this.ijk;
+    if (!ijk) {
       return 0;
     }
-    if (player.state !== 'prepared' && player.state !== 'playing' && player.state !== 'paused' &&
-      player.state !== 'completed') {
-      return 0;
-    }
-    const target = Math.max(0, timeSec);
+    const targetMs = Math.max(0, Math.floor(timeSec * PlayerAv.MS_PER_SEC));
     const seq = ++this.seekGen;
-    this.pendingSeeks.push(new PendingSeek(seq, target));
-    console.info(`[PlayerAv] 调用 player.seek(${target}s) seq=${seq}`);
+    console.info(`[PlayerAv] ijkplayer.seekTo(${timeSec}s / ${targetMs}ms) seq=${seq}`);
     try {
-      player.seek(Math.floor(target * PlayerAv.MS_PER_SEC), media.SeekMode.SEEK_CLOSEST);
+      ijk.seekTo(targetMs.toString());
       return seq;
     } catch (e) {
-      console.error(`[PlayerAv] 调用 player.seek 异常: ${JSON.stringify(e)}`);
-      this.removePendingSeek(seq);
+      console.error(`[PlayerAv] ijkplayer.seekTo 异常: ${JSON.stringify(e)}`);
       return 0;
     }
   }
 
-  abandonSeeksUpTo(seq: number): void {
-    if (seq <= 0) {
-      this.pendingSeeks = [];
-      return;
-    }
-    this.pendingSeeks = this.pendingSeeks.filter((pending: PendingSeek) => pending.seq > seq);
+  abandonSeeksUpTo(_seq: number): void {
+    // ijkplayer 内部维护精准 seek 队列
   }
 
   async release(): Promise<void> {
     this.gen++;
     this.url = '';
+    this.stopProgressTimer();
     await this.resetPlayer();
   }
 
-  private bind(player: media.AVPlayer, gen: number): void {
-    player.on('stateChange', (state: string) => {
-      console.info(`[PlayerAv] stateChange 回调 -> ${state}, gen: ${gen}/${this.gen}, surfaceId: ${this.surfaceId}`);
-      if (gen !== this.gen || this.player !== player) {
-        return;
-      }
-      if (state === 'initialized') {
-        try {
-          player.audioRendererInfo = {
-            content: audio.ContentType.CONTENT_TYPE_MOVIE,
-            usage: audio.StreamUsage.STREAM_USAGE_MEDIA,
-            rendererFlags: 0
-          };
-        } catch (_e) {}
-        if (this.surfaceId) {
-          this.prepareWithSurface(player, this.surfaceId);
-        } else {
-          console.info(`[PlayerAv] state=initialized 但 surfaceId 为空，进入 pendingPrepare 等待 setSurface`);
-          this.pendingPrepare = true;
-        }
-      } else if (state === 'prepared') {
-        const durationMs = player.duration;
-        const duration = durationMs > 0 ? durationMs / PlayerAv.MS_PER_SEC : 0;
-        console.info(`[PlayerAv] prepared 完成! duration: ${duration}s, 容器尺寸: ${player.width}x${player.height}`);
+  private bindListeners(ijk: IjkMediaPlayer, gen: number): void {
+    const onPrepared: OnPreparedListener = {
+      onPrepared: () => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        const durMs = ijk.getDuration();
+        const duration = durMs > 0 ? durMs / PlayerAv.MS_PER_SEC : 0;
+        console.info(`[PlayerAv] ijkplayer prepared! duration: ${duration}s`);
         this.applyVolume();
         this.applySpeed();
-        this.applyScale();
+        const w = ijk.getVideoWidth();
+        const h = ijk.getVideoHeight();
+        if (w > 0 && h > 0) {
+          this.listener.onVideoSize(w, h);
+        }
         this.listener.onPrepared(duration);
-      } else if (state === 'playing') {
-        console.info(`[PlayerAv] playing 状态开始`);
-        this.listener.onStart();
-      } else if (state === 'paused') {
-        console.info(`[PlayerAv] paused 状态暂停`);
-        this.listener.onPause();
-      } else if (state === 'completed') {
-        console.info(`[PlayerAv] completed 播放完成`);
+      }
+    };
+    ijk.setOnPreparedListener(onPrepared);
+
+    const onCompletion: OnCompletionListener = {
+      onCompletion: () => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        console.info(`[PlayerAv] ijkplayer 播放完成`);
+        this.stopProgressTimer();
         this.listener.onFinish();
-      } else if (state === 'error') {
-        console.error(`[PlayerAv] error 状态错误`);
-        this.listener.onError('AVPlayer State: error');
       }
-    });
-    player.on('videoSizeChange', (width: number, height: number) => {
-      if (gen !== this.gen) {
-        return;
+    };
+    ijk.setOnCompletionListener(onCompletion);
+
+    const onError: OnErrorListener = {
+      onError: (what: number, extra: number) => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        console.error(`[PlayerAv] ijkplayer onError: what=${what}, extra=${extra}`);
+        this.stopProgressTimer();
+        this.listener.onError(`播放异常 (${what}, ${extra})`);
       }
-      if (width > 0 && height > 0) {
-        console.info(`[PlayerAv] videoSizeChange 原生尺寸回调: ${width}x${height}`);
-        this.listener.onVideoSize(width, height);
-      }
-    });
-    player.on('timeUpdate', (time: number) => {
-      if (gen !== this.gen) {
-        return;
-      }
-      this.listener.onTime(time / PlayerAv.MS_PER_SEC);
-    });
-    player.on('seekDone', (timeMs: number) => {
-      if (gen !== this.gen) {
-        return;
-      }
-      const timeSec = timeMs >= 0 ? timeMs / PlayerAv.MS_PER_SEC : 0;
-      this.listener.onSeeked(timeSec, this.takePendingSeek(timeSec));
-    });
-    player.on('bufferingUpdate', (infoType: media.BufferingInfoType, value: number) => {
-      if (gen !== this.gen) {
-        return;
-      }
-      if (infoType === media.BufferingInfoType.CACHED_DURATION) {
-        this.listener.onBuffer(value / PlayerAv.MS_PER_SEC);
-      } else if (infoType === media.BufferingInfoType.BUFFERING_START) {
-        this.listener.onStalled(true);
-      } else if (infoType === media.BufferingInfoType.BUFFERING_END) {
-        this.listener.onStalled(false);
-      }
-    });
-    player.on('error', (err) => {
-      if (gen !== this.gen) {
-        return;
-      }
-      console.error(`[PlayerAv] player error: ${JSON.stringify(err)}`);
-      let detail = '';
-      if (err) {
-        const parts: string[] = [];
-        if (err.code !== undefined && err.code !== null) {
-          parts.push(`code: ${err.code}`);
+    };
+    ijk.setOnErrorListener(onError);
+
+    const onVideoSize: OnVideoSizeChangedListener = {
+      onVideoSizeChanged: (width: number, height: number) => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        if (width > 0 && height > 0) {
+          this.listener.onVideoSize(width, height);
         }
-        if (err.message) {
-          parts.push(`message: ${err.message}`);
-        }
-        detail = parts.length > 0 ? parts.join('\n') : String(err);
       }
-      this.listener.onError(detail || 'Unknown error');
-    });
+    };
+    ijk.setOnVideoSizeChangedListener(onVideoSize);
+
+    const onBuffer: OnBufferingUpdateListener = {
+      onBufferingUpdate: (percent: number) => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        this.listener.onBuffer(percent);
+      }
+    };
+    ijk.setOnBufferingUpdateListener(onBuffer);
+
+    const onSeek: OnSeekCompleteListener = {
+      onSeekComplete: () => {
+        if (gen !== this.gen || this.ijk !== ijk) return;
+        const curMs = ijk.getCurrentPosition();
+        const curSec = curMs > 0 ? curMs / PlayerAv.MS_PER_SEC : 0;
+        this.listener.onSeeked(curSec, this.seekGen);
+      }
+    };
+    ijk.setOnSeekCompleteListener(onSeek);
+
+    ijk.setMessageListener();
   }
 
-  private prepareWithSurface(player: media.AVPlayer, surfaceId: string): void {
-    try {
-      player.surfaceId = surfaceId;
-      player.prepare();
-    } catch (err) {
-      console.error(`[PlayerAv] prepareWithSurface 异常: ${JSON.stringify(err)}`);
-      const msg = err instanceof Error ? (err.message || String(err)) : String(err);
-      this.listener.onError(msg || 'Unknown error');
+  private startProgressTimer(): void {
+    this.stopProgressTimer();
+    this.progressTimer = setInterval(() => {
+      const ijk = this.ijk;
+      if (ijk && ijk.isPlaying()) {
+        const curMs = ijk.getCurrentPosition();
+        const curSec = curMs > 0 ? curMs / PlayerAv.MS_PER_SEC : 0;
+        this.listener.onTime(curSec);
+      }
+    }, 250);
+  }
+
+  private stopProgressTimer(): void {
+    if (this.progressTimer !== -1) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = -1;
     }
   }
 
   private applySpeed(): void {
-    const player = this.player;
-    if (!player) {
-      return;
-    }
-    if (player.state === 'prepared' || player.state === 'playing' || player.state === 'paused') {
-      player.setSpeed(PlayerSpeed.mediaSpeed(this.speedIndex));
-    }
+    const ijk = this.ijk;
+    if (!ijk) return;
+    try {
+      const rate = PlayerSpeed.of(this.speedIndex);
+      ijk.setSpeed(rate.toString());
+    } catch (_e) {}
   }
 
   private applyVolume(): void {
-    const player = this.player;
-    if (!player) {
-      return;
-    }
-    if (player.state === 'prepared' || player.state === 'playing' || player.state === 'paused' ||
-      player.state === 'completed') {
-      player.setVolume(this.muted ? 0 : 1);
-    }
-  }
-
-  private takePendingSeek(landedSec: number): number {
-    if (this.pendingSeeks.length === 0) {
-      return 0;
-    }
-    let best = 0;
-    let bestDist = Math.abs(this.pendingSeeks[0].timeSec - landedSec);
-    for (let i = 1; i < this.pendingSeeks.length; i++) {
-      const dist = Math.abs(this.pendingSeeks[i].timeSec - landedSec);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = i;
-      }
-    }
-    const matched: PendingSeek = this.pendingSeeks.splice(best, 1)[0];
-    return matched.seq;
-  }
-
-  private removePendingSeek(seq: number): void {
-    for (let i = this.pendingSeeks.length - 1; i >= 0; i--) {
-      if (this.pendingSeeks[i].seq === seq) {
-        this.pendingSeeks.splice(i, 1);
-        return;
-      }
-    }
+    const ijk = this.ijk;
+    if (!ijk) return;
+    try {
+      const vol = this.muted ? "0" : "1";
+      ijk.setVolume(vol, vol);
+    } catch (_e) {}
   }
 
   private async resetPlayer(): Promise<void> {
-    const player = this.player;
-    this.player = undefined;
-    this.pendingPrepare = false;
-    this.pendingSeeks = [];
-    if (!player) {
-      return;
-    }
+    const ijk = this.ijk;
+    this.ijk = undefined;
+    if (!ijk) return;
     try {
-      player.off('stateChange');
-      player.off('videoSizeChange');
-      player.off('timeUpdate');
-      player.off('seekDone');
-      player.off('bufferingUpdate');
-      player.off('error');
-      await player.release();
-    } catch (err) {
-    }
+      ijk.stop();
+      ijk.reset();
+      ijk.release();
+    } catch (_err) {}
   }
 }
