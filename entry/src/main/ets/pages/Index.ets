@@ -1,5 +1,5 @@
 import { ServerConfigManager } from '../services/ServerConfigManager';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
 import { FilmApi } from '../api/FilmApi';
@@ -272,8 +272,6 @@ struct Index {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         if (!this.ready) {
@@ -494,10 +492,9 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    }
-    }
-    .width('100%')
-    .height('100%')
+    .backgroundColor(AppTheme.BG)
+    .clip(true)
+    .renderGroup(true)
     .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }
 }

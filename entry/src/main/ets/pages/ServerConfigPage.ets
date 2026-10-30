@@ -10,7 +10,7 @@ import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppIcon } from '../components/common/AppIcon';
 import { BackIcon } from '../components/common/BackIcon';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { AppToast } from '../common/utils/AppToast';
 
 @Entry
@@ -175,8 +175,6 @@ struct ServerConfigPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Stack({ alignContent: Alignment.TopStart }) {
       // Main Page Column that pads away safe insets and the soft keyboard
       Column() {
@@ -640,10 +638,7 @@ struct ServerConfigPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
+    .clip(true)
+    .renderGroup(true)
   }
 }
-

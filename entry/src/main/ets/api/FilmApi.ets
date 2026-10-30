@@ -11,10 +11,10 @@ import {
   HomeData,
   MovieBasicInfo,
   PlayInfo,
+  DanmakuComment,
   SearchResult,
   SearchSourceTab
 } from '../types/FilmModels';
-
 export class FilmApi {
   private static siteConfig: BasicConfig | null = null;
   private static configPromise: Promise<BasicConfig> | null = null;
@@ -203,6 +203,36 @@ export class FilmApi {
       return ApiParser.parseMovies(res.data as Object[]);
     }
     return [];
+  }
+
+  static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuComment[]> {
+    if (!ServerCompat.getInstance().canDanmaku) {
+      return [];
+    }
+    const params = new QueryParams()
+      .set('mid', mid)
+      .set('episode', episode)
+      .set('title', title);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.DANMAKU), params);
+    if (res.code !== 0 || !Array.isArray(res.data)) {
+      return [];
+    }
+    const list: DanmakuComment[] = [];
+    const raw = res.data as Object[];
+    for (let i = 0; i < raw.length; i++) {
+      const row = ApiParser.asRecord(raw[i]);
+      const text = ApiParser.str(row, 'text');
+      if (!text) {
+        continue;
+      }
+      list.push({
+        text: text,
+        time: ApiParser.num(row, 'time'),
+        color: ApiParser.str(row, 'color', '#ffffff'),
+        mode: ApiParser.num(row, 'mode')
+      });
+    }
+    return list;
   }
 }
 

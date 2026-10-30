@@ -63,16 +63,7 @@ export class WindowBar {
     };
     win.setSpecificSystemBarEnabled('status', show, false).then(() => {
       win.setSpecificSystemBarEnabled('navigation', show, false).then(() => {
-        if (!show) {
-          finish();
-          return;
-        }
-        win.setWindowSystemBarEnable(['status', 'navigation']).then(() => {
-          finish();
-        }).catch((err: Error) => {
-          console.error(`[WindowBar] 显示系统栏失败: ${JSON.stringify(err)}`);
-          finish();
-        });
+        finish();
       }).catch((err: Error) => {
         console.error(`[WindowBar] 设置导航栏失败: ${JSON.stringify(err)}`);
         finish();
@@ -131,15 +122,9 @@ export class WindowBar {
     }
     WindowBar.listenedWin = win;
     WindowBar.onAvoid = (_data: window.AvoidAreaOptions) => {
-      if (WindowBar.avoidTimer !== -1) {
-        clearTimeout(WindowBar.avoidTimer);
+      if (WindowBar.listenedWin) {
+        WindowBar.notifyInsets(WindowBar.listenedWin);
       }
-      WindowBar.avoidTimer = setTimeout(() => {
-        WindowBar.avoidTimer = -1;
-        if (WindowBar.listenedWin) {
-          WindowBar.notifyInsets(WindowBar.listenedWin);
-        }
-      }, 80);
     };
     WindowBar.onSize = (size: Size) => {
       if (WindowBar.avoidTimer !== -1) {
@@ -173,17 +158,14 @@ export class WindowBar {
       const leftVp = uiContext.px2vp(left);
       const rightVp = uiContext.px2vp(right);
       const keyboardVp = uiContext.px2vp(keyboardHeight);
-      const turned = WindowBar.isTurned(WindowBar.pageAngle());
-      const mapped = WindowBar.mapInsets(topVp, turned ? bottomVp + keyboardVp : bottomVp, leftVp, rightVp);
-
-      AppStorage.setOrCreate<number>('SAFE_INSET_TOP', mapped.top);
-      AppStorage.setOrCreate<number>('SAFE_INSET_BOTTOM', mapped.bottom);
-      AppStorage.setOrCreate<number>('SAFE_INSET_LEFT', mapped.left);
-      AppStorage.setOrCreate<number>('SAFE_INSET_RIGHT', mapped.right);
-      AppStorage.setOrCreate<number>('KEYBOARD_HEIGHT', turned ? 0 : keyboardVp);
+      AppStorage.setOrCreate<number>('SAFE_INSET_TOP', topVp);
+      AppStorage.setOrCreate<number>('SAFE_INSET_BOTTOM', bottomVp);
+      AppStorage.setOrCreate<number>('SAFE_INSET_LEFT', leftVp);
+      AppStorage.setOrCreate<number>('SAFE_INSET_RIGHT', rightVp);
+      AppStorage.setOrCreate<number>('KEYBOARD_HEIGHT', keyboardVp);
 
       if (WindowBar.onInsets) {
-        WindowBar.onInsets(mapped.top, mapped.bottom, mapped.left, mapped.right);
+        WindowBar.onInsets(topVp, bottomVp, leftVp, rightVp);
       }
     } catch (err) {
       console.error('notifyInsets failed:', JSON.stringify(err));
@@ -269,59 +251,13 @@ export class WindowBar {
     }
     WindowBar.republish();
   }
-
-  private static pageAngle(): number {
-    const held = AppStorage.get<boolean>('APP_ROTATION_HELD') === true;
-    const frozen = AppStorage.get<number>('APP_FROZEN_ANGLE') ?? 0;
-    const sensor = AppStorage.get<number>('APP_DEVICE_ANGLE') ?? 0;
-    return held ? frozen : sensor;
-  }
-
-  private static isTurned(angle: number): boolean {
-    return angle === 90 || angle === -90 || angle === 270 || angle === -270;
-  }
-
   private static republish(): void {
     if (WindowBar.rawW <= 0 || WindowBar.rawH <= 0) {
       return;
     }
-    const turned = WindowBar.isTurned(WindowBar.pageAngle());
-    const width = turned ? WindowBar.rawH : WindowBar.rawW;
-    const height = turned ? WindowBar.rawW : WindowBar.rawH;
-    Breakpoint.publish(width, height);
+    Breakpoint.publish(WindowBar.rawW, WindowBar.rawH);
     if (WindowBar.onDisplay) {
-      WindowBar.onDisplay(WindowBar.leftInset(), WindowBar.rightInset(), width, height);
+      WindowBar.onDisplay(WindowBar.leftInset(), WindowBar.rightInset(), WindowBar.rawW, WindowBar.rawH);
     }
   }
-
-  private static mapInsets(top: number, bottom: number, left: number, right: number): EdgeInsets {
-    const angle = WindowBar.pageAngle();
-    const mapped = new EdgeInsets();
-    if (angle === 90 || angle === -270) {
-      mapped.top = right;
-      mapped.bottom = left;
-      mapped.left = top;
-      mapped.right = bottom;
-      return mapped;
-    }
-    if (angle === -90 || angle === 270) {
-      mapped.top = left;
-      mapped.bottom = right;
-      mapped.left = bottom;
-      mapped.right = top;
-      return mapped;
-    }
-    mapped.top = top;
-    mapped.bottom = bottom;
-    mapped.left = left;
-    mapped.right = right;
-    return mapped;
-  }
-}
-
-class EdgeInsets {
-  top: number = 0;
-  bottom: number = 0;
-  left: number = 0;
-  right: number = 0;
 }

@@ -18,6 +18,7 @@ import { PlayerActionCoordinator, PlayerActionHost } from './PlayerActionCoordin
 import { PlayerDialogHelper } from './PlayerDialogHelper';
 import { DlnaDevice } from '../../types/DlnaTypes';
 import { PlayerScaleMode } from './PlayerScale';
+
 import { PlayerAv } from './PlayerAv';
 import { AppToast } from '../../common/utils/AppToast';
 
@@ -45,6 +46,9 @@ export struct VideoPlayer {
   onNext?: () => void;
   onFullscreenChange?: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => void;
   onVideoSize?: (width: number, height: number) => void;
+  @Prop filmId: string = '';
+  @Prop episode: number = 1;
+  @Prop filmTitle: string = '';
 
   private static readonly PLAY_TOGGLE_DEBOUNCE_MS: number = 280;
 
@@ -410,9 +414,9 @@ export struct VideoPlayer {
         poster: this.poster, ready: this.ready, opening: this.opening,
         videoWidth: this.videoWidth, videoHeight: this.videoHeight, scaleMode: this.scaleMode,
         containerWidth: this.playerW, containerHeight: this.playerH,
-        onXComponentLoad: (ctx: object, sId: string) => this.playerAv.setXComponentContext(ctx, sId),
-        onSurfaceCreated: (sId: string) => this.playerAv.setSurface(sId)
+        onXComponentLoad: (ctx: object, sId: string) => this.playerAv.setXComponentContext(ctx, sId)
       })
+
 
       PlayerSpeedSheet({
         openSeq: this.speedOpenSeq, speedLabel: this.speedLabel,

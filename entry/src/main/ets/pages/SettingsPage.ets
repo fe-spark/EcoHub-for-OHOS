@@ -4,7 +4,7 @@ import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
 import { AppSettingsManager } from '../services/AppSettingsManager';
 import { common } from '@kit.AbilityKit';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { AppToast } from '../common/utils/AppToast';
 
 @Entry
@@ -104,8 +104,6 @@ struct SettingsPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Column() {
       PageHeader({ title: '设置' })
 
@@ -266,15 +264,13 @@ struct SettingsPage {
     .height('100%')
     .justifyContent(FlexAlign.Start)
     .backgroundColor(AppTheme.BG)
+    .clip(true)
+    .renderGroup(true)
     .padding({
       top: this.topInset,
       bottom: this.bottomInset,
       left: this.leftInset,
       right: this.rightInset
     })
-    }
-    }
-    .width('100%')
-    .height('100%')
   }
 }

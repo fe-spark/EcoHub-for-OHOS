@@ -56,18 +56,6 @@ export class PlayerAv {
     }
   }
 
-  setSurface(id: string): void {
-    console.info(`[PlayerAv] setSurface: ${id}`);
-    this.surfaceId = id;
-    if (this.pendingUrl && this.xContext) {
-      const url = this.pendingUrl;
-      const gen = this.pendingGen;
-      this.pendingUrl = '';
-      this.pendingGen = 0;
-      this.startPlayInternal(url, gen);
-    }
-  }
-
   setSpeedIndex(index: number): void {
     this.speedIndex = index;
     this.applySpeed();
@@ -122,11 +110,11 @@ export class PlayerAv {
       console.info(`[PlayerAv] startPlayInternal: ${playable}, surfaceId: ${this.surfaceId}`);
       const ijk = IjkMediaPlayer.getInstance();
       this.ijk = ijk;
+      ijk.setDebug(true);
 
       // 1. 绑定 XComponent 上下文并指定 SURFACE 硬件渲染模式（核心！必须为 SURFACE 才能渲染画面）
       ijk.setContext(this.xContext, this.surfaceId);
       ijk.native_setup(VideoCodecMode.SURFACE);
-
       // 2. 配置 FFmpeg / ijkplayer 选项
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "1"); // 硬件解码
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", "1");   // 音频驱动

@@ -1,4 +1,4 @@
-import { DialogTurn } from '../../components/common/DialogTurn';
+
 import { AppTheme } from '../../common/constants/AppTheme';
 import { DlnaClient } from './DlnaClient';
 import { DlnaDevice, DlnaScanState, soapErrorMessage } from '../../types/DlnaTypes';
@@ -158,7 +158,6 @@ struct PlayerCastPicker {
   }
 
   build() {
-    DialogTurn({ onBlank: () => { if (this.controller) { this.controller.close(); } } }) {
     Column() {
       Row() {
         Text('投屏到电视')
@@ -267,7 +266,6 @@ struct PlayerCastPicker {
     })
     .backgroundColor('#191B20')
     .borderRadius({ topLeft: 20, topRight: 20 })
-    }
   }
 }
 

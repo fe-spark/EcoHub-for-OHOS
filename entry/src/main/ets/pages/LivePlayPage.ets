@@ -1,5 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { HistoryManager } from '../services/HistoryManager';
@@ -396,7 +396,7 @@ struct LivePlayPage {
     })
       .width('100%')
       .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
-      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : this.frameRatio)
+      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
       .constraintSize({ maxHeight: '100%' })
   }
 
@@ -482,46 +482,47 @@ struct LivePlayPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
-    Column() {
-      if (this.loading && !this.sources.length) {
-        LoadingView({ label: '正在打开播放页' })
-      } else if (this.errorText && !this.sources.length) {
-        LivePlayErrorView({
-          filmName: this.name,
-          errorText: this.errorText,
-          isFavorite: this.isFav,
-          onBack: () => {
-            try { this.getUIContext().getRouter().back(); } catch (_e) {}
-          },
-          onRetry: () => { this.loadPlay(); },
-          onRemoveFavorite: () => { this.removeFavorite(); }
-        })
-      } else {
-        this.playBody()
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        if (this.loading && !this.sources.length) {
+          LoadingView({ label: '正在打开播放页' })
+        } else if (this.errorText && !this.sources.length) {
+          LivePlayErrorView({
+            filmName: this.name,
+            errorText: this.errorText,
+            isFavorite: this.isFav,
+            onBack: () => {
+              try { this.getUIContext().getRouter().back(); } catch (_e) {}
+            },
+            onRetry: () => { this.loadPlay(); },
+            onRemoveFavorite: () => { this.removeFavorite(); }
+          })
+        } else {
+          this.playBody()
+        }
       }
+      .width('100%')
+      .height('100%')
+      .onAreaChange((_old: Area, newArea: Area) => {
+        const w = Number(newArea.width);
+        const h = Number(newArea.height);
+        if (w > 0 && h > 0) {
+          this.pageW = w;
+          this.pageH = h;
+        }
+      })
+      .padding({
+        top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
+        bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
+        left: this.playerFull ? 0 : this.leftInset,
+        right: this.playerFull ? 0 : this.rightInset
+      })
+      .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
     }
     .width('100%')
     .height('100%')
-    .onAreaChange((_old: Area, newArea: Area) => {
-      const w = Number(newArea.width);
-      const h = Number(newArea.height);
-      if (w > 0 && h > 0) {
-        this.pageW = w;
-        this.pageH = h;
-      }
-    })
-    .padding({
-      top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
-      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
-      left: this.playerFull ? 0 : this.leftInset,
-      right: this.playerFull ? 0 : this.rightInset
-    })
+    .clip(true)
+    .renderGroup(true)
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
   }
 }

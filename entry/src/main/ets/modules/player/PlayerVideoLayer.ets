@@ -23,7 +23,6 @@ export struct PlayerVideoLayer {
   @Prop scaleMode: number = PlayerScaleMode.FIT;
   @Prop containerWidth: number = 0;
   @Prop containerHeight: number = 0;
-  onSurfaceCreated?: (surfaceId: string) => void;
   onXComponentLoad?: (context: object, surfaceId: string) => void;
   xComponentController: XComponentController = new XComponentController();
   @State private layerW: number = 0;
@@ -51,26 +50,50 @@ export struct PlayerVideoLayer {
     return { W, H, hasLayer, isPortrait, videoRatio, containerRatio };
   }
 
-  private calcTargetWidth(): string {
-    const d = this.getDimensions();
-    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0 || d.videoRatio >= d.containerRatio) {
+  private getTargetWidth(): string {
+    if (this.scaleMode === PlayerScaleMode.STRETCH) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    const pct = Math.min(100, (d.videoRatio / d.containerRatio) * 100);
-    return `${pct}%`;
-  }
-
-  private calcTargetHeight(): string {
     const d = this.getDimensions();
-    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0 || d.videoRatio < d.containerRatio) {
+    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    const pct = Math.min(100, (d.containerRatio / d.videoRatio) * 100);
-    return `${pct}%`;
+    if (this.scaleMode === PlayerScaleMode.COVER) {
+      if (d.videoRatio > d.containerRatio) {
+        const pct = (d.videoRatio / d.containerRatio) * 100;
+        return `${pct}%`;
+      }
+      return PlayerVideoLayer.FULL_PERCENT;
+    }
+    // FIT 适应保持比例
+    if (d.videoRatio < d.containerRatio) {
+      const pct = Math.min(100, (d.videoRatio / d.containerRatio) * 100);
+      return `${pct}%`;
+    }
+    return PlayerVideoLayer.FULL_PERCENT;
   }
 
-  private letterbox(): boolean {
-    return this.scaleMode === PlayerScaleMode.FIT && !PlayerScale.useNativeAspect();
+  private getTargetHeight(): string {
+    if (this.scaleMode === PlayerScaleMode.STRETCH) {
+      return PlayerVideoLayer.FULL_PERCENT;
+    }
+    const d = this.getDimensions();
+    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0) {
+      return PlayerVideoLayer.FULL_PERCENT;
+    }
+    if (this.scaleMode === PlayerScaleMode.COVER) {
+      if (d.videoRatio < d.containerRatio) {
+        const pct = (d.containerRatio / d.videoRatio) * 100;
+        return `${pct}%`;
+      }
+      return PlayerVideoLayer.FULL_PERCENT;
+    }
+    // FIT 适应保持比例
+    if (d.videoRatio > d.containerRatio) {
+      const pct = Math.min(100, (d.containerRatio / d.videoRatio) * 100);
+      return `${pct}%`;
+    }
+    return PlayerVideoLayer.FULL_PERCENT;
   }
 
   build() {
@@ -81,31 +104,31 @@ export struct PlayerVideoLayer {
         libraryname: 'ijkplayer_napi',
         controller: this.xComponentController
       })
-        .width(this.letterbox() ? this.calcTargetWidth() : PlayerVideoLayer.FULL_PERCENT)
-        .height(this.letterbox() ? this.calcTargetHeight() : PlayerVideoLayer.FULL_PERCENT)
+        .width(this.getTargetWidth())
+        .height(this.getTargetHeight())
         .hitTestBehavior(HitTestMode.None)
         .onLoad((context) => {
+          console.info(`[PlayerVideoLayer] XComponent onLoad, context=${!!context}`);
           if (this.onXComponentLoad && context) {
             this.onXComponentLoad(context, PlayerVideoLayer.SURFACE_ID);
           }
-          try {
-            const sId = this.xComponentController.getXComponentSurfaceId();
-            console.info(`[PlayerVideoLayer] XComponent onLoad 成功获取 surfaceId: ${sId}`);
-            if (sId && this.onSurfaceCreated) {
-              this.onSurfaceCreated(sId);
-            }
-          } catch (e) {
-            console.error(`[PlayerVideoLayer] 获取 surfaceId 异常: ${JSON.stringify(e)}`);
-          }
         })
 
-      if (this.poster && (!this.ready || this.opening)) {
-        Image(this.poster)
-          .width(PlayerVideoLayer.FULL_PERCENT)
-          .height(PlayerVideoLayer.FULL_PERCENT)
-          .objectFit(ImageFit.Contain)
-          .backgroundColor(PlayerVideoLayer.BG_COLOR)
-          .hitTestBehavior(HitTestMode.None)
+      if (!this.ready || this.opening) {
+        if (this.poster) {
+          Image(this.poster)
+            .width(PlayerVideoLayer.FULL_PERCENT)
+            .height(PlayerVideoLayer.FULL_PERCENT)
+            .objectFit(ImageFit.Contain)
+            .backgroundColor(PlayerVideoLayer.BG_COLOR)
+            .hitTestBehavior(HitTestMode.None)
+        } else {
+          Stack()
+            .width(PlayerVideoLayer.FULL_PERCENT)
+            .height(PlayerVideoLayer.FULL_PERCENT)
+            .backgroundColor(PlayerVideoLayer.BG_COLOR)
+            .hitTestBehavior(HitTestMode.None)
+        }
       }
     }
     .width(PlayerVideoLayer.FULL_PERCENT)

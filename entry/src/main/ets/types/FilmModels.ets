@@ -24,8 +24,15 @@ export interface BasicConfig {
   noticeShowInApp?: boolean;
   noticeAppVersion?: string;
   noticeVersion?: string;
+  danmakuEnabled?: boolean;
 }
 
+export interface DanmakuComment {
+  text: string;
+  time: number;
+  color: string;
+  mode: number;
+}
 export interface CategoryItem {
   id: number;
   pid: number;

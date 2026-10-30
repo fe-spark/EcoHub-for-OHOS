@@ -13,7 +13,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { AppIcon } from '../components/common/AppIcon';
 import { RefreshHint } from '../common/utils/RefreshHint';
 import { Breakpoint } from '../common/utils/Breakpoint';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { AppToast } from '../common/utils/AppToast';
 
 @Entry
@@ -150,8 +150,6 @@ struct FavoritePage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Column() {
       PageHeader({
         title: '我的收藏',
@@ -286,9 +284,7 @@ struct FavoritePage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
+    .clip(true)
+    .renderGroup(true)
   }
 }

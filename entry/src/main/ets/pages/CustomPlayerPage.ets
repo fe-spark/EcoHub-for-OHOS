@@ -1,5 +1,5 @@
 import { AppTheme } from '../common/constants/AppTheme';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { HttpClient } from '../common/network/HttpClient';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
 import { PageHeader } from '../components/common/PageHeader';
@@ -162,6 +162,8 @@ struct CustomPlayerPage {
     .padding(AppTheme.SPACE_LG)
   }
 
+
+
   @Builder
   idlePane() {
     Column() {
@@ -199,68 +201,68 @@ struct CustomPlayerPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
-    Column() {
-      if (!this.playerFull) {
-        Column() {
-          PageHeader({ title: '自定义播放' })
-          this.urlBar()
-        }
-        .width('100%')
-      }
-
-      if (this.hasPlayUrl()) {
-        VideoPlayer({
-          videoUrl: this.playUrl,
-          title: '自定义播放',
-          showBack: this.playerFull,
-          isFull: this.playerFull,
-          pageActive: this.playerActive,
-          topInset: this.playerFull ? this.topInset : 0,
-          leftInset: this.playerFull ? this.leftInset : 0,
-          rightInset: this.playerFull ? this.rightInset : 0,
-          bottomInset: this.playerFull ? this.bottomInset : 0,
-          onBack: () => this.setPlayerFull(false),
-          onFullscreenChange: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => {
-            this.setPlayerFull(full, isPortrait === true, isLandscape === true);
-          },
-          onVideoSize: (width: number, height: number) => {
-            if (width > height && height > 0) {
-              this.frameRatio = width / height;
-            } else {
-              this.frameRatio = 16 / 9;
-            }
-          }
-        })
-          .width('100%')
-          .height(this.playerFull ? '100%' : undefined)
-          .aspectRatio(this.playerFull ? undefined : this.frameRatio)
-          .layoutWeight(this.playerFull || Breakpoint.isWide(this.widthBp) ? 1 : 0)
-
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
         if (!this.playerFull) {
-          Text('仅支持直链 mp4 / m3u8，不会写入观看历史。')
-            .fontSize(12)
-            .fontColor(AppTheme.TEXT_MUTED)
-            .margin({ top: AppTheme.SPACE_LG })
-            .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+          Column() {
+            PageHeader({ title: '自定义播放' })
+            this.urlBar()
+          }
+          .width('100%')
         }
-      } else {
-        this.idlePane()
+
+        if (this.hasPlayUrl()) {
+          VideoPlayer({
+            videoUrl: this.playUrl,
+            title: '自定义播放',
+            showBack: this.playerFull,
+            isFull: this.playerFull,
+            pageActive: this.playerActive,
+            topInset: this.playerFull ? this.topInset : 0,
+            leftInset: this.playerFull ? this.leftInset : 0,
+            rightInset: this.playerFull ? this.rightInset : 0,
+            bottomInset: this.playerFull ? this.bottomInset : 0,
+            onBack: () => this.setPlayerFull(false),
+            onFullscreenChange: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => {
+              this.setPlayerFull(full, isPortrait === true, isLandscape === true);
+            },
+            onVideoSize: (width: number, height: number) => {
+              if (width > height && height > 0) {
+                this.frameRatio = width / height;
+              } else {
+                this.frameRatio = 16 / 9;
+              }
+            }
+          })
+            .width('100%')
+            .height(this.playerFull ? '100%' : undefined)
+            .aspectRatio(this.playerFull ? undefined : 16 / 9)
+            .layoutWeight(this.playerFull || Breakpoint.isWide(this.widthBp) ? 1 : 0)
+          if (!this.playerFull) {
+            Text('仅支持直链 mp4 / m3u8，不会写入观看历史。')
+              .fontSize(12)
+              .fontColor(AppTheme.TEXT_MUTED)
+              .margin({ top: AppTheme.SPACE_LG })
+              .padding({ left: AppTheme.SPACE_LG, right: AppTheme.SPACE_LG })
+          }
+        } else {
+          this.idlePane()
+        }
       }
+      .width('100%')
+      .height('100%')
+      .padding({
+        top: this.playerFull ? 0 : this.topInset,
+        bottom: this.playerFull ? 0 : this.bottomInset,
+        left: this.playerFull ? 0 : this.leftInset,
+        right: this.playerFull ? 0 : this.rightInset
+      })
+      .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
     }
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.playerFull ? 0 : this.topInset,
-      bottom: this.playerFull ? 0 : this.bottomInset,
-      left: this.playerFull ? 0 : this.leftInset,
-      right: this.playerFull ? 0 : this.rightInset
-    })
+    .clip(true)
+    .renderGroup(true)
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
   }
 }

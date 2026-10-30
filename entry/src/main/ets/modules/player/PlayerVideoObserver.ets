@@ -69,6 +69,20 @@ export class PlayerVideoObserver {
     }
     this.bestW = width;
     this.bestH = height;
+
+    // 首帧尺寸立即生效，杜绝初始拉伸与二次跳动
+    if (this.host.state.videoWidth === 0 || this.host.state.videoHeight === 0) {
+      if (this.sizeTimer !== -1) {
+        clearTimeout(this.sizeTimer);
+        this.sizeTimer = -1;
+      }
+      console.info(`[PlayerVideoObserver] 首帧即时排版: ${width}x${height}`);
+      this.host.state.videoWidth = width;
+      this.host.state.videoHeight = height;
+      this.host.onUIUpdate();
+      return;
+    }
+
     if (this.sizeTimer !== -1) {
       clearTimeout(this.sizeTimer);
     }

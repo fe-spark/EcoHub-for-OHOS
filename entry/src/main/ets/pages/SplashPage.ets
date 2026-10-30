@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { ServerConfigManager } from '../services/ServerConfigManager';
 import { FilmApi } from '../api/FilmApi';
 import { AppTheme } from '../common/constants/AppTheme';
@@ -137,8 +137,6 @@ struct SplashPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         Image($r('app.media.startIcon'))
@@ -186,10 +184,8 @@ struct SplashPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
+    .clip(true)
+    .renderGroup(true)
     .expandSafeArea([SafeAreaType.SYSTEM, SafeAreaType.CUTOUT],
       [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END])
   }
