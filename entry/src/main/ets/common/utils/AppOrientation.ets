@@ -38,27 +38,18 @@ export class AppOrientation {
     window.getLastWindow(ctx).then((win: window.Window) => {
       if (full) {
         WindowBar.requestBars(ctx, false);
-        // 先看手机当前的物理/窗口实际朝向，绝不逆势反转
-        const rect = win.getWindowProperties().windowRect;
-        const isCurrentLandscape = (rect && rect.width > 0 && rect.height > 0)
-          ? (rect.width > rect.height)
-          : (Breakpoint.windowWidth() > Breakpoint.windowHeight());
-
-        let targetOrientation: window.Orientation;
-        if (isCurrentLandscape) {
-          // 手机当前本来就是横屏，全屏直接保持横屏全屏，绝不转回竖屏
-          targetOrientation = window.Orientation.USER_ROTATION_LANDSCAPE;
-        } else {
-          // 手机当前是竖屏：横屏视频转横屏，竖屏视频直接留在竖屏全屏
-          targetOrientation = landscapeVideo
-            ? window.Orientation.USER_ROTATION_LANDSCAPE
-            : window.Orientation.USER_ROTATION_PORTRAIT;
-        }
+        // 全屏：进入全屏那一刻就锁定目标朝向！
+        // 横屏视频锁定横屏（LANDSCAPE），手机物理旋转绝不改变全屏窗口，更不会被压扁或挤成横线
+        // 竖屏视频锁定竖屏（PORTRAIT）
+        const targetOrientation = landscapeVideo
+          ? window.Orientation.LANDSCAPE
+          : window.Orientation.PORTRAIT;
 
         win.setPreferredOrientation(targetOrientation).catch((err: Error) => {
           console.error(`[AppOrientation] 设置全屏朝向失败: ${JSON.stringify(err)}`);
         });
       } else {
+        // 退出全屏：恢复系统自动旋转策略，随重力感应自然回落
         WindowBar.requestBars(ctx, true);
         win.setPreferredOrientation(window.Orientation.AUTO_ROTATION_RESTRICTED).catch((err: Error) => {
           console.error(`[AppOrientation] 退出全屏恢复系统旋转失败: ${JSON.stringify(err)}`);

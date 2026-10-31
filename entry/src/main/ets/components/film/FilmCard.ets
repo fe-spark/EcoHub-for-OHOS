@@ -14,9 +14,9 @@ export struct FilmCard {
   @State private isFav: boolean = false;
   onClickCard?: (film: MovieBasicInfo) => void;
   @State private broken: boolean = false;
-  @State private pressed: boolean = false;
-  @State private shouldLoad: boolean = false;
-  private favChangeCb: () => void = () => {};
+   @State private pressed: boolean = false;
+   private favChangeCb: () => void = () => {};
+  private lastFilmId: string = '';
 
   aboutToAppear(): void {
     this.updateFavState();
@@ -30,9 +30,14 @@ export struct FilmCard {
     FavoriteManager.offFavoriteChange(this.favChangeCb);
   }
 
-  private onFilmChange(): void {
-    this.updateFavState();
-  }
+   private onFilmChange(): void {
+    const curId = FormatUtil.filmId(this.film);
+    if (curId !== this.lastFilmId) {
+      this.lastFilmId = curId;
+      this.broken = false;
+    }
+     this.updateFavState();
+   }
 
   private onFavVersionChange(): void {
     this.updateFavState();
@@ -94,31 +99,41 @@ export struct FilmCard {
   build() {
     Column() {
       Stack({ alignContent: Alignment.BottomEnd }) {
-        if (!this.broken && this.posterUrl() && this.shouldLoad) {
+        // 1. 骨架底座：无论是否加载中，始终保持影院质感与菲林水印，绝不“缺一块”
+        Column() {
+          Stack({ alignContent: Alignment.Center }) {
+            AppIcon({
+              src: $r('sys.symbol.film'),
+              iconSize: 32,
+              color: 'rgba(255, 255, 255, 0.12)'
+            })
+            if (this.broken) {
+              Text(this.film.name ? this.film.name.substring(0, 1) : '影')
+                .fontSize(20)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('rgba(255, 255, 255, 0.35)')
+            }
+          }
+          .width('100%')
+          .height('100%')
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(255, 255, 255, 0.04)')
+        .borderRadius(AppTheme.RADIUS_MD)
+
+        // 2. 真实海报：直接渲染，加载中自然透视底层胶卷底座，加载后直接呈现
+        if (!this.broken && this.posterUrl()) {
           Image(this.posterUrl())
             .width('100%')
             .height('100%')
             .objectFit(ImageFit.Cover)
             .borderRadius(AppTheme.RADIUS_MD)
-            .backgroundColor(AppTheme.BG_CARD)
             .syncLoad(false)
             .onError(() => {
               this.broken = true;
             })
-        } else {
-          Column() {
-            Text(this.film.name ? this.film.name.substring(0, 1) : '影')
-              .fontSize(28)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(AppTheme.RADIUS_MD)
         }
-
         Column()
           .width('100%')
           .height('100%')
@@ -183,11 +198,6 @@ export struct FilmCard {
         this.getUIContext()?.animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
           this.pressed = false;
         });
-      }
-    })
-    .onVisibleAreaChange([0.0, 0.05], (isIntersecting: boolean, _currentRatio: number) => {
-      if (isIntersecting && !this.shouldLoad) {
-        this.shouldLoad = true;
       }
     })
     .onClick(() => this.handleClick())

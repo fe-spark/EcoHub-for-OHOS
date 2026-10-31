@@ -339,7 +339,7 @@ struct LivePlayPage {
 
   private splitPlay(): boolean { return !this.playerFull && this.isWideScreen(); }
   private hudLeftInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0; }
-  private hudRightInset(): number { return this.playerFull ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : AppTheme.SAFE_EDGE; }
+  private hudRightInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : AppTheme.SAFE_EDGE; }
   private hudTopInset(): number { return (this.playerFull || this.splitPlay()) ? this.topInset : 0; }
   private hudBottomInset(): number { return (this.playerFull || this.splitPlay()) ? this.bottomInset : 0; }
 
@@ -453,31 +453,55 @@ struct LivePlayPage {
   @Builder
   playBody() {
     Row() {
+      // 1. 播放器容器：背景纯黑，视频画布始终撑满铺满整个区域（padding为0，适应/填充/拉伸完全生效）
+      // 安全避让距离仅作用于内部浮层控件（HUD/返回键/控制条），画面本身绝不缩进
       Column() { this.playVideo() }
         .layoutWeight(this.splitPlay() ? 7 : 1)
         .width(this.splitPlay() ? undefined : '100%')
         .height(this.splitPlay() || this.playerFull ? '100%' : 'auto')
-        .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+        .backgroundColor('#000000')
+        .padding({
+          top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
+          left: 0,
+          right: 0,
+          bottom: 0
+        })
 
+      // 2. 横屏分栏模式（右侧面板）
       if (this.splitPlay()) {
         Column() {
           Column().width(1).height('100%').backgroundColor('rgba(255, 255, 255, 0.14)')
         }
-        .height('100%').padding({ top: this.topInset, bottom: this.bottomInset })
+        .height('100%')
+        .padding({ top: this.topInset, bottom: this.bottomInset })
 
         Column() { this.sideTabs() }
           .layoutWeight(5)
           .height('100%')
-          .padding({ top: this.topInset, bottom: this.bottomInset })
+          .padding({
+            top: this.topInset,
+            bottom: this.bottomInset,
+            right: this.rightInset
+          })
           .backgroundColor(AppTheme.BG_ELEVATED)
       }
     }
     .width('100%')
     .layoutWeight(this.splitPlay() || this.playerFull ? 1 : 0)
 
+    // 3. 竖屏模式（下方选集与详情列表）
     if (!this.playerFull && !this.splitPlay()) {
       Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
-      this.sideTabs()
+      Column() {
+        this.sideTabs()
+      }
+      .layoutWeight(1)
+      .width('100%')
+      .padding({
+        left: this.leftInset,
+        right: this.rightInset,
+        bottom: this.bottomInset
+      })
     }
   }
 
@@ -486,6 +510,12 @@ struct LivePlayPage {
       Column() {
         if (this.loading && !this.sources.length) {
           LoadingView({ label: '正在打开播放页' })
+            .padding({
+              top: this.topInset,
+              bottom: this.bottomInset,
+              left: this.leftInset,
+              right: this.rightInset
+            })
         } else if (this.errorText && !this.sources.length) {
           LivePlayErrorView({
             filmName: this.name,
@@ -497,6 +527,12 @@ struct LivePlayPage {
             onRetry: () => { this.loadPlay(); },
             onRemoveFavorite: () => { this.removeFavorite(); }
           })
+            .padding({
+              top: this.topInset,
+              bottom: this.bottomInset,
+              left: this.leftInset,
+              right: this.rightInset
+            })
         } else {
           this.playBody()
         }
@@ -504,10 +540,10 @@ struct LivePlayPage {
       .width('100%')
       .height('100%')
       .padding({
-        top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
-        bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
-        left: this.playerFull ? 0 : this.leftInset,
-        right: this.playerFull ? 0 : this.rightInset
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0
       })
       .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
 

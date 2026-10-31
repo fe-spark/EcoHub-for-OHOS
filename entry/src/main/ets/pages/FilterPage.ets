@@ -334,33 +334,25 @@ struct FilterPage {
     .padding({ left: AppTheme.SPACE_MD, right: AppTheme.SPACE_MD, bottom: AppTheme.SPACE_MD })
   }
 
-  @Builder
-  navHeader() {
-    FilterNavHeader({
-      total: this.total,
-      tags: this.selectedTags(),
-      onBack: () => {
-        try {
-          this.getUIContext().getRouter().back();
-        } catch (_e) {}
-      }
-    })
-  }
 
   build() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
+        // 顶部沉浸式导航栏：常驻顶格，吸纳状态栏，提供返回键、已选标签与数量
+        FilterNavHeader({
+          total: this.total,
+          tags: this.selectedTags(),
+          topInset: this.topInset,
+          onBack: () => {
+            try {
+              this.getUIContext().getRouter().back();
+            } catch (_e) {}
+          }
+        })
+
         if (this.loading) {
-          FilterNavHeader({
-            total: 0,
-            tags: [],
-            onBack: () => {
-              try {
-                this.getUIContext().getRouter().back();
-              } catch (_e) {}
-            }
-          })
           LoadingView({ label: '加载中' })
+            .layoutWeight(1)
         } else {
           List({ scroller: this.scroller }) {
             ListItem() {
@@ -380,64 +372,63 @@ struct FilterPage {
               }
               .width('100%')
               .alignItems(HorizontalAlign.Start)
-              .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_SM })
+              .padding({ top: AppTheme.SPACE_SM, bottom: AppTheme.SPACE_MD })
               .backgroundColor(AppTheme.BG_ELEVATED)
+              .borderRadius({ bottomLeft: AppTheme.RADIUS_MD, bottomRight: AppTheme.RADIUS_MD })
+              .margin({ bottom: AppTheme.SPACE_MD })
             }
 
-            ListItemGroup({ header: this.navHeader }) {
-              if (this.listLoading) {
-                ListItem() {
-                  LoadingView({ label: '列表加载中' })
-                }
-              } else if (this.errorText) {
-                ListItem() {
-                  EmptyState({ title: '加载失败', subtitle: this.errorText, icon: $r('sys.symbol.info_circle') }) {
-                    Column({ space: 12 }) {
-                      Button() {
-                        Row() {
-                          AppIcon({ src: $r('sys.symbol.link'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
-                          Text('更换软件源').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
-                        }
-                      }
-                      .width(148).height(38).backgroundColor(AppTheme.ACCENT).borderRadius(AppTheme.RADIUS_PILL)
-                      .onClick(() => {
-                        try { this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' }); } catch (_e) {}
-                      })
-
-                      Button() {
-                        Row() {
-                          AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
-                          Text('刷新').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
-                        }
-                      }
-                      .width(148).height(38).backgroundColor(AppTheme.BG_CARD).borderRadius(AppTheme.RADIUS_PILL)
-                      .onClick(() => { this.loadData(true, false); })
-                    }.margin({ top: 16 }).width('100%').alignItems(HorizontalAlign.Center)
-                  }
-                }
-              } else if (this.films.length === 0) {
-                ListItem() {
-                  EmptyState({ title: '没有符合条件的影片', icon: $r('sys.symbol.film') })
-                }
-              } else {
-                ForEach(this.rowIds(), (row: number) => {
-                  ListItem() {
-                    this.filmRow(row)
-                  }
-                }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
-              }
-
+            if (this.listLoading) {
               ListItem() {
-                Text(this.loadingMore ? '加载中...' : (this.current >= this.pageCount ? '没有更多了' : ''))
-                  .fontSize(12)
-                  .fontColor(AppTheme.TEXT_MUTED)
-                  .width('100%')
-                  .height(40)
-                  .textAlign(TextAlign.Center)
+                LoadingView({ label: '列表加载中' })
               }
+            } else if (this.errorText) {
+              ListItem() {
+                EmptyState({ title: '加载失败', subtitle: this.errorText, icon: $r('sys.symbol.info_circle') }) {
+                  Column({ space: 12 }) {
+                    Button() {
+                      Row() {
+                        AppIcon({ src: $r('sys.symbol.link'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+                        Text('更换软件源').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+                      }
+                    }
+                    .width(148).height(38).backgroundColor(AppTheme.ACCENT).borderRadius(AppTheme.RADIUS_PILL)
+                    .onClick(() => {
+                      try { this.getUIContext().getRouter().pushUrl({ url: 'pages/ServerConfigPage' }); } catch (_e) {}
+                    })
+
+                    Button() {
+                      Row() {
+                        AppIcon({ src: $r('sys.symbol.arrow_counterclockwise'), iconSize: 15, color: AppTheme.TEXT_PRIMARY })
+                        Text('刷新').fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.TEXT_PRIMARY).margin({ left: 6 })
+                      }
+                    }
+                    .width(148).height(38).backgroundColor(AppTheme.BG_CARD).borderRadius(AppTheme.RADIUS_PILL)
+                    .onClick(() => { this.loadData(true, false); })
+                  }.margin({ top: 16 }).width('100%').alignItems(HorizontalAlign.Center)
+                }
+              }
+            } else if (this.films.length === 0) {
+              ListItem() {
+                EmptyState({ title: '没有符合条件的影片', icon: $r('sys.symbol.film') })
+              }
+            } else {
+              ForEach(this.rowIds(), (row: number) => {
+                ListItem() {
+                  this.filmRow(row)
+                }
+              }, (row: number) => `film_row_${this.gridCols()}_${row}_${this.films[row * this.gridCols()].id}`)
+            }
+
+            ListItem() {
+              Text(this.loadingMore ? '加载中...' : (this.current >= this.pageCount ? '没有更多了' : ''))
+                .fontSize(12)
+                .fontColor(AppTheme.TEXT_MUTED)
+                .width('100%')
+                .height(40)
+                .textAlign(TextAlign.Center)
             }
           }
-          .sticky(StickyStyle.Header)
           .width('100%')
           .layoutWeight(1)
           .scrollBar(BarState.Off)
@@ -463,19 +454,17 @@ struct FilterPage {
       .width('100%')
       .height('100%')
       .padding({
-        top: this.topInset,
+        top: 0,
         bottom: this.bottomInset,
         left: this.leftInset,
         right: this.rightInset
       })
       .backgroundColor(AppTheme.BG)
-
       FloatingRefreshIndicator({
         pullDistance: this.pullDistance,
         refreshing: this.refreshing,
-        topOffset: this.topInset + 16
+        topOffset: this.topInset + 48 + 16
       })
-
       if (!this.loading) {
         ScrollFab({
           visible: this.showTopFab,

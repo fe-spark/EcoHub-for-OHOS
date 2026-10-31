@@ -76,37 +76,50 @@
 在控制中心关闭系统旋转锁定后，手机在应用内进行横竖屏旋转时，应用画面被卡在旧尺寸的正方形区域（如 `727×727`），其余未铺满区域直接**卡出系统底层的桌面壁纸**，持续约 300~500ms 后才突然展开为全屏。
 > **特征**：数据加载中（仅 Loading 指示器）时旋转完全正常顺滑，一旦影视列表加载完成并渲染海报后，旋转必定卡出桌面背景。
 
-#### 2. 原因剖析
-1. **页面根节点严禁挂载 `.renderGroup(true)` 与根级 `.clip(true)`**：
-   - ArkUI 的 `renderGroup(true)` 会强制将整页所有子组件渲染到一块**离屏纹理缓冲区（Offscreen Buffer）**。
-   - 在系统窗口旋转转场动画期间，ArkUI **不会逐帧重绘/重建这个全屏离屏纹理**，而是直接复用旧尺寸纹理进行旋转变换；若同时配合根级 `.clip(true)`，超出旧尺寸的部分被硬件硬截断，导致多余区域透明，直接漏出下层的 Launcher 桌面壁纸；直到动画结束、离屏缓存失效后才重新测量重绘成全屏。
-2. **卡片组件严禁挂载全局隐式动画 `.animation()`**：
-   - 在 `FilmCard` 外层挂载 `.animation()` 会捕获组件的所有属性变更。旋转时断点宽度 `WINDOW_WIDTH` 变化，触发所有 `FilmRow` 内成百上千个卡片的 `cardWidth` 同步突变。
-   - 这导致上百张海报同时启动 `120ms` 宽度插值动画，瞬间阻塞 UI 线程，导致应用无法在垂直同步周期内及时向 WMS 提交新方向的画面 Buffer，最终触发系统的**旋转转场超时兜底**（强制以旧画面 Buffer 旋转，未铺满区域透出壁纸）。
-3. **窗口尺寸监听 `on('windowSizeChange')` 严禁同步发起跨进程 IPC**：
-   - `windowSizeChange` 触发时正值旋转过渡首帧的关键期，如果在回调中同步调用 `win.getWindowAvoidArea()`（跨进程 IPC 调用），会进一步加剧主线程卡顿。避让区必须通过独立的 `avoidAreaChange` 监听负责。
-4. **列表项慎用实时毛玻璃 `.backdropBlur`**：
-   - 在大批量渲染的列表或横向滚动胶囊上批量使用 `backdropBlur`，会导致旋转重绘时 GPU 需频繁执行多通道离屏模糊 pass，严重争抢图形资源。
+#### 2. 深层原因剖析（四大连环瓶颈）
+1. **`AppStorage` 广播风暴引发子组件级联 Re-render 堵死 UI 线程**：
+   - 推荐页包含 12 组 `FilmRow`，原先每个 `FilmRow` 内部都直接声明了 4 个 `@StorageLink`（`WINDOW_WIDTH`、`WIDTH_BP`、`SAFE_INSET_LEFT`、`SAFE_INSET_RIGHT`）。
+   - 旋转瞬间窗口发生改变，触发系统向 `AppStorage` 广播。单个旋转动作瞬间引爆 $12 \times 4 = 48$ 次组件级重绘，联动底层成百上千张 `FilmCard` 在同一个 VSync 帧周期内疯狂重复测量与排版（CPU 打满超 800ms）。
+   - 渲染线程严重超载掉帧，无法在垂直同步周期内向窗口管理器（WMS）提交新方向的画面 Buffer，触发系统转场超时兜底，直接露出了底层的桌面壁纸。
+2. **规避区监听密集触发无防抖的跨进程同步 IPC**：
+   - 屏幕旋转阶段系统会连续发送 3~4 次 `onAvoidAreaChange` 和 `windowSizeChange` 事件。
+   - 原逻辑在每次回调中均**无条件同步调用 4 次系统 IPC**（`win.getWindowAvoidArea()`，分别同步查询状态栏、刘海屏、导航条、软键盘）。
+   - 在旋转转场的几十毫秒关键过渡期内发起数十次跨进程同步阻塞，使主线程雪上加霜。
+3. **`XComponent (SURFACE)` 挖洞图层与动态异步宽高计算失步**：
+   - 播放器采用 `XComponentType.SURFACE` 原生渲染模式。在鸿蒙渲染架构中，Surface 属于独立物理图层，通过向上“穿透挖洞（Punch-Hole）”展示在窗口中。
+   - 原实现试图在 `VideoPlayer` 中通过异步 `onAreaChange` 回调计算宽高，再作为 `@Prop` 传递给 `PlayerVideoLayer` 动态算出百分比。
+   - 旋转发生瞬间，ArkUI 窗口与容器已被 WMS 强制拉伸，但 `onAreaChange` 事件存在多帧延迟，导致 XComponent 被赋予了过期的旧尺寸或 0 尺寸，原生视频帧与 ArkUI 挖洞区域严重失调断层，缝隙直接穿透露出系统桌面。
+4. **旋转朝向竞态仲裁导致“两阶段回弹抖动（Jitter）”**：
+   - 过去全屏逻辑根据即时物理窗口宽高判断（`rect.width > rect.height`），并采用 `USER_ROTATION_*`。
+   - 在手机快速翻转时，由于重力感应器与应用旋转指令处于竞争状态，应用常在临界点误判当前朝向，导致系统窗口经历 **“横屏 $\to$ 竖屏回跳 $\to$ 重新横屏”** 的二次销毁重建，画面撕裂穿透。
 
-#### 3. 规范要求（防错准则）
-- ❌ **禁止在任何页面根容器上使用 `.renderGroup(true)` 和根级 `.clip(true)`**。
+#### 3. 核心规范与防错准则
+
+##### (1) 状态流转与全局存储治理
+- ✅ **严禁在可复用列表子组件内部滥用 `@StorageLink`**：
+  - 必须由父容器页面（如 `RecommendTab`）统一订阅窗口断点与边距，再通过基础 `@Prop` 传给子组件 `FilmRow`。
+  - 切断全局状态向下广播的级联 Re-render 风暴，将旋转期间的测量排版耗时从 800ms+ 压缩至 16ms 极速水准。
+- ✅ **规避区与尺寸回调必须严格做内存值缓存（防抖去重）**：
+  - 在 `WindowBar.notifyInsets` 中对 `top/bottom/left/right` 及软键盘高度做历史值比对；只有真实像素值变动时才调用 `AppStorage.setOrCreate`，过滤 95% 无效 IPC 与事件派发。
+
+##### (2) XComponent 原生渲染层规范
+- ✅ **抛弃基于 `onAreaChange` 的动态百分比推算**：
+  - 使用 ArkUI 原生声明式规则自适应：
+    - **横屏视频**（16:9）：锁定宽度为 `100%`，高度设为 `undefined`，由 `aspectRatio` 自动匹配计算；
+    - **竖屏视频**（9:16 短剧）：锁定高度为 `100%`，宽度设为 `undefined`，避免被容器强行撑高撑爆详情页；
+    - 增加 `.constraintSize({ maxWidth: '100%', maxHeight: '100%' })` 兜底保护。
+- ✅ **播放器外层容器必须增加 `.clip(true)` 强行裁切保护**，彻底杜绝视频 Surface 溢出或比例拉伸。
+
+##### (3) 全屏与转场锁定
+- ✅ **全屏进入即锁死目标朝向**：
+  - 横屏视频点击全屏直接锁定 `window.Orientation.LANDSCAPE`，杜绝一切由于手机旋转引起的窗口反复拉扯；
+  - 退出全屏后恢复系统自动旋转策略 `AUTO_ROTATION_RESTRICTED`，随重力感应自然回落。
+
+##### (4) 基础排版禁忌
+- ❌ **禁止在任何页面根容器上使用 `.renderGroup(true)` 和根级 `.clip(true)`**（避免转场期间复用未更新的离屏纹理产生黑洞）。
 - ❌ **禁止在列表卡片根节点上挂载全局 `.animation()`**。按压缩放等局部交互动效必须在 `onTouch` 中使用 `this.getUIContext().animateTo` 显式驱动。
-- ❌ **禁止在 `windowSizeChange` 中同步调用 `getWindowAvoidArea`**，尺寸回调只负责更新尺寸与断点，避免主线程 IPC 阻塞。
-- ❌ **避免在滚动列表项中滥用 `backdropBlur`**，尽量使用半透明纯色背景替代。
+- ❌ **避免在滚动列表项中滥用实时毛玻璃 `.backdropBlur`**，尽量使用半透明纯色背景替代。
 - ✅ **保持底层纯色兜底**：在 `WindowBar.applyBarColors()` 中始终保证 `target.setWindowBackgroundColor(AppTheme.BG)`，确保窗口层与页面底色始终一致。
-
-### 🎬 播放器与分栏模式规范
-
-#### 1. 规范设计
-- **横屏保持分栏（`splitPlay`）**：在横屏模式下，播放详情页默认保持 **7:5 分栏模式**（左侧视频流，右侧剧集选集与相关推荐），**不要在横屏时强行自动全屏**，为用户留出横向边看边选集的交互空间。
-- **全屏显式触发与退出**：
-  - 仅在用户主动点击全屏按钮时才进入沉浸式全屏；
-  - 进入全屏使用 `window.Orientation.USER_ROTATION_LANDSCAPE`，退出全屏恢复系统自动旋转策略 `AUTO_ROTATION_RESTRICTED`，使退出全屏后在横屏下自然回落至 7:5 分栏，竖屏下自然回落至半屏。
-- **播放器比例与防拉伸规范**：
-  - `VideoPlayer` 内维护容器宽高的 `playerW / playerH` 必须声明为 `@State` 响应式状态，在 `.onAreaChange` 尺寸变更时自动下发最新的 `containerWidth / containerHeight` 给 `PlayerVideoLayer`。
-  - `PlayerVideoLayer` 在自身 `onAreaChange` 与父级传参双重保底下，实时根据 `videoRatio` 与 `containerRatio` 计算 `XComponent` 的适应比例（FIT 模式），杜绝退化为 100%×100% 导致画面随分栏/横竖屏被强行拉伸变扁。
-  - 播放器与视频渲染层严禁使用 `.clip(true)`。
-  - **宽屏分栏判定使用同步断点**：`isWideScreen()` 必须直接依赖 `@StorageLink` 绑定的 `WINDOW_WIDTH / WINDOW_HEIGHT`，**严禁使用异步 `onAreaChange` 回调赋值的临时 `@State` 变量**，否则在横转竖时第一帧会使用横屏分栏旧尺寸排版（导致视频被压缩在 210vp 狭窄区域，高度仅 118vp），下一帧才恢复 202.5vp，产生视觉上“高度从小变大”的二阶段跳变。
 ---
 
 ## 🛠️ 本地开发

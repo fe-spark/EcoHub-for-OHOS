@@ -1,13 +1,4 @@
-import { PlayerScale, PlayerScaleMode } from './PlayerScale';
-
-interface VideoDimensions {
-  W: number;
-  H: number;
-  hasLayer: boolean;
-  isPortrait: boolean;
-  videoRatio: number;
-  containerRatio: number;
-}
+import { PlayerScaleMode } from './PlayerScale';
 
 @Component
 export struct PlayerVideoLayer {
@@ -21,78 +12,35 @@ export struct PlayerVideoLayer {
   @Prop videoWidth: number = 0;
   @Prop videoHeight: number = 0;
   @Prop scaleMode: number = PlayerScaleMode.FIT;
-  @Prop containerWidth: number = 0;
-  @Prop containerHeight: number = 0;
   onXComponentLoad?: (context: object, surfaceId: string) => void;
   xComponentController: XComponentController = new XComponentController();
 
-
-  private isPortraitMode(hasVideo: boolean, hasLayer: boolean, W: number, H: number): boolean {
-    if (hasVideo) {
-      return this.videoHeight > this.videoWidth;
-    }
-    if (hasLayer && H > W) {
-      return true;
-    }
-    return false;
+  private isPortraitVideo(): boolean {
+    return this.videoHeight > 0 && this.videoWidth > 0 && this.videoHeight > this.videoWidth;
   }
 
-  private getDimensions(): VideoDimensions {
-    const W = this.containerWidth;
-    const H = this.containerHeight;
-    const hasLayer = W > 0 && H > 0;
-    const hasVideo = this.videoWidth > 0 && this.videoHeight > 0;
-    const isPortrait = this.isPortraitMode(hasVideo, hasLayer, W, H);
-    const fallbackRatio: number = isPortrait ? PlayerScale.RATIO_9_16 : PlayerScale.RATIO_16_9;
-    const videoRatio: number = hasVideo ? (this.videoWidth / this.videoHeight) : fallbackRatio;
-    const containerRatio: number = hasLayer ? (W / H) : fallbackRatio;
-    return { W, H, hasLayer, isPortrait, videoRatio, containerRatio };
-  }
-
-  private getTargetWidth(): string {
+  private getTargetWidth(): Length | undefined {
     if (this.scaleMode === PlayerScaleMode.STRETCH) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    const d = this.getDimensions();
-    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0) {
-      return PlayerVideoLayer.FULL_PERCENT;
-    }
     if (this.scaleMode === PlayerScaleMode.COVER) {
-      if (d.videoRatio > d.containerRatio) {
-        const pct = (d.videoRatio / d.containerRatio) * 100;
-        return `${pct}%`;
-      }
-      return PlayerVideoLayer.FULL_PERCENT;
+      // 填充 (COVER)：竖屏视频锁定宽度为 100%，高度等比放大超出裁剪；横屏视频由高度决定
+      return this.isPortraitVideo() ? PlayerVideoLayer.FULL_PERCENT : undefined;
     }
-    // FIT 适应保持比例
-    if (d.videoRatio < d.containerRatio) {
-      const pct = Math.min(100, (d.videoRatio / d.containerRatio) * 100);
-      return `${pct}%`;
-    }
-    return PlayerVideoLayer.FULL_PERCENT;
+    // 适应 (FIT)：横屏视频锁宽 100%，竖屏视频留黑边
+    return this.isPortraitVideo() ? undefined : PlayerVideoLayer.FULL_PERCENT;
   }
 
-  private getTargetHeight(): string {
+  private getTargetHeight(): Length | undefined {
     if (this.scaleMode === PlayerScaleMode.STRETCH) {
       return PlayerVideoLayer.FULL_PERCENT;
     }
-    const d = this.getDimensions();
-    if (!d.hasLayer || d.videoRatio <= 0 || d.containerRatio <= 0) {
-      return PlayerVideoLayer.FULL_PERCENT;
-    }
     if (this.scaleMode === PlayerScaleMode.COVER) {
-      if (d.videoRatio < d.containerRatio) {
-        const pct = (d.containerRatio / d.videoRatio) * 100;
-        return `${pct}%`;
-      }
-      return PlayerVideoLayer.FULL_PERCENT;
+      // 填充 (COVER)：横屏视频锁定高度为 100%，宽度等比放大超出裁剪；竖屏视频由宽度决定
+      return this.isPortraitVideo() ? undefined : PlayerVideoLayer.FULL_PERCENT;
     }
-    // FIT 适应保持比例
-    if (d.videoRatio > d.containerRatio) {
-      const pct = Math.min(100, (d.containerRatio / d.videoRatio) * 100);
-      return `${pct}%`;
-    }
-    return PlayerVideoLayer.FULL_PERCENT;
+    // 适应 (FIT)：竖屏视频锁高 100%，横屏视频留黑边
+    return this.isPortraitVideo() ? PlayerVideoLayer.FULL_PERCENT : undefined;
   }
 
   build() {
@@ -105,6 +53,18 @@ export struct PlayerVideoLayer {
       })
         .width(this.getTargetWidth())
         .height(this.getTargetHeight())
+        .aspectRatio(
+          this.scaleMode === PlayerScaleMode.STRETCH
+            ? undefined
+            : (this.videoWidth > 0 && this.videoHeight > 0
+                ? (this.videoWidth / this.videoHeight)
+                : undefined)
+        )
+        .constraintSize(
+          this.scaleMode === PlayerScaleMode.COVER
+            ? { minWidth: PlayerVideoLayer.FULL_PERCENT, minHeight: PlayerVideoLayer.FULL_PERCENT }
+            : { maxWidth: PlayerVideoLayer.FULL_PERCENT, maxHeight: PlayerVideoLayer.FULL_PERCENT }
+        )
         .hitTestBehavior(HitTestMode.None)
         .onLoad((context) => {
           console.info(`[PlayerVideoLayer] XComponent onLoad, context=${!!context}`);
@@ -133,5 +93,6 @@ export struct PlayerVideoLayer {
     .width(PlayerVideoLayer.FULL_PERCENT)
     .height(PlayerVideoLayer.FULL_PERCENT)
     .backgroundColor(PlayerVideoLayer.BG_COLOR)
+    .clip(true)
   }
 }
