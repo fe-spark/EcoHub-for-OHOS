@@ -397,7 +397,6 @@ struct LivePlayPage {
       .width('100%')
       .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
       .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
-      .constraintSize({ maxHeight: '100%' })
   }
 
   @Builder
@@ -456,7 +455,7 @@ struct LivePlayPage {
       // 1. 播放器容器：背景纯黑，视频画布始终撑满铺满整个区域（padding为0，适应/填充/拉伸完全生效）
       // 安全避让距离仅作用于内部浮层控件（HUD/返回键/控制条），画面本身绝不缩进
       Column() { this.playVideo() }
-        .layoutWeight(this.splitPlay() ? 7 : 1)
+        .layoutWeight(this.splitPlay() ? 7 : undefined)
         .width(this.splitPlay() ? undefined : '100%')
         .height(this.splitPlay() || this.playerFull ? '100%' : 'auto')
         .backgroundColor('#000000')

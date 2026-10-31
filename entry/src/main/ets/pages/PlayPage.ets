@@ -406,7 +406,6 @@ struct PlayPage {
       .width('100%')
       .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
       .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
-      .constraintSize({ maxHeight: '100%' })
   }
 
   @Builder
@@ -475,7 +474,7 @@ struct PlayPage {
       Column() {
         this.playVideo()
       }
-      .layoutWeight(this.splitPlay() ? 7 : 1)
+      .layoutWeight(this.splitPlay() ? 7 : undefined)
       .width(this.splitPlay() ? undefined : '100%')
       .height(this.splitPlay() || this.playerFull ? '100%' : 'auto')
       .backgroundColor('#000000')
