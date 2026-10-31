@@ -225,8 +225,19 @@ export struct VideoPlayer {
     const next = !this.fullNow();
     if (next && this.castBridge.isCasting()) { AppToast.show('投屏中无法全屏，请先停止投屏'); return; }
     this.closeCastDialog(); this.innerFull = next; this.pulseHud();
-    if (this.onFullscreenChange) this.onFullscreenChange(next, this.state.isPortrait(), this.state.isLandscape());
-    else PlayerWindow.setFullscreen(this.ctx(), next, this.state.isPortrait());
+
+    // 仅在进入全屏和退出全屏那一瞬间取真实视频的横竖比例
+    let vw = this.videoWidth > 0 ? this.videoWidth : this.state.videoWidth;
+    let vh = this.videoHeight > 0 ? this.videoHeight : this.state.videoHeight;
+    if (vw <= 0 || vh <= 0) {
+      vw = this.playerAv.getVideoWidth();
+      vh = this.playerAv.getVideoHeight();
+    }
+    const isPortrait = vh > 0 && vw > 0 && vh > vw;
+    const isLandscape = !isPortrait;
+
+    if (this.onFullscreenChange) this.onFullscreenChange(next, isPortrait, isLandscape);
+    else PlayerWindow.setFullscreen(this.ctx(), next, isPortrait);
     this.syncKeepScreen();
   }
 

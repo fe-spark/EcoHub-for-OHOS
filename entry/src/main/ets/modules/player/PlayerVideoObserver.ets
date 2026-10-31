@@ -63,8 +63,7 @@ export class PlayerVideoObserver {
       this.bestW = 0;
       this.bestH = 0;
     }
-    if (width * height <= this.bestW * this.bestH) {
-      console.info(`[PlayerVideoObserver] 忽略较小尺寸: ${width}x${height}`);
+    if (width === this.bestW && height === this.bestH) {
       return;
     }
     this.bestW = width;
@@ -76,7 +75,6 @@ export class PlayerVideoObserver {
         clearTimeout(this.sizeTimer);
         this.sizeTimer = -1;
       }
-      console.info(`[PlayerVideoObserver] 首帧即时排版: ${width}x${height}`);
       this.host.state.videoWidth = width;
       this.host.state.videoHeight = height;
       this.host.onUIUpdate();

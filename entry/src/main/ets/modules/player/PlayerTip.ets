@@ -264,7 +264,6 @@ export struct PlayerLoadingCard {
       })
       .backgroundColor('rgba(0,0,0,0.78)')
       .borderRadius(PlayerLoadingCard.CARD_RADIUS)
-      .animation({ duration: 200, curve: Curve.EaseInOut })
     }
   }
 }

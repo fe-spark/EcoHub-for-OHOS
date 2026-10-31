@@ -25,8 +25,7 @@ export struct PlayerVideoLayer {
   @Prop containerHeight: number = 0;
   onXComponentLoad?: (context: object, surfaceId: string) => void;
   xComponentController: XComponentController = new XComponentController();
-  @State private layerW: number = 0;
-  @State private layerH: number = 0;
+
 
   private isPortraitMode(hasVideo: boolean, hasLayer: boolean, W: number, H: number): boolean {
     if (hasVideo) {
@@ -39,8 +38,8 @@ export struct PlayerVideoLayer {
   }
 
   private getDimensions(): VideoDimensions {
-    const W = this.layerW > 0 ? this.layerW : this.containerWidth;
-    const H = this.layerH > 0 ? this.layerH : this.containerHeight;
+    const W = this.containerWidth;
+    const H = this.containerHeight;
     const hasLayer = W > 0 && H > 0;
     const hasVideo = this.videoWidth > 0 && this.videoHeight > 0;
     const isPortrait = this.isPortraitMode(hasVideo, hasLayer, W, H);
@@ -134,13 +133,5 @@ export struct PlayerVideoLayer {
     .width(PlayerVideoLayer.FULL_PERCENT)
     .height(PlayerVideoLayer.FULL_PERCENT)
     .backgroundColor(PlayerVideoLayer.BG_COLOR)
-    .onAreaChange((_old: Area, area: Area) => {
-      const w = Number(area.width);
-      const h = Number(area.height);
-      if (w > 0 && h > 0 && (this.layerW !== w || this.layerH !== h)) {
-        this.layerW = w;
-        this.layerH = h;
-      }
-    })
   }
 }

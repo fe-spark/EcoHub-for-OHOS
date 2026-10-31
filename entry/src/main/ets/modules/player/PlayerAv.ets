@@ -71,6 +71,13 @@ export class PlayerAv {
     // 画面比例由 PlayerVideoLayer 外层容器与 XComponent 布局自适应控制
   }
 
+  getVideoWidth(): number {
+    return this.ijk ? this.ijk.getVideoWidth() : 0;
+  }
+
+  getVideoHeight(): number {
+    return this.ijk ? this.ijk.getVideoHeight() : 0;
+  }
   async open(url: string): Promise<void> {
     const gen = ++this.gen;
     console.info(`[PlayerAv] ijkplayer 开始打开: ${url}`);
@@ -117,7 +124,9 @@ export class PlayerAv {
       ijk.setContext(this.xContext, this.surfaceId);
       ijk.native_setup(VideoCodecMode.SURFACE);
       // 2. 配置 FFmpeg / ijkplayer 选项
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "1"); // 硬件解码
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", "1");
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "auto-mediacodec", "1");
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", "842094158");
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", "1");   // 音频驱动
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "soundtouch", "1"); // 倍速变调补偿
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", "1");  // 丢帧保同步

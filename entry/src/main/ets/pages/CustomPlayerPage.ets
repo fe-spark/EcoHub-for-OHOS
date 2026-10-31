@@ -227,10 +227,8 @@ struct CustomPlayerPage {
               this.setPlayerFull(full, isPortrait === true, isLandscape === true);
             },
             onVideoSize: (width: number, height: number) => {
-              if (width > height && height > 0) {
+              if (width > 0 && height > 0) {
                 this.frameRatio = width / height;
-              } else {
-                this.frameRatio = 16 / 9;
               }
             }
           })

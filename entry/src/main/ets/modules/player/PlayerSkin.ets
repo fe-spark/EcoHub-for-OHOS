@@ -499,15 +499,13 @@ export struct PlayerSkin {
             angle: 180,
             colors: [['rgba(0,0,0,0.60)', 0], ['rgba(0,0,0,0.20)', 0.6], ['rgba(0,0,0,0)', 1]]
           })
-          .opacity(this.showHud ? 1 : 0)
-          .animation({ duration: 200, curve: Curve.EaseInOut })
+          .opacity((!this.isFull && this.showBack) ? 1 : (this.showHud ? 1 : 0))
           .hitTestBehavior(HitTestMode.Transparent)
           .zIndex(999)
         }
       }
       .width('100%')
       .height('100%')
-      .clip(true)
       .hitTestBehavior(HitTestMode.Transparent)
     }
   }

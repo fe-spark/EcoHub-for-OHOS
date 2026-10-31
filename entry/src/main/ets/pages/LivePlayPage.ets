@@ -12,6 +12,7 @@ import { AppOrientation } from '../common/utils/AppOrientation';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { common } from '@kit.AbilityKit';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
+import { PlayerBackBtn } from '../modules/player/PlayerControl';
 import { PlayDetailPanel } from '../components/film/PlayDetailPanel';
 import { LivePlayRelatedView } from '../components/film/LivePlayRelatedView';
 import { LoadingView } from '../components/common/LoadingView';
@@ -385,10 +386,8 @@ struct LivePlayPage {
         this.setPlayerFull(full, isPortrait === true, isLandscape === true);
       },
       onVideoSize: (width: number, height: number) => {
-        if (width > height && height > 0) {
+        if (width > 0 && height > 0) {
           this.frameRatio = width / height;
-        } else {
-          this.frameRatio = 16 / 9;
         }
       },
       onProgress: (cur: number, dur: number) => {
@@ -511,6 +510,21 @@ struct LivePlayPage {
         right: this.playerFull ? 0 : this.rightInset
       })
       .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+
+      if (!this.playerFull && (this.loading && !this.sources.length || this.errorText && !this.sources.length)) {
+        Row() {
+          PlayerBackBtn({
+            onTap: () => {
+              try { this.getUIContext().getRouter().back(); } catch (_e) {}
+            }
+          })
+        }
+        .padding({
+          left: Math.max(8, this.leftInset + 4),
+          top: this.topInset + 4
+        })
+        .zIndex(9999)
+      }
     }
     .width('100%')
     .height('100%')
