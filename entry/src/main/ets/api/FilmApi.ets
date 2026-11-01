@@ -206,8 +206,8 @@ export class FilmApi {
   }
 
   static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuComment[]> {
-    if (!ServerCompat.getInstance().canDanmaku) {
-      console.info('[Danmaku] 当前非 V3 协议或环境不支持弹幕特性，跳过请求');
+    if (!ServerCompat.getInstance().canDanmaku || !mid || mid.trim().length === 0) {
+      console.info('[Danmaku] 当前非 V3 协议或缺少影片ID，跳过请求');
       return [];
     }
     const params = new QueryParams()

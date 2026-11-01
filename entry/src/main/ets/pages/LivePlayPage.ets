@@ -382,6 +382,7 @@ struct LivePlayPage {
       videoUrl: this.playUrl,
       reloadToken: this.playToken,
       title: this.playTitle,
+      allowDanmaku: false,
       poster: this.picture,
       initialTime: this.initialTime,
       showBack: true,

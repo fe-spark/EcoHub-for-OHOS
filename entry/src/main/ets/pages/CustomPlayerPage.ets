@@ -215,6 +215,7 @@ struct CustomPlayerPage {
           VideoPlayer({
             videoUrl: this.playUrl,
             title: '自定义播放',
+            allowDanmaku: false,
             showBack: this.playerFull,
             isFull: this.playerFull,
             pageActive: this.playerActive,
