@@ -451,23 +451,17 @@ struct LivePlayPage {
 
   @Builder
   playBody() {
-    Row() {
-      // 1. 播放器容器：背景纯黑，视频画布始终撑满铺满整个区域（padding为0，适应/填充/拉伸完全生效）
-      // 安全避让距离仅作用于内部浮层控件（HUD/返回键/控制条），画面本身绝不缩进
-      Column() { this.playVideo() }
-        .layoutWeight(this.splitPlay() ? 7 : undefined)
-        .width(this.splitPlay() ? undefined : '100%')
-        .height(this.splitPlay() || this.playerFull ? '100%' : 'auto')
-        .backgroundColor('#000000')
-        .padding({
-          top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
-          left: 0,
-          right: 0,
-          bottom: 0
-        })
+    if (this.playerFull) {
+      // 1. 全屏模式：播放器填满全屏
+      this.playVideo()
+    } else if (this.splitPlay()) {
+      // 2. 横屏分栏模式（左右排版）
+      Row() {
+        Column() { this.playVideo() }
+          .layoutWeight(7)
+          .height('100%')
+          .backgroundColor('#000000')
 
-      // 2. 横屏分栏模式（右侧面板）
-      if (this.splitPlay()) {
         Column() {
           Column().width(1).height('100%').backgroundColor('rgba(255, 255, 255, 0.14)')
         }
@@ -484,23 +478,35 @@ struct LivePlayPage {
           })
           .backgroundColor(AppTheme.BG_ELEVATED)
       }
-    }
-    .width('100%')
-    .layoutWeight(this.splitPlay() || this.playerFull ? 1 : 0)
-
-    // 3. 竖屏模式（下方选集与详情列表）
-    if (!this.playerFull && !this.splitPlay()) {
-      Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
-      Column() {
-        this.sideTabs()
-      }
-      .layoutWeight(1)
       .width('100%')
-      .padding({
-        left: this.leftInset,
-        right: this.rightInset,
-        bottom: this.bottomInset
-      })
+      .height('100%')
+    } else {
+      // 3. 竖屏模式（上下纯正垂直排版，顶层放置播放器，杜绝Row与layoutWeight死锁挤压成线！）
+      Column() {
+        Column() {
+          this.playVideo()
+        }
+        .width('100%')
+        .backgroundColor('#000000')
+        .padding({
+          top: this.topInset
+        })
+
+        Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
+
+        Column() {
+          this.sideTabs()
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .padding({
+          left: this.leftInset,
+          right: this.rightInset,
+          bottom: this.bottomInset
+        })
+      }
+      .width('100%')
+      .height('100%')
     }
   }
 

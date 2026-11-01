@@ -186,7 +186,8 @@ export class WindowBar {
         WindowBar.pendingWidth = size.width;
         WindowBar.pendingHeight = size.height;
       }
-      WindowBar.scheduleFlush(WindowBar.listenedWin);
+      // 尺寸变动立即同步生效，绝不延后 16ms，确保旋转首帧断点与分栏判定完全同步
+      WindowBar.flush(WindowBar.listenedWin);
     };
 
     win.on('avoidAreaChange', WindowBar.onAvoid);
