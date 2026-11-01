@@ -428,6 +428,7 @@ export struct VideoPlayer {
         xComponentController: this.xComponentController,
         poster: this.poster, ready: this.ready, opening: this.opening,
         videoWidth: this.videoWidth, videoHeight: this.videoHeight, scaleMode: this.scaleMode,
+        isFull: this.fullNow(),
         onXComponentLoad: (ctx: object, sId: string) => this.playerAv.setXComponentContext(ctx, sId)
       })
 

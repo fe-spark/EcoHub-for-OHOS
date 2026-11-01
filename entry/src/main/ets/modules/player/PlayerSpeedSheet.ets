@@ -34,13 +34,16 @@ export struct PlayerSpeedSheet {
         onPickSpeed: (index: number) => {
           this.onPick(index);
           this.close();
+        },
+        onClose: () => {
+          this.close();
         }
       }),
       autoCancel: true,
       alignment: isLand ? DialogAlignment.BottomEnd : DialogAlignment.Bottom,
       customStyle: true,
       backgroundColor: Color.Transparent,
-      maskColor: isLand ? 'rgba(0,0,0,0.36)' : 'rgba(0,0,0,0.50)',
+      maskColor: isLand ? 'rgba(0,0,0,0.36)' : 'rgba(0,0,0,0.25)',
       cancel: () => {
         this.dialog = null;
         this.onClosed();
@@ -54,6 +57,7 @@ export struct PlayerSpeedSheet {
       this.dialog.close();
       this.dialog = null;
     }
+    this.onClosed();
   }
 
   build() {

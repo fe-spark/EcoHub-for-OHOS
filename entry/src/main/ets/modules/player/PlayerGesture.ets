@@ -17,6 +17,7 @@ export struct PlayerGestureLayer {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(Color.Transparent)
     .gesture(
       GestureGroup(GestureMode.Exclusive,
         TapGesture({ count: 2 })
@@ -47,7 +48,7 @@ export struct PlayerGestureLayer {
               this.onLongPressEnd();
             }
           }),
-        PanGesture({ fingers: 1, direction: PanDirection.All, distance: 18 })
+        PanGesture({ fingers: 1, direction: PanDirection.All, distance: 24 })
           .onActionStart((event: GestureEvent) => {
             if (!this.ignoreHit && this.onPanStart) {
               this.onPanStart(event);

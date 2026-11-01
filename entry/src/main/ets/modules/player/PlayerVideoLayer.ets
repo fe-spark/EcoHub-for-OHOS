@@ -12,11 +12,28 @@ export struct PlayerVideoLayer {
   @Prop videoWidth: number = 0;
   @Prop videoHeight: number = 0;
   @Prop scaleMode: number = PlayerScaleMode.FIT;
+  @Prop isFull: boolean = false;
   onXComponentLoad?: (context: object, surfaceId: string) => void;
   xComponentController: XComponentController = new XComponentController();
+  @State private containerW: number = 0;
+  @State private containerH: number = 0;
 
   private isPortraitVideo(): boolean {
     return this.videoHeight > 0 && this.videoWidth > 0 && this.videoHeight > this.videoWidth;
+  }
+
+  private getVideoRatio(): number {
+    if (this.videoWidth > 0 && this.videoHeight > 0) {
+      return this.videoWidth / this.videoHeight;
+    }
+    return this.isPortraitVideo() ? (9 / 16) : (16 / 9);
+  }
+
+  private isWideContainer(): boolean {
+    if (this.containerW > 0 && this.containerH > 0) {
+      return (this.containerW / this.containerH) > this.getVideoRatio();
+    }
+    return this.isFull;
   }
 
   private getTargetWidth(): Length | undefined {
@@ -24,11 +41,13 @@ export struct PlayerVideoLayer {
       return PlayerVideoLayer.FULL_PERCENT;
     }
     if (this.scaleMode === PlayerScaleMode.COVER) {
-      // 填充 (COVER)：竖屏视频锁定宽度为 100%，高度等比放大超出裁剪；横屏视频由高度决定
-      return this.isPortraitVideo() ? PlayerVideoLayer.FULL_PERCENT : undefined;
+      // 填充 (COVER)：
+      // 1. 全屏时（容器比 16:9 视频更宽）：必须锁宽 100%，高度等比放大超出上下裁切，消灭左右黑边！
+      // 2. 分栏时（容器比 16:9 视频更窄）：锁高 100%，宽度等比放大超出左右裁切，消灭上下黑边（当前确认正确）
+      return this.isWideContainer() ? PlayerVideoLayer.FULL_PERCENT : undefined;
     }
-    // 适应 (FIT)：横屏视频锁宽 100%，竖屏视频留黑边
-    return this.isPortraitVideo() ? undefined : PlayerVideoLayer.FULL_PERCENT;
+    // 适应 (FIT)：全屏下锁高 100% 居中，左右留黑边；分栏下锁宽 100% 居中，上下留黑边
+    return this.isWideContainer() ? undefined : PlayerVideoLayer.FULL_PERCENT;
   }
 
   private getTargetHeight(): Length | undefined {
@@ -36,13 +55,12 @@ export struct PlayerVideoLayer {
       return PlayerVideoLayer.FULL_PERCENT;
     }
     if (this.scaleMode === PlayerScaleMode.COVER) {
-      // 填充 (COVER)：横屏视频锁定高度为 100%，宽度等比放大超出裁剪；竖屏视频由宽度决定
-      return this.isPortraitVideo() ? undefined : PlayerVideoLayer.FULL_PERCENT;
+      // 填充 (COVER)：全屏下高度等比放大超出裁切；分栏下高度锁满 100%
+      return this.isWideContainer() ? undefined : PlayerVideoLayer.FULL_PERCENT;
     }
-    // 适应 (FIT)：竖屏视频锁高 100%，横屏视频留黑边
-    return this.isPortraitVideo() ? PlayerVideoLayer.FULL_PERCENT : undefined;
+    // 适应 (FIT)：全屏下高度锁 100%；分栏下由宽高比自适应
+    return this.isWideContainer() ? PlayerVideoLayer.FULL_PERCENT : undefined;
   }
-
   build() {
     Stack({ alignContent: Alignment.Center }) {
       XComponent({
@@ -58,7 +76,7 @@ export struct PlayerVideoLayer {
             ? undefined
             : (this.videoWidth > 0 && this.videoHeight > 0
                 ? (this.videoWidth / this.videoHeight)
-                : undefined)
+                : (this.isPortraitVideo() ? (9 / 16) : (16 / 9)))
         )
         .constraintSize(
           this.scaleMode === PlayerScaleMode.COVER
@@ -94,5 +112,13 @@ export struct PlayerVideoLayer {
     .height(PlayerVideoLayer.FULL_PERCENT)
     .backgroundColor(PlayerVideoLayer.BG_COLOR)
     .clip(true)
+    .onAreaChange((_old: Area, area: Area) => {
+      const w = Number(area.width);
+      const h = Number(area.height);
+      if (w > 0 && h > 0 && (this.containerW !== w || this.containerH !== h)) {
+        this.containerW = w;
+        this.containerH = h;
+      }
+    })
   }
 }

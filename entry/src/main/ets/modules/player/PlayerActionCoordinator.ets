@@ -169,7 +169,13 @@ export class PlayerActionCoordinator {
         }
       },
       onToggleHud: () => {
-        if (this.speedCtrl.showing || this.gestures.pan.mode > 1) return;
+        if (this.gestures.pan.mode > 1) {
+          this.gestures.pan.reset();
+          return;
+        }
+        if (this.speedCtrl.showing) {
+          this.speedCtrl.setShowing(false);
+        }
         if (host.isShowHud()) {
           if (!host.isPlayRequested() || host.isCompleted()) return;
           host.setShowHud(false);

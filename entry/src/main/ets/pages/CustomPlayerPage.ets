@@ -221,7 +221,7 @@ struct CustomPlayerPage {
             topInset: this.playerFull ? this.topInset : 0,
             leftInset: this.playerFull ? this.leftInset : 0,
             rightInset: this.playerFull ? this.rightInset : 0,
-            bottomInset: this.playerFull ? this.bottomInset : 0,
+            bottomInset: 0,
             onBack: () => this.setPlayerFull(false),
             onFullscreenChange: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => {
               this.setPlayerFull(full, isPortrait === true, isLandscape === true);

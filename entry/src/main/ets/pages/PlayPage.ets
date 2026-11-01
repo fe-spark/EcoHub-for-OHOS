@@ -348,7 +348,7 @@ struct PlayPage {
   private hudLeftInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0; }
   private hudRightInset(): number { return this.playerFull ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : AppTheme.SAFE_EDGE; }
   private hudTopInset(): number { return (this.playerFull || this.splitPlay()) ? this.topInset : 0; }
-  private hudBottomInset(): number { return (this.playerFull || this.splitPlay()) ? this.bottomInset : 0; }
+  private hudBottomInset(): number { return 0; }
 
   @Builder
   playTabItem(title: string, index: number) {
@@ -468,67 +468,52 @@ struct PlayPage {
 
   @Builder
   playBody() {
-    if (this.playerFull) {
-      // 1. 全屏模式：播放器填满全屏
-      this.playVideo()
-    } else if (this.splitPlay()) {
-      // 2. 横屏分栏模式（左右排版）
-      Row() {
-        Column() {
-          this.playVideo()
-        }
-        .layoutWeight(7)
-        .height('100%')
-        .backgroundColor('#000000')
+    Flex({
+      direction: this.splitPlay() ? FlexDirection.Row : FlexDirection.Column,
+      justifyContent: FlexAlign.Start,
+      alignItems: ItemAlign.Start
+    }) {
+      // 1. 播放器容器（单例常驻节点，跨全屏/横屏分栏/竖屏模式永不销毁重建，彻底消除旋转重新加载与黑屏！）
+      Column() {
+        this.playVideo()
+      }
+      .width(this.splitPlay() ? undefined : '100%')
+      .height(this.splitPlay() || this.playerFull ? '100%' : undefined)
+      .layoutWeight(this.playerFull ? 1 : (this.splitPlay() ? 7 : undefined))
+      .backgroundColor('#000000')
+      .padding({
+        top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset
+      })
 
+      // 2. 分割条（全屏时隐藏）
+      if (this.splitPlay()) {
         Column() {
           Column().width(1).height('100%').backgroundColor('rgba(255, 255, 255, 0.14)')
         }
         .height('100%')
         .padding({ top: this.topInset, bottom: this.bottomInset })
-
-        Column() {
-          this.sideTabs()
-        }
-        .layoutWeight(5)
-        .height('100%')
-        .padding({
-          top: this.topInset,
-          bottom: this.bottomInset,
-          right: this.rightInset
-        })
-        .backgroundColor(AppTheme.BG_ELEVATED)
-      }
-      .width('100%')
-      .height('100%')
-    } else {
-      // 3. 竖屏模式（上下纯正垂直排版，顶层放置播放器，杜绝Row与layoutWeight死锁挤压成线！）
-      Column() {
-        Column() {
-          this.playVideo()
-        }
-        .width('100%')
-        .backgroundColor('#000000')
-        .padding({
-          top: this.topInset
-        })
-
+      } else if (!this.playerFull) {
         Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
-
-        Column() {
-          this.sideTabs()
-        }
-        .layoutWeight(1)
-        .width('100%')
-        .padding({
-          left: this.leftInset,
-          right: this.rightInset,
-          bottom: this.bottomInset
-        })
       }
-      .width('100%')
-      .height('100%')
+
+      // 3. 选集与详情列表（全屏时隐藏）
+      Column() {
+        this.sideTabs()
+      }
+      .width(this.splitPlay() ? undefined : '100%')
+      .height(this.splitPlay() ? '100%' : undefined)
+      .layoutWeight(this.playerFull ? 0 : (this.splitPlay() ? 5 : 1))
+      .visibility(this.playerFull ? Visibility.None : Visibility.Visible)
+      .padding({
+        top: this.splitPlay() ? this.topInset : 0,
+        bottom: this.bottomInset,
+        left: this.splitPlay() ? 0 : this.leftInset,
+        right: this.rightInset
+      })
+      .backgroundColor(this.splitPlay() ? AppTheme.BG_ELEVATED : Color.Transparent)
     }
+    .width('100%')
+    .height('100%')
   }
 
   build() {

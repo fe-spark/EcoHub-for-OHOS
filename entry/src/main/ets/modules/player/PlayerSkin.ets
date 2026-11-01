@@ -158,11 +158,11 @@ export struct PlayerSkin {
       style: SliderStyle.OutSet
     })
       .width('100%')
-      .height(20)
-      .trackThickness(2)
-      .blockSize({ width: 12, height: 12 })
+      .height(18)
+      .trackThickness(3)
+      .blockSize({ width: 10, height: 10 })
       .blockColor('#FFFFFF')
-      .trackColor('rgba(255,255,255,0.28)')
+      .trackColor('rgba(255,255,255,0.22)')
       .selectedColor(AppTheme.ACCENT)
       .enabled(this.duration > 0 && this.ready)
       .onChange((value: number, mode: SliderChangeMode) => {
@@ -219,11 +219,30 @@ export struct PlayerSkin {
   }
 
   @Builder
-  playToggle() {
+  timeBlock(compact: boolean = false) {
+    Row({ space: 2 }) {
+      Text(FormatUtil.duration(this.currentTime))
+        .fontSize(compact ? 11 : 12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#FFFFFF')
+      Text('/')
+        .fontSize(compact ? 10 : 11)
+        .fontColor('rgba(255,255,255,0.40)')
+        .margin({ left: 3, right: 3 })
+      Text(FormatUtil.duration(this.duration))
+        .fontSize(compact ? 11 : 12)
+        .fontColor('rgba(255,255,255,0.65)')
+    }
+    .alignItems(VerticalAlign.Center)
+    .margin({ left: 4 })
+  }
+
+  @Builder
+  playToggle(boxSize: number = 36, iconSize: number = 22) {
     PlayerIconBtn({
       src: this.continuing() ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'),
-      iconSize: 20,
-      boxSize: 40,
+      iconSize: iconSize,
+      boxSize: boxSize,
       onTap: this.onPlay
     })
   }
@@ -282,73 +301,104 @@ export struct PlayerSkin {
   bottomBar() {
     if (this.showBottom()) {
       if (this.cinemaHud()) {
-        Column({ space: 2 }) {
+        Column({ space: 4 }) {
           this.sliderBar()
           Row() {
-            this.playToggle()
-            Text(this.timeText())
-              .fontSize(12)
-              .fontColor('rgba(255,255,255,0.92)')
-              .margin({ left: 4 })
-              .maxLines(1)
-            Blank()
-            PlayerChip({ label: this.scaleLabel, canTap: this.ready, onTap: this.onScale })
-            PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
-            PlayerIconBtn({
-              src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
-              iconSize: 20,
-              boxSize: 40,
-              onTap: this.onMute
-            })
-            if (!this.castDeviceName) {
-              PlayerIconBtn({
-                src: this.isFull ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') :
-                  $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-                iconSize: 20,
-                boxSize: 40,
-                onTap: this.onFull
-              })
+            // 左侧控制群组：播放/暂停、下一集、时间刻度
+            Row({ space: 4 }) {
+              this.playToggle(36, 22)
+              if (this.hasNext) {
+                PlayerIconBtn({
+                  src: $r('sys.symbol.forward_end_fill'),
+                  iconSize: 18,
+                  boxSize: 36,
+                  onTap: this.onNext
+                })
+              }
+              this.timeBlock(false)
             }
+            .alignItems(VerticalAlign.Center)
+
+            Blank()
+
+            // 右侧功能调节群组：倍速胶囊、比例胶囊、静音开关、全屏切换
+            Row({ space: 8 }) {
+              PlayerChip({
+                label: this.speedLabel,
+                canTap: this.ready,
+                highlight: this.speedLabel !== '1.0x',
+                onTap: this.onSpeed
+              })
+              PlayerChip({
+                label: this.scaleLabel,
+                canTap: this.ready,
+                highlight: this.scaleLabel !== '适应',
+                onTap: this.onScale
+              })
+              PlayerIconBtn({
+                src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
+                iconSize: 20,
+                boxSize: 36,
+                onTap: this.onMute
+              })
+              if (!this.castDeviceName) {
+                PlayerIconBtn({
+                  src: this.isFull ? $r('sys.symbol.exit_full_screen') : $r('sys.symbol.full_screen'),
+                  iconSize: 20,
+                  boxSize: 36,
+                  onTap: this.onFull
+                })
+              }
+            }
+            .alignItems(VerticalAlign.Center)
           }
           .width('100%')
-          .height(44)
+          .height(38)
           .alignItems(VerticalAlign.Center)
         }
         .width('100%')
         .padding({
           left: Math.max(14, this.leftInset + 10),
           right: Math.max(14, this.rightInset + 10),
-          bottom: Math.max(12, this.bottomInset + 8),
-          top: 6
+          bottom: Math.max(10, this.bottomInset),
+          top: 8
         })
         .linearGradient({
           angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
+          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.36)', 0.45], ['rgba(0,0,0,0.78)', 1]]
         })
       } else {
-        Row() {
-          this.playToggle()
+        Row({ space: 6 }) {
+          this.playToggle(34, 20)
+          Text(FormatUtil.duration(this.currentTime))
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
           Column() {
             this.sliderBar()
           }
           .layoutWeight(1)
-          .margin({ left: 2, right: 8 })
-          Text(this.timeText())
+          .margin({ left: 2, right: 2 })
+          Text(FormatUtil.duration(this.duration))
             .fontSize(11)
-            .fontColor('rgba(255,255,255,0.88)')
-            .maxLines(1)
-          PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
+            .fontColor('rgba(255,255,255,0.60)')
+          PlayerChip({
+            label: this.speedLabel,
+            canTap: this.ready,
+            highlight: this.speedLabel !== '1.0x',
+            onTap: this.onSpeed
+          })
           if (!this.castDeviceName) {
             PlayerIconBtn({
-              src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-              iconSize: 20,
-              boxSize: 40,
+              src: $r('sys.symbol.full_screen'),
+              iconSize: 18,
+              boxSize: 34,
               onTap: this.onFull
             })
           }
         }
         .width('100%')
-        .height(44)
+        .height(38)
         .alignItems(VerticalAlign.Center)
         .padding({
           left: Math.max(10, this.leftInset + 6),
@@ -357,7 +407,7 @@ export struct PlayerSkin {
         })
         .linearGradient({
           angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
+          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.36)', 0.45], ['rgba(0,0,0,0.78)', 1]]
         })
       }
     } else if (!this.errorText && this.ready) {

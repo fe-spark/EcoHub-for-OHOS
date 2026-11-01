@@ -212,24 +212,25 @@ export class WindowBar {
         return;
       }
       // 1. 规避区运算（基于内存缓存，0 次跨进程 IPC 查询）
-      const top = Math.max(
-        WindowBar.cachedSystem?.topRect.height || 0,
-        WindowBar.cachedCutout?.topRect.height || 0
-      );
-      const bottom = Math.max(
-        WindowBar.cachedNav?.bottomRect.height || 0,
-        WindowBar.cachedSystem?.bottomRect.height || 0,
-        WindowBar.cachedCutout?.bottomRect.height || 0
-      );
+      const top = WindowBar.barsWanted
+        ? Math.max(WindowBar.cachedSystem?.topRect.height || 0, WindowBar.cachedCutout?.topRect.height || 0)
+        : (WindowBar.cachedCutout?.topRect.height || 0);
+      const bottom = WindowBar.barsWanted
+        ? Math.max(
+            WindowBar.cachedNav?.bottomRect.height || 0,
+            WindowBar.cachedSystem?.bottomRect.height || 0,
+            WindowBar.cachedCutout?.bottomRect.height || 0
+          )
+        : (WindowBar.cachedCutout?.bottomRect.height || 0);
       const left = Math.max(
-        WindowBar.cachedSystem?.leftRect.width || 0,
+        WindowBar.barsWanted ? (WindowBar.cachedSystem?.leftRect.width || 0) : 0,
         WindowBar.cachedCutout?.leftRect.width || 0,
-        WindowBar.cachedNav?.leftRect.width || 0
+        WindowBar.barsWanted ? (WindowBar.cachedNav?.leftRect.width || 0) : 0
       );
       const right = Math.max(
-        WindowBar.cachedSystem?.rightRect.width || 0,
+        WindowBar.barsWanted ? (WindowBar.cachedSystem?.rightRect.width || 0) : 0,
         WindowBar.cachedCutout?.rightRect.width || 0,
-        WindowBar.cachedNav?.rightRect.width || 0
+        WindowBar.barsWanted ? (WindowBar.cachedNav?.rightRect.width || 0) : 0
       );
       const keyboardHeight = WindowBar.cachedKeyboard?.bottomRect.height || 0;
 

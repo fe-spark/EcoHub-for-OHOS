@@ -154,6 +154,7 @@ export struct PlayerChip {
   private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop label: string = '';
   @Prop canTap: boolean = true;
+  @Prop highlight: boolean = false;
   onTap?: () => void;
   private lastTapAt: number = 0;
 
@@ -172,17 +173,27 @@ export struct PlayerChip {
   }
 
   build() {
-    Text(this.label)
-      .fontSize(13)
-      .fontWeight(FontWeight.Medium)
-      .fontColor(this.canTap ? '#FFFFFF' : 'rgba(255,255,255,0.35)')
-      .height(44)
-      .padding({ left: 8, right: 8 })
-      .textAlign(TextAlign.Center)
-      .priorityGesture(
-        TapGesture({ count: 1 })
-          .onAction(() => this.handleTap())
-      )
+    Row() {
+      Text(this.label)
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.canTap ? (this.highlight ? AppTheme.ACCENT : '#FFFFFF') : 'rgba(255,255,255,0.35)')
+        .lineHeight(14)
+        .hitTestBehavior(HitTestMode.None)
+    }
+    .height(26)
+    .padding({ left: 9, right: 9 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor(this.highlight ? 'rgba(0, 180, 216, 0.16)' : 'rgba(255, 255, 255, 0.12)')
+    .borderRadius(13)
+    .borderWidth(0.5)
+    .borderColor(this.highlight ? 'rgba(0, 180, 216, 0.35)' : 'rgba(255, 255, 255, 0.18)')
+    .responseRegion({ x: 0, y: 0, width: '100%', height: '100%' })
+    .priorityGesture(
+      TapGesture({ count: 1 })
+        .onAction(() => this.handleTap())
+    )
   }
 }
 

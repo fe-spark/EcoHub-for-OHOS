@@ -21,10 +21,10 @@ export struct PlayerTip {
       return $r('sys.symbol.sun_max');
     }
     if (this.kind === PlayerTipKind.VOLUME) {
-      return this.message === '0%' ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2');
+      return this.message === '0%' ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill');
     }
     if (this.kind === PlayerTipKind.SCALE) {
-      return $r('sys.symbol.arrow_up_left_and_arrow_down_right');
+      return $r('sys.symbol.full_screen');
     }
     return $r('sys.symbol.play_fill');
   }
@@ -336,6 +336,7 @@ export struct PlayerSpeedDialog {
   controller?: CustomDialogController
   speedLabel: string = '1.0x'
   onPickSpeed: (index: number) => void = (_index: number) => {}
+  onClose?: () => void;
   @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16;
   @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
   @StorageLink('SAFE_INSET_TOP') private topInset: number = 0;
@@ -419,76 +420,107 @@ export struct PlayerSpeedDialog {
       .borderRadius({ topLeft: 16, bottomLeft: 16 })
       .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
     } else {
-      // 竖屏/半屏：移动端标准的底部平滑抽屉 (Bottom Sheet)
+      // 竖屏/半屏：轻量优雅的影院级悬浮微卡片 (Floating Cinema Card)
       Column() {
-        Row()
-          .width(36)
-          .height(4)
-          .borderRadius(2)
-          .backgroundColor('rgba(255, 255, 255, 0.22)')
-          .margin({ top: 8, bottom: 14 })
-
+        // 1. 顶部标题栏：图标 + 标题 + 当前倍速徽章 + 关闭按钮
         Row() {
-          Text('播放速度')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-          Blank()
-          Row() {
-            Text(`当前 ${this.speedLabel}`)
-              .fontSize(12)
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.video_speed'))
+              .fontSize(18)
+              .fontColor([AppTheme.ACCENT])
+            Text('播放速度')
+              .fontSize(15)
               .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.ACCENT)
+              .fontColor('#FFFFFF')
           }
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .backgroundColor(AppTheme.ACCENT_SOFT)
-          .borderRadius(AppTheme.RADIUS_PILL)
+          .alignItems(VerticalAlign.Center)
+
+          Blank()
+
+          Row({ space: 8 }) {
+            Row() {
+              Text(this.speedLabel === '1.0x' ? '1.0x 标准' : this.speedLabel)
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.ACCENT)
+            }
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor('rgba(0, 180, 216, 0.14)')
+            .borderRadius(10)
+            .border({ width: 0.5, color: 'rgba(0, 180, 216, 0.28)' })
+
+            // 关闭按钮
+            Column() {
+              SymbolGlyph($r('sys.symbol.xmark'))
+                .fontSize(12)
+                .fontColor(['rgba(255, 255, 255, 0.65)'])
+            }
+            .width(26)
+            .height(26)
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .borderRadius(13)
+            .onClick(() => {
+              if (this.onClose) {
+                this.onClose();
+              } else if (this.controller) {
+                this.controller.close();
+              }
+            })
+          }
+          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .margin({ bottom: 16 })
+        .padding({ bottom: 14 })
 
-        GridRow({ columns: 4, gutter: { x: 8, y: 8 } }) {
-          ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
-            GridCol() {
+        // 2. 倍速单行流线胶囊轨道 (水平顺畅滑动，杜绝网格破洞缺角)
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
               Row() {
-                Text(label)
-                  .fontSize(14)
+                Text(label === '1.0x' ? '1.0x 标准' : label)
+                  .fontSize(13)
                   .fontWeight(this.speedLabel === label ? FontWeight.Bold : FontWeight.Medium)
-                  .fontColor(this.speedLabel === label ? '#FFFFFF' : AppTheme.TEXT_PRIMARY)
+                  .fontColor(this.speedLabel === label ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)')
+                  .lineHeight(15)
               }
-              .width('100%')
-              .height(40)
+              .height(36)
+              .padding({ left: 14, right: 14 })
               .justifyContent(FlexAlign.Center)
-              .backgroundColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.07)')
-              .borderRadius(AppTheme.RADIUS_MD)
+              .alignItems(VerticalAlign.Center)
+              .backgroundColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)')
+              .borderRadius(18)
               .border({
-                width: 1,
-                color: this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
+                width: 0.5,
+                color: this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.12)'
               })
+              .shadow(this.speedLabel === label ? { radius: 8, color: 'rgba(0, 180, 216, 0.35)', offsetY: 2 } : { radius: 0, color: Color.Transparent })
               .onClick(() => {
                 this.onPickSpeed(index);
                 if (this.controller) {
                   this.controller.close();
                 }
               })
-            }
-          }, (label: string) => `spd_p_${label}`)
+            }, (label: string) => `spd_p_${label}`)
+          }
+          .padding({ left: 2, right: 2, top: 2, bottom: 4 })
         }
         .width('100%')
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
       }
-      .width('100%')
-      .padding({
-        left: 20,
-        right: 20,
-        bottom: Math.max(24, this.bottomInset + 12)
-      })
-      .backgroundColor('#1A1C23')
-      .borderRadius({ topLeft: 24, topRight: 24 })
-      .border({ width: { top: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
+      .width('calc(100% - 32vp)')
+      .margin({ left: 16, right: 16, bottom: Math.max(16, this.bottomInset + 8) })
+      .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+      .backgroundColor('rgba(24, 26, 34, 0.94)')
+      .borderRadius(20)
+      .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.16)' })
+      .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.45)', offsetY: 8 })
     }
   }
 }
-
 @CustomDialog
 export struct PlayerScaleDialog {
   controller?: CustomDialogController
@@ -584,55 +616,78 @@ export struct PlayerScaleDialog {
       .borderRadius({ topLeft: 16, bottomLeft: 16 })
       .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
     } else {
-      // 竖屏/半屏：移动端标准的底部平滑抽屉 (Bottom Sheet)
+      // 竖屏/半屏：轻量优雅的影院级悬浮微卡片 (Floating Cinema Card)
       Column() {
-        Row()
-          .width(36)
-          .height(4)
-          .borderRadius(2)
-          .backgroundColor('rgba(255, 255, 255, 0.22)')
-          .margin({ top: 8, bottom: 14 })
-
         Row() {
-          Text('画面填充')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-          Blank()
-          Row() {
-            Text(`当前 ${PlayerScale.label(this.scaleMode, this.isPortrait)}`)
-              .fontSize(12)
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.full_screen'))
+              .fontSize(18)
+              .fontColor([AppTheme.ACCENT])
+            Text('画面填充')
+              .fontSize(15)
               .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.ACCENT)
+              .fontColor('#FFFFFF')
           }
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .backgroundColor(AppTheme.ACCENT_SOFT)
-          .borderRadius(AppTheme.RADIUS_PILL)
+          .alignItems(VerticalAlign.Center)
+
+          Blank()
+
+          Row({ space: 8 }) {
+            Row() {
+              Text(PlayerScale.label(this.scaleMode, this.isPortrait))
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.ACCENT)
+            }
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor('rgba(0, 180, 216, 0.14)')
+            .borderRadius(10)
+            .border({ width: 0.5, color: 'rgba(0, 180, 216, 0.28)' })
+
+            Column() {
+              SymbolGlyph($r('sys.symbol.xmark'))
+                .fontSize(12)
+                .fontColor(['rgba(255, 255, 255, 0.65)'])
+            }
+            .width(26)
+            .height(26)
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .borderRadius(13)
+            .onClick(() => {
+              if (this.controller) {
+                this.controller.close();
+              }
+            })
+          }
+          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .margin({ bottom: 16 })
+        .padding({ bottom: 14 })
 
         Row({ space: 10 }) {
           ForEach(PlayerScale.items(this.isPortrait), (item: PlayerScaleItem) => {
-            Column({ space: 4 }) {
+            Column({ space: 3 }) {
               Text(item.label)
-                .fontSize(14)
+                .fontSize(13)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(this.scaleMode === item.mode ? AppTheme.ACCENT : AppTheme.TEXT_PRIMARY)
+                .fontColor(this.scaleMode === item.mode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)')
               Text(item.desc)
-                .fontSize(11)
-                .fontColor(this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.85)' : AppTheme.TEXT_MUTED)
+                .fontSize(10)
+                .fontColor(this.scaleMode === item.mode ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.45)')
             }
             .layoutWeight(1)
-            .height(56)
+            .height(52)
             .justifyContent(FlexAlign.Center)
             .alignItems(HorizontalAlign.Center)
-            .backgroundColor(this.scaleMode === item.mode ? AppTheme.ACCENT_SOFT : 'rgba(255, 255, 255, 0.07)')
-            .borderRadius(AppTheme.RADIUS_MD)
+            .backgroundColor(this.scaleMode === item.mode ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)')
+            .borderRadius(14)
             .border({
-              width: 1,
-              color: this.scaleMode === item.mode ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)'
+              width: 0.5,
+              color: this.scaleMode === item.mode ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.12)'
             })
+            .shadow(this.scaleMode === item.mode ? { radius: 8, color: 'rgba(0, 180, 216, 0.35)', offsetY: 2 } : { radius: 0, color: Color.Transparent })
             .onClick(() => {
               this.onPickScale(item.mode);
               if (this.controller) {
@@ -643,15 +698,13 @@ export struct PlayerScaleDialog {
         }
         .width('100%')
       }
-      .width('100%')
-      .padding({
-        left: 20,
-        right: 20,
-        bottom: Math.max(24, this.bottomInset + 12)
-      })
-      .backgroundColor('#1A1C23')
-      .borderRadius({ topLeft: 24, topRight: 24 })
-      .border({ width: { top: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
+      .width('calc(100% - 32vp)')
+      .margin({ left: 16, right: 16, bottom: Math.max(16, this.bottomInset + 8) })
+      .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+      .backgroundColor('rgba(24, 26, 34, 0.94)')
+      .borderRadius(20)
+      .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.16)' })
+      .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.45)', offsetY: 8 })
     }
   }
 }

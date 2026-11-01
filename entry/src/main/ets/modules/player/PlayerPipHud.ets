@@ -56,7 +56,7 @@ export struct PlayerPipHud {
         Button({ type: ButtonType.Capsule }) {
           Row({ space: 6 }) {
             AppIcon({
-              src: $r('sys.symbol.arrow_down_right_and_arrow_up_left'),
+              src: $r('sys.symbol.exit_full_screen'),
               iconSize: 13,
               color: '#FFFFFF'
             })
