@@ -19,6 +19,7 @@ export struct FilmCard {
   private lastFilmId: string = '';
 
   aboutToAppear(): void {
+    this.lastFilmId = FormatUtil.filmId(this.film);
     this.updateFavState();
     this.favChangeCb = () => {
       this.updateFavState();
@@ -49,6 +50,21 @@ export struct FilmCard {
 
   private posterUrl(): string {
     return FormatUtil.poster(this.film);
+  }
+
+  private isPosterBroken(): boolean {
+    return this.broken || !this.posterUrl();
+  }
+
+  private initialLetter(): string {
+    const raw = (this.film.name || '').trim();
+    if (!raw) {
+      return '影';
+    }
+    const stripped = raw.replace(/^[\[【(（][^\]】)）]{1,10}[\]】)）]\s*/, '').trim();
+    const target = stripped || raw;
+    const finalStr = target.replace(/^[《〈"“'‘『「【\[(（\s]+/, '').trim() || target;
+    return finalStr.charAt(0).toUpperCase() || '影';
   }
 
   private cardSize(): Length {
@@ -99,31 +115,38 @@ export struct FilmCard {
   build() {
     Column() {
       Stack({ alignContent: Alignment.BottomEnd }) {
-        // 1. 骨架底座：无论是否加载中，始终保持影院质感与菲林水印，绝不“缺一块”
+        // 1. 底座骨架层：加载中显示胶卷占位；无图或加载失败时切换为独立首字母兜底徽章，彻底避免重叠冲突
         Column() {
-          Stack({ alignContent: Alignment.Center }) {
+          if (this.isPosterBroken()) {
+            Column() {
+              Text(this.initialLetter())
+                .fontSize(24)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('rgba(255, 255, 255, 0.85)')
+            }
+            .width(44)
+            .height(44)
+            .justifyContent(FlexAlign.Center)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .borderRadius(22)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.14)' })
+          } else {
             AppIcon({
               src: $r('sys.symbol.film'),
               iconSize: 32,
               color: 'rgba(255, 255, 255, 0.12)'
             })
-            if (this.broken) {
-              Text(this.film.name ? this.film.name.substring(0, 1) : '影')
-                .fontSize(20)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('rgba(255, 255, 255, 0.35)')
-            }
           }
-          .width('100%')
-          .height('100%')
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('rgba(255, 255, 255, 0.04)')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor(this.isPosterBroken() ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.04)')
         .borderRadius(AppTheme.RADIUS_MD)
 
-        // 2. 真实海报：直接渲染，加载中自然透视底层胶卷底座，加载后直接呈现
-        if (!this.broken && this.posterUrl()) {
+        // 2. 真实海报：存在有效海报且尚未出错时渲染，成功后直接覆盖底层骨架
+        if (!this.isPosterBroken()) {
           Image(this.posterUrl())
             .width('100%')
             .height('100%')
@@ -142,6 +165,7 @@ export struct FilmCard {
             angle: 180,
             colors: [['rgba(0,0,0,0)', 0.65], ['rgba(10,11,16,0.60)', 1]]
           })
+          .hitTestBehavior(HitTestMode.Transparent)
 
         if (this.isFav) {
           Row() {

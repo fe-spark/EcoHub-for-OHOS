@@ -24,6 +24,8 @@ export struct PlayerSkin {
   @Prop muted: boolean = false;
   @Prop speedLabel: string = '1.0x';
   @Prop scaleLabel: string = '适应';
+  @Prop danmakuEnabled: boolean = true;
+  @Prop canDanmaku: boolean = true;
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -46,6 +48,7 @@ export struct PlayerSkin {
   onNext?: () => void;
   onSpeed?: () => void;
   onScale?: () => void;
+  onToggleDanmaku?: () => void;
   onRetry?: () => void;
   onErrorDetail?: () => void;
   onSeekBack?: () => void;
@@ -110,6 +113,10 @@ export struct PlayerSkin {
 
   private cinemaHud(): boolean {
     return this.isFull || this.edgeHud;
+  }
+
+  private isPortrait(): boolean {
+    return !this.isFull && !this.edgeHud;
   }
 
   private showTopFull(): boolean {
@@ -300,116 +307,85 @@ export struct PlayerSkin {
   @Builder
   bottomBar() {
     if (this.showBottom()) {
-      if (this.cinemaHud()) {
-        Column({ space: 4 }) {
-          this.sliderBar()
-          Row() {
-            // 左侧控制群组：播放/暂停、下一集、时间刻度
-            Row({ space: 4 }) {
-              this.playToggle(36, 22)
-              if (this.hasNext) {
-                PlayerIconBtn({
-                  src: $r('sys.symbol.forward_end_fill'),
-                  iconSize: 18,
-                  boxSize: 36,
-                  onTap: this.onNext
-                })
-              }
-              this.timeBlock(false)
-            }
-            .alignItems(VerticalAlign.Center)
+      Column({ space: 4 }) {
+        // 1. 顶层通栏进度条（100% 满宽自由拖拽，彻底解决挤压与误触）
+        this.sliderBar()
 
-            Blank()
-
-            // 右侧功能调节群组：倍速胶囊、比例胶囊、静音开关、全屏切换
-            Row({ space: 8 }) {
-              PlayerChip({
-                label: this.speedLabel,
-                canTap: this.ready,
-                highlight: this.speedLabel !== '1.0x',
-                onTap: this.onSpeed
+        // 2. 底部控制栏（左侧播控与时间，中间弹性留白，右侧功能群组）
+        Row() {
+          // 左侧控制群组：播放/暂停、下一集、时间刻度
+          Row({ space: 4 }) {
+            this.playToggle(36, 22)
+            if (this.hasNext && !this.isPortrait()) {
+              PlayerIconBtn({
+                src: $r('sys.symbol.forward_end_fill'),
+                iconSize: 18,
+                boxSize: 36,
+                onTap: this.onNext
               })
+            }
+            this.timeBlock(this.isPortrait())
+          }
+          .alignItems(VerticalAlign.Center)
+
+          Blank()
+
+          // 右侧功能调节群组：倍速胶囊、比例胶囊、弹幕开关、静音开关、全屏切换
+          Row({ space: this.isPortrait() ? 6 : 8 }) {
+            PlayerChip({
+              label: this.speedLabel,
+              canTap: this.ready,
+              highlight: this.speedLabel !== '1.0x',
+              onTap: this.onSpeed
+            })
+            if (this.cinemaHud()) {
               PlayerChip({
                 label: this.scaleLabel,
                 canTap: this.ready,
                 highlight: this.scaleLabel !== '适应',
                 onTap: this.onScale
               })
-              PlayerIconBtn({
-                src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
-                iconSize: 20,
-                boxSize: 36,
-                onTap: this.onMute
-              })
-              if (!this.castDeviceName) {
-                PlayerIconBtn({
-                  src: this.isFull ? $r('sys.symbol.exit_full_screen') : $r('sys.symbol.full_screen'),
-                  iconSize: 20,
-                  boxSize: 36,
-                  onTap: this.onFull
-                })
-              }
             }
-            .alignItems(VerticalAlign.Center)
-          }
-          .width('100%')
-          .height(38)
-          .alignItems(VerticalAlign.Center)
-        }
-        .width('100%')
-        .padding({
-          left: Math.max(14, this.leftInset + 10),
-          right: Math.max(14, this.rightInset + 10),
-          bottom: this.isFull ? Math.max(12, this.bottomInset) : Math.max(20, this.bottomInset + 4),
-          top: 8
-        })
-        .linearGradient({
-          angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.36)', 0.45], ['rgba(0,0,0,0.78)', 1]]
-        })
-      } else {
-        Row({ space: 6 }) {
-          this.playToggle(34, 20)
-          Text(FormatUtil.duration(this.currentTime))
-            .fontSize(11)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#FFFFFF')
-          Column() {
-            this.sliderBar()
-          }
-          .layoutWeight(1)
-          .margin({ left: 2, right: 2 })
-          Text(FormatUtil.duration(this.duration))
-            .fontSize(11)
-            .fontColor('rgba(255,255,255,0.60)')
-          PlayerChip({
-            label: this.speedLabel,
-            canTap: this.ready,
-            highlight: this.speedLabel !== '1.0x',
-            onTap: this.onSpeed
-          })
-          if (!this.castDeviceName) {
+            if (this.canDanmaku) {
+              PlayerChip({
+                label: '弹幕',
+                canTap: true,
+                highlight: this.danmakuEnabled,
+                onTap: this.onToggleDanmaku
+              })
+            }
             PlayerIconBtn({
-              src: $r('sys.symbol.full_screen'),
-              iconSize: 18,
-              boxSize: 34,
-              onTap: this.onFull
+              src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
+              iconSize: this.isPortrait() ? 18 : 20,
+              boxSize: this.isPortrait() ? 34 : 36,
+              onTap: this.onMute
             })
+            if (!this.castDeviceName) {
+              PlayerIconBtn({
+                src: this.isFull ? $r('sys.symbol.exit_full_screen') : $r('sys.symbol.full_screen'),
+                iconSize: this.isPortrait() ? 18 : 20,
+                boxSize: this.isPortrait() ? 34 : 36,
+                onTap: this.onFull
+              })
+            }
           }
+          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
         .height(38)
         .alignItems(VerticalAlign.Center)
-        .padding({
-          left: Math.max(10, this.leftInset + 6),
-          right: Math.max(10, this.rightInset + 6),
-          bottom: 6
-        })
-        .linearGradient({
-          angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.36)', 0.45], ['rgba(0,0,0,0.78)', 1]]
-        })
       }
+      .width('100%')
+      .padding({
+        left: Math.max(12, this.leftInset + (this.isFull ? 10 : 4)),
+        right: Math.max(12, this.rightInset + (this.isFull ? 10 : 4)),
+        bottom: this.isFull ? Math.max(12, this.bottomInset) : (this.edgeHud ? Math.max(20, this.bottomInset + 4) : Math.max(8, this.bottomInset)),
+        top: this.isPortrait() ? 2 : 8
+      })
+      .linearGradient({
+        angle: 180,
+        colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.36)', 0.45], ['rgba(0,0,0,0.78)', 1]]
+      })
     } else if (!this.errorText && this.ready) {
       Row() {
         Row()

@@ -207,32 +207,42 @@ export class FilmApi {
 
   static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuComment[]> {
     if (!ServerCompat.getInstance().canDanmaku) {
+      console.info('[Danmaku] 当前非 V3 协议或环境不支持弹幕特性，跳过请求');
       return [];
     }
     const params = new QueryParams()
       .set('mid', mid)
       .set('episode', episode)
       .set('title', title);
-    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.DANMAKU), params);
-    if (res.code !== 0 || !Array.isArray(res.data)) {
+    try {
+      const ep = ServerCompat.getInstance().endpoint(ApiEndpoint.DANMAKU);
+      console.info(`[Danmaku] 请求弹幕: ep=${ep} mid=${mid} epNum=${episode} title=${title}`);
+      const res = await HttpClient.getInstance().get(ep, params);
+      if ((res.code !== 0 && res.code !== 1) || !Array.isArray(res.data)) {
+        console.warn(`[Danmaku] 响应异常或无数据: code=${res.code} msg=${res.msg}`);
+        return [];
+      }
+      const list: DanmakuComment[] = [];
+      const raw = res.data as Object[];
+      for (let i = 0; i < raw.length; i++) {
+        const row = ApiParser.asRecord(raw[i]);
+        const text = ApiParser.str(row, 'text');
+        if (!text) {
+          continue;
+        }
+        list.push({
+          text: text,
+          time: ApiParser.num(row, 'time'),
+          color: ApiParser.str(row, 'color', '#ffffff'),
+          mode: ApiParser.num(row, 'mode')
+        });
+      }
+      console.info(`[Danmaku] 成功解析弹幕列表: ${list.length} 条`);
+      return list;
+    } catch (err) {
+      console.error(`[Danmaku] 请求发生异常: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
       return [];
     }
-    const list: DanmakuComment[] = [];
-    const raw = res.data as Object[];
-    for (let i = 0; i < raw.length; i++) {
-      const row = ApiParser.asRecord(raw[i]);
-      const text = ApiParser.str(row, 'text');
-      if (!text) {
-        continue;
-      }
-      list.push({
-        text: text,
-        time: ApiParser.num(row, 'time'),
-        color: ApiParser.str(row, 'color', '#ffffff'),
-        mode: ApiParser.num(row, 'mode')
-      });
-    }
-    return list;
   }
 }
 

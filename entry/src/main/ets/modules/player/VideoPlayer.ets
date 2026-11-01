@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { AVVolumePanel } from '@kit.AudioKit';
+import { PlayerDanmakuLayer } from './PlayerDanmakuLayer';
 import { PlayerWindow } from './PlayerWindow';
 import { PlayerTipKind } from './PlayerPan';
 import { PlayerStallWatcher } from './PlayerStallWatcher';
@@ -20,6 +21,8 @@ import { DlnaDevice } from '../../types/DlnaTypes';
 import { PlayerScaleMode } from './PlayerScale';
 
 import { PlayerAv } from './PlayerAv';
+import { PlayerSpeed } from './PlayerSpeed';
+import { ServerCompat } from '../../services/ServerCompat';
 import { AppToast } from '../../common/utils/AppToast';
 
 @Component
@@ -88,6 +91,7 @@ export struct VideoPlayer {
   @State private castTransport: string = '';
   @State private isPipActive: boolean = false;
   @StorageLink('SETTING_PIP_AUTO_START') @Watch('onSettingPipAutoStartChange') private settingPipAutoStart: boolean = true;
+  @StorageLink('SETTING_DANMAKU_ENABLED') private danmakuEnabled: boolean = true;
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -389,10 +393,17 @@ export struct VideoPlayer {
     }
   }
 
+  private toggleDanmaku(): void {
+    this.danmakuEnabled = !this.danmakuEnabled;
+    this.pulseHud();
+    AppToast.show(this.danmakuEnabled ? '已开启弹幕' : '已关闭弹幕');
+  }
+
   private skinActionHost(): PlayerActionHost {
     return {
       fullNow: () => this.fullNow(), toggleFull: () => this.toggleFull(),
       togglePlay: () => this.togglePlay(), toggleMute: () => this.toggleMute(),
+      toggleDanmaku: () => this.toggleDanmaku(),
       openSpeedDialog: () => this.openSpeedDialog(), cycleScaleMode: () => this.cycleScaleMode(),
       retry: () => this.retry(),
       showErrorDetail: () => PlayerDialogHelper.showErrorDetail(this.getUIContext(), this.errorText),
@@ -432,6 +443,27 @@ export struct VideoPlayer {
         onXComponentLoad: (ctx: object, sId: string) => this.playerAv.setXComponentContext(ctx, sId)
       })
 
+      if (!this.isPipActive && !this.castDeviceName && ServerCompat.getInstance().canDanmaku) {
+        PlayerDanmakuLayer({
+          filmId: this.filmId,
+          episode: this.episode,
+          filmTitle: this.filmTitle,
+          currentTime: this.currentTime,
+          playing: this.isPlaying && this.playRequested && !this.completed && !this.stalled && !this.opening,
+          visible: this.danmakuEnabled,
+          playbackSpeed: PlayerSpeed.of(this.speedIndex),
+          isFull: this.fullNow(),
+          topInset: this.topInset,
+          bottomInset: this.bottomInset,
+          leftInset: this.leftInset,
+          rightInset: this.rightInset
+        })
+          .width('100%')
+          .height('100%')
+          .hitTestBehavior(HitTestMode.None)
+          .zIndex(10)
+      }
+
 
       PlayerSpeedSheet({
         openSeq: this.speedOpenSeq, speedLabel: this.speedLabel,
@@ -463,6 +495,8 @@ export struct VideoPlayer {
           opening: this.opening, seeking: this.seeking, stalled: this.stalled, errorText: this.errorText,
           currentTime: this.currentTime, duration: this.duration, muted: this.muted || this.volumeIndex <= 0,
           speedLabel: this.speedLabel, scaleLabel: this.actions.scaleCtrl.label(this.state.isPortrait()),
+          danmakuEnabled: this.danmakuEnabled,
+          canDanmaku: ServerCompat.getInstance().canDanmaku,
           hasPrev: this.hasPrev, hasNext: this.hasNext, longPressing: this.longPressing,
           feedback: this.feedback, feedbackKind: this.feedbackKind,
           topInset: this.topInset, leftInset: this.leftInset, rightInset: this.rightInset, bottomInset: this.bottomInset,

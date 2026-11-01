@@ -354,13 +354,13 @@ struct LivePlayPage {
     return (this.isLandscape() || this.playerFull) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0;
   }
   private hudRightInset(): number {
-    return Math.max(this.rightInset, AppTheme.SAFE_EDGE);
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : 0;
   }
   private hudTopInset(): number {
     return (this.isLandscape() || this.playerFull) ? Math.max(this.topInset, AppTheme.SAFE_EDGE) : 0;
   }
   private hudBottomInset(): number {
-    return this.isLandscape() && !this.playerFull ? this.bottomInset : 0;
+    return (this.isLandscape() || this.playerFull) ? this.bottomInset : 0;
   }
   @Builder
   playTabItem(title: string, index: number) {

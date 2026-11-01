@@ -17,6 +17,7 @@ export interface PlayerActionHost {
   toggleFull: () => void;
   togglePlay: () => void;
   toggleMute: () => void;
+  toggleDanmaku: () => void;
   openSpeedDialog: () => void;
   cycleScaleMode: () => void;
   retry: () => void;
@@ -135,6 +136,7 @@ export class PlayerActionCoordinator {
       onNext: () => { if (host.onNext) host.onNext(); },
       onSpeed: () => host.openSpeedDialog(),
       onScale: () => host.cycleScaleMode(),
+      onToggleDanmaku: () => host.toggleDanmaku(),
       onRetry: () => host.retry(),
       onErrorDetail: () => host.showErrorDetail(),
       onSeekBack: () => {

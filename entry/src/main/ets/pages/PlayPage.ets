@@ -91,6 +91,10 @@ struct PlayPage {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
     this.filmId = NavUtil.param(params, 'id');
+    const paramTitle = NavUtil.param(params, 'title');
+    if (paramTitle) {
+      this.name = paramTitle;
+    }
     const paramSourceId = NavUtil.param(params, 'sourceId'), paramEp = NavUtil.param(params, 'episodeIndex'), paramTime = NavUtil.param(params, 'currentTime');
     let targetSourceId = paramSourceId, targetEpIndex = paramEp !== '' ? Number(paramEp) : -1, targetTime = paramTime !== '' ? Number(paramTime) : -1;
 
@@ -357,13 +361,13 @@ struct PlayPage {
     return (this.isLandscape() || this.playerFull) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0;
   }
   private hudRightInset(): number {
-    return Math.max(this.rightInset, AppTheme.SAFE_EDGE);
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : 0;
   }
   private hudTopInset(): number {
     return (this.isLandscape() || this.playerFull) ? Math.max(this.topInset, AppTheme.SAFE_EDGE) : 0;
   }
   private hudBottomInset(): number {
-    return this.isLandscape() && !this.playerFull ? this.bottomInset : 0;
+    return (this.isLandscape() || this.playerFull) ? this.bottomInset : 0;
   }
   @Builder
   playTabItem(title: string, index: number) {
@@ -393,6 +397,9 @@ struct PlayPage {
       pageActive: this.playerActive,
       hasPrev: this.hasPrev(),
       hasNext: this.hasNext(),
+      filmId: this.filmId,
+      episode: this.episodeIndex + 1,
+      filmTitle: this.name,
       topInset: this.hudTopInset(),
       leftInset: this.hudLeftInset(),
       rightInset: this.hudRightInset(),
