@@ -360,7 +360,7 @@ export struct PlayerSkin {
         .padding({
           left: Math.max(14, this.leftInset + 10),
           right: Math.max(14, this.rightInset + 10),
-          bottom: Math.max(10, this.bottomInset),
+          bottom: this.isFull ? Math.max(12, this.bottomInset) : Math.max(20, this.bottomInset + 4),
           top: 8
         })
         .linearGradient({
@@ -538,12 +538,12 @@ export struct PlayerSkin {
           }
           .width('100%')
           .height(44 + this.topInset)
-          .justifyContent(FlexAlign.SpaceBetween)
-          .alignItems(VerticalAlign.Center)
+          .alignItems(VerticalAlign.Bottom)
           .padding({
-            left: Math.max(8, this.leftInset + 4),
-            right: Math.max(8, this.rightInset + 4),
-            top: this.topInset
+            left: Math.max(12, this.leftInset + 6),
+            right: Math.max(12, this.rightInset + 6),
+            top: this.topInset,
+            bottom: 4
           })
           .linearGradient({
             angle: 180,

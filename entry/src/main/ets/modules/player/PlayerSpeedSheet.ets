@@ -40,10 +40,10 @@ export struct PlayerSpeedSheet {
         }
       }),
       autoCancel: true,
-      alignment: isLand ? DialogAlignment.BottomEnd : DialogAlignment.Bottom,
+      alignment: DialogAlignment.Bottom,
       customStyle: true,
       backgroundColor: Color.Transparent,
-      maskColor: isLand ? 'rgba(0,0,0,0.36)' : 'rgba(0,0,0,0.25)',
+      maskColor: 'rgba(0, 0, 0, 0.25)',
       cancel: () => {
         this.dialog = null;
         this.onClosed();

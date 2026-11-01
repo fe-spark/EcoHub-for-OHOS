@@ -14,6 +14,8 @@ import { common } from '@kit.AbilityKit';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
 import { PlayerBackBtn } from '../modules/player/PlayerControl';
 import { PlayDetailPanel } from '../components/film/PlayDetailPanel';
+import { FilmDetailHeader } from '../components/film/FilmDetailHeader';
+import { FormatUtil } from '../common/utils/FormatUtil';
 import { LivePlayRelatedView } from '../components/film/LivePlayRelatedView';
 import { LoadingView } from '../components/common/LoadingView';
 import { SourceGuard } from '../services/SourceGuard';
@@ -331,18 +333,35 @@ struct LivePlayPage {
     });
   }
 
-  private isWideScreen(): boolean {
+  private isLandscape(): boolean {
     const w = this.windowWidth > 0 ? this.windowWidth : Breakpoint.windowWidth();
     const h = this.windowHeight > 0 ? this.windowHeight : Breakpoint.windowHeight();
-    return w >= 600 && w > h;
+    return w > h && h > 0;
   }
 
-  private splitPlay(): boolean { return !this.playerFull && this.isWideScreen(); }
-  private hudLeftInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0; }
-  private hudRightInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : AppTheme.SAFE_EDGE; }
-  private hudTopInset(): number { return (this.playerFull || this.splitPlay()) ? this.topInset : 0; }
-  private hudBottomInset(): number { return 0; }
+  private isPortrait(): boolean {
+    const w = this.windowWidth > 0 ? this.windowWidth : Breakpoint.windowWidth();
+    const h = this.windowHeight > 0 ? this.windowHeight : Breakpoint.windowHeight();
+    return w <= h;
+  }
 
+  private sidebarWidth(): number {
+    const w = this.windowWidth > 0 ? this.windowWidth : 780;
+    return Math.min(360, Math.max(260, w * 0.35));
+  }
+
+  private hudLeftInset(): number {
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0;
+  }
+  private hudRightInset(): number {
+    return Math.max(this.rightInset, AppTheme.SAFE_EDGE);
+  }
+  private hudTopInset(): number {
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.topInset, AppTheme.SAFE_EDGE) : 0;
+  }
+  private hudBottomInset(): number {
+    return this.isLandscape() && !this.playerFull ? this.bottomInset : 0;
+  }
   @Builder
   playTabItem(title: string, index: number) {
     Column() {
@@ -367,7 +386,7 @@ struct LivePlayPage {
       initialTime: this.initialTime,
       showBack: true,
       isFull: this.playerFull,
-      edgeHud: this.splitPlay(),
+      edgeHud: this.isLandscape(),
       pageActive: this.playerActive,
       hasPrev: this.hasPrev(),
       hasNext: this.hasNext(),
@@ -395,8 +414,8 @@ struct LivePlayPage {
       }
     })
       .width('100%')
-      .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
-      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
+      .height((this.playerFull || this.isLandscape()) ? '100%' : undefined)
+      .aspectRatio((this.playerFull || this.isLandscape()) ? undefined : 16 / 9)
   }
 
   @Builder
@@ -439,7 +458,7 @@ struct LivePlayPage {
           LivePlayRelatedView({
             relateLoading: this.relateLoading,
             related: this.related,
-            columns: this.splitPlay() ? 3 : Breakpoint.gridCols(this.widthBp),
+            columns: this.isLandscape() ? 3 : Breakpoint.gridCols(this.widthBp),
             onOpenRelated: (film: MovieBasicInfo) => this.openRelated(film)
           })
         }.width('100%').height('100%')
@@ -448,52 +467,47 @@ struct LivePlayPage {
     .layoutWeight(1)
     .width('100%')
   }
-
   @Builder
   playBody() {
-    Flex({
-      direction: this.splitPlay() ? FlexDirection.Row : FlexDirection.Column,
-      justifyContent: FlexAlign.Start,
-      alignItems: ItemAlign.Start
-    }) {
-      // 1. 播放器容器（单例常驻节点，跨全屏/横屏分栏/竖屏模式永不销毁重建，彻底消除旋转重新加载与黑屏！）
+    Row() {
+      // 1. 左侧主区域 (所有模式下单例常驻播放器；竖屏或平板横屏时下方自适应内容)
       Column() {
         this.playVideo()
-      }
-      .width(this.splitPlay() ? undefined : '100%')
-      .height(this.splitPlay() || this.playerFull ? '100%' : undefined)
-      .layoutWeight(this.playerFull ? 1 : (this.splitPlay() ? 7 : undefined))
-      .backgroundColor('#000000')
-      .padding({
-        top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset
-      })
 
-      // 2. 分割条（全屏时隐藏）
-      if (this.splitPlay()) {
-        Column() {
-          Column().width(1).height('100%').backgroundColor('rgba(255, 255, 255, 0.14)')
+        // 竖屏非全屏：展示竖屏标准的侧边 Tabs
+        if (this.isPortrait() && !this.playerFull) {
+          Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
+          Column() {
+            this.sideTabs()
+          }
+          .layoutWeight(1)
+          .width('100%')
+          .padding({
+            left: this.leftInset,
+            right: this.rightInset,
+            bottom: this.bottomInset
+          })
         }
-        .height('100%')
-        .padding({ top: this.topInset, bottom: this.bottomInset })
-      } else if (!this.playerFull) {
-        Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
       }
-
-      // 3. 选集与详情列表（全屏时隐藏）
-      Column() {
-        this.sideTabs()
-      }
-      .width(this.splitPlay() ? undefined : '100%')
-      .height(this.splitPlay() ? '100%' : undefined)
-      .layoutWeight(this.playerFull ? 0 : (this.splitPlay() ? 5 : 1))
-      .visibility(this.playerFull ? Visibility.None : Visibility.Visible)
+      .layoutWeight(1)
+      .height('100%')
+      .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
       .padding({
-        top: this.splitPlay() ? this.topInset : 0,
-        bottom: this.bottomInset,
-        left: this.splitPlay() ? 0 : this.leftInset,
-        right: this.rightInset
+        top: (this.playerFull || this.isLandscape()) ? 0 : this.topInset
       })
-      .backgroundColor(this.splitPlay() ? AppTheme.BG_ELEVATED : Color.Transparent)
+      if (this.isLandscape() && !this.playerFull) {
+        Column() {
+          this.sideTabs()
+        }
+        .width(this.sidebarWidth())
+        .height('100%')
+        .backgroundColor(AppTheme.BG_ELEVATED)
+        .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
+        .padding({
+          top: this.topInset,
+          bottom: this.bottomInset
+        })
+      }
     }
     .width('100%')
     .height('100%')

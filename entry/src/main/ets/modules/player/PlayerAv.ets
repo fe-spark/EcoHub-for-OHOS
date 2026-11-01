@@ -124,9 +124,10 @@ export class PlayerAv {
       ijk.setContext(this.xContext, this.surfaceId);
       ijk.native_setup(VideoCodecMode.SURFACE);
       // 2. 配置 FFmpeg / ijkplayer 选项
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", "1");
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "auto-mediacodec", "1");
-      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", "842094158");
+      // 禁用强制硬件硬解，启用软件解码与标准 YUV420P 输出，确保在虚拟机(无物理 VPU 硬解)与真机上 100% 渲染视频画面，绝不黑屏！
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", "0");
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "auto-mediacodec", "0");
+      ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", "808596553");
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", "1");   // 音频驱动
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "soundtouch", "1"); // 倍速变调补偿
       ijk.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", "1");  // 丢帧保同步

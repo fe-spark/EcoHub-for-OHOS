@@ -348,79 +348,6 @@ export struct PlayerSpeedDialog {
   }
 
   build() {
-    if (this.isLandscape()) {
-      // 横屏/全屏：移动端最流行的右侧浮层面板 (Right Drawer)
-      Column() {
-        Row() {
-          Text('播放速度')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-          Blank()
-          Row() {
-            Text(this.speedLabel)
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.ACCENT)
-          }
-          .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-          .backgroundColor(AppTheme.ACCENT_SOFT)
-          .borderRadius(AppTheme.RADIUS_PILL)
-        }
-        .width('100%')
-        .padding({ bottom: 16 })
-
-        List({ space: 6 }) {
-          ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
-            ListItem() {
-              Row() {
-                Text(label === '1.0x' ? '1.0x (正常)' : label)
-                  .fontSize(14)
-                  .fontWeight(this.speedLabel === label ? FontWeight.Bold : FontWeight.Medium)
-                  .fontColor(this.speedLabel === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.90)')
-                Blank()
-                if (this.speedLabel === label) {
-                  SymbolGlyph($r('sys.symbol.checkmark'))
-                    .fontSize(16)
-                    .fontColor([AppTheme.ACCENT])
-                    .fontWeight(FontWeight.Bold)
-                }
-              }
-              .width('100%')
-              .height(44)
-              .padding({ left: 16, right: 16 })
-              .backgroundColor(this.speedLabel === label ? 'rgba(250, 140, 22, 0.12)' : 'rgba(255, 255, 255, 0.05)')
-              .borderRadius(AppTheme.RADIUS_MD)
-              .border({
-                width: 1,
-                color: this.speedLabel === label ? 'rgba(250, 140, 22, 0.36)' : 'rgba(255, 255, 255, 0.06)'
-              })
-              .onClick(() => {
-                this.onPickSpeed(index);
-                if (this.controller) {
-                  this.controller.close();
-                }
-              })
-            }
-          }, (label: string) => `spd_l_${label}`)
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Off)
-      }
-      .width(280)
-      .height('100%')
-      .padding({
-        top: Math.max(16, this.topInset + 12),
-        bottom: Math.max(16, this.bottomInset + 12),
-        left: 20,
-        right: Math.max(20, this.rightInset + 12)
-      })
-      .backgroundColor('rgba(20, 22, 28, 0.96)')
-      .borderRadius({ topLeft: 16, bottomLeft: 16 })
-      .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
-    } else {
-      // 竖屏/半屏：轻量优雅的影院级悬浮微卡片 (Floating Cinema Card)
       Column() {
         // 1. 顶部标题栏：图标 + 标题 + 当前倍速徽章 + 关闭按钮
         Row() {
@@ -512,13 +439,13 @@ export struct PlayerSpeedDialog {
         .edgeEffect(EdgeEffect.Spring)
       }
       .width('calc(100% - 32vp)')
+      .constraintSize({ maxWidth: 520 })
       .margin({ left: 16, right: 16, bottom: Math.max(16, this.bottomInset + 8) })
       .padding({ left: 18, right: 18, top: 16, bottom: 16 })
       .backgroundColor('rgba(24, 26, 34, 0.94)')
       .borderRadius(20)
       .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.16)' })
       .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.45)', offsetY: 8 })
-    }
   }
 }
 @CustomDialog
@@ -538,85 +465,6 @@ export struct PlayerScaleDialog {
   }
 
   build() {
-    if (this.isLandscape()) {
-      // 横屏/全屏：移动端最流行的右侧浮层面板 (Right Drawer)
-      Column() {
-        Row() {
-          Text('画面填充')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.TEXT_PRIMARY)
-          Blank()
-          Row() {
-            Text(PlayerScale.label(this.scaleMode, this.isPortrait))
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.ACCENT)
-          }
-          .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-          .backgroundColor(AppTheme.ACCENT_SOFT)
-          .borderRadius(AppTheme.RADIUS_PILL)
-        }
-        .width('100%')
-        .padding({ bottom: 16 })
-
-        List({ space: 10 }) {
-          ForEach(PlayerScale.items(this.isPortrait), (item: PlayerScaleItem) => {
-            ListItem() {
-              Row() {
-                Column({ space: 3 }) {
-                  Text(item.label)
-                    .fontSize(14)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(this.scaleMode === item.mode ? AppTheme.ACCENT : AppTheme.TEXT_PRIMARY)
-                  Text(item.desc)
-                    .fontSize(11)
-                    .fontColor(this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.85)' : AppTheme.TEXT_MUTED)
-                }
-                .alignItems(HorizontalAlign.Start)
-
-                Blank()
-                if (this.scaleMode === item.mode) {
-                  SymbolGlyph($r('sys.symbol.checkmark'))
-                    .fontSize(16)
-                    .fontColor([AppTheme.ACCENT])
-                    .fontWeight(FontWeight.Bold)
-                }
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-              .backgroundColor(this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.12)' : 'rgba(255, 255, 255, 0.05)')
-              .borderRadius(AppTheme.RADIUS_MD)
-              .border({
-                width: 1,
-                color: this.scaleMode === item.mode ? 'rgba(250, 140, 22, 0.36)' : 'rgba(255, 255, 255, 0.06)'
-              })
-              .onClick(() => {
-                this.onPickScale(item.mode);
-                if (this.controller) {
-                  this.controller.close();
-                }
-              })
-            }
-          }, (item: PlayerScaleItem) => `scale_l_${item.mode}`)
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Off)
-      }
-      .width(280)
-      .height('100%')
-      .padding({
-        top: Math.max(16, this.topInset + 12),
-        bottom: Math.max(16, this.bottomInset + 12),
-        left: 20,
-        right: Math.max(20, this.rightInset + 12)
-      })
-      .backgroundColor('rgba(20, 22, 28, 0.96)')
-      .borderRadius({ topLeft: 16, bottomLeft: 16 })
-      .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
-    } else {
-      // 竖屏/半屏：轻量优雅的影院级悬浮微卡片 (Floating Cinema Card)
       Column() {
         Row() {
           Row({ space: 8 }) {
@@ -699,12 +547,12 @@ export struct PlayerScaleDialog {
         .width('100%')
       }
       .width('calc(100% - 32vp)')
+      .constraintSize({ maxWidth: 520 })
       .margin({ left: 16, right: 16, bottom: Math.max(16, this.bottomInset + 8) })
       .padding({ left: 18, right: 18, top: 16, bottom: 16 })
       .backgroundColor('rgba(24, 26, 34, 0.94)')
       .borderRadius(20)
       .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.16)' })
       .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.45)', offsetY: 8 })
-    }
   }
 }
