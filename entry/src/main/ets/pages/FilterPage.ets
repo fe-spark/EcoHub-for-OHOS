@@ -5,6 +5,7 @@ import { NavUtil } from '../common/utils/NavUtil';
 import { WindowBar } from '../common/utils/WindowBar';
 import { common } from '@kit.AbilityKit';
 import { QueryParams } from '../common/utils/QueryParams';
+import { FilterParams } from '../common/utils/FilterParams';
 import { LoadingView } from '../components/common/LoadingView';
 import { EmptyState } from '../components/common/EmptyState';
 import { AppIcon } from '../components/common/AppIcon';
@@ -101,14 +102,20 @@ struct FilterPage {
   }
 
   private setSelected(key: string, value: string): void {
-    const nextKeys = this.selectedKeys.slice();
-    const nextValues = this.selectedValues.slice();
-    const index = nextKeys.indexOf(key);
-    if (index >= 0) {
-      nextValues[index] = value;
-    } else {
-      nextKeys.push(key);
-      nextValues.push(value);
+    const canon = FilterParams.canonical(key);
+    const nextKeys: string[] = [];
+    const nextValues: string[] = [];
+    for (let i = 0; i < this.selectedKeys.length; i++) {
+      if (FilterParams.canonical(this.selectedKeys[i]) === canon) {
+        continue;
+      }
+      nextKeys.push(this.selectedKeys[i]);
+      nextValues.push(this.selectedValues[i]);
+    }
+    const text = (value || '').trim();
+    if (text) {
+      nextKeys.push(canon);
+      nextValues.push(text);
     }
     this.selectedKeys = nextKeys;
     this.selectedValues = nextValues;
@@ -126,8 +133,9 @@ struct FilterPage {
 
   private buildQuery(page: number): QueryParams {
     const query = new QueryParams().set('Pid', this.pid).set('current', page).set('pageSize', 21);
-    for (let i = 0; i < this.selectedKeys.length; i++) {
-      query.set(this.selectedKeys[i], this.selectedValues[i]);
+    const folded = FilterParams.fold(this.selectedKeys, this.selectedValues);
+    for (let i = 0; i < folded.keys.length; i++) {
+      query.set(folded.keys[i], folded.values[i]);
     }
     return query;
   }
@@ -150,24 +158,9 @@ struct FilterPage {
   }
 
   private applyParams(keys: string[], values: string[]): void {
-    const nextKeys = this.selectedKeys.slice();
-    const nextValues = this.selectedValues.slice();
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      const value = values[i] || '';
-      if (!value) {
-        continue;
-      }
-      const index = nextKeys.indexOf(key);
-      if (index >= 0) {
-        nextValues[index] = value;
-      } else {
-        nextKeys.push(key);
-        nextValues.push(value);
-      }
-    }
-    this.selectedKeys = nextKeys;
-    this.selectedValues = nextValues;
+    const merged = FilterParams.applyEcho(this.selectedKeys, this.selectedValues, keys, values);
+    this.selectedKeys = merged.keys;
+    this.selectedValues = merged.values;
   }
 
   private selectedFor(key: string): string {
