@@ -196,7 +196,7 @@ export struct PlayerDanmakuLayer {
   }
 
   private reload(): void {
-    if (!ServerCompat.getInstance().canDanmaku) {
+    if (!ServerCompat.getInstance().canDanmaku || !this.filmId || this.filmId.trim().length === 0) {
       this.allComments = [];
       this.activeList = [];
       this.fixedTopFreeTime.clear();

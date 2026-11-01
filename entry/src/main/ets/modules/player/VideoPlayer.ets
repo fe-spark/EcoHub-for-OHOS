@@ -52,6 +52,7 @@ export struct VideoPlayer {
   @Prop filmId: string = '';
   @Prop episode: number = 1;
   @Prop filmTitle: string = '';
+  @Prop allowDanmaku: boolean = true;
 
   private static readonly PLAY_TOGGLE_DEBOUNCE_MS: number = 280;
 
@@ -393,7 +394,14 @@ export struct VideoPlayer {
     }
   }
 
+  private canDanmakuNow(): boolean {
+    return this.allowDanmaku && ServerCompat.getInstance().canDanmaku && this.filmId.trim().length > 0;
+  }
+
   private toggleDanmaku(): void {
+    if (!this.canDanmakuNow()) {
+      return;
+    }
     this.danmakuEnabled = !this.danmakuEnabled;
     this.pulseHud();
     AppToast.show(this.danmakuEnabled ? '已开启弹幕' : '已关闭弹幕');
@@ -443,7 +451,7 @@ export struct VideoPlayer {
         onXComponentLoad: (ctx: object, sId: string) => this.playerAv.setXComponentContext(ctx, sId)
       })
 
-      if (!this.isPipActive && !this.castDeviceName && ServerCompat.getInstance().canDanmaku) {
+      if (!this.isPipActive && !this.castDeviceName && this.canDanmakuNow()) {
         PlayerDanmakuLayer({
           filmId: this.filmId,
           episode: this.episode,
@@ -496,7 +504,7 @@ export struct VideoPlayer {
           currentTime: this.currentTime, duration: this.duration, muted: this.muted || this.volumeIndex <= 0,
           speedLabel: this.speedLabel, scaleLabel: this.actions.scaleCtrl.label(this.state.isPortrait()),
           danmakuEnabled: this.danmakuEnabled,
-          canDanmaku: ServerCompat.getInstance().canDanmaku,
+          canDanmaku: this.canDanmakuNow(),
           hasPrev: this.hasPrev, hasNext: this.hasNext, longPressing: this.longPressing,
           feedback: this.feedback, feedbackKind: this.feedbackKind,
           topInset: this.topInset, leftInset: this.leftInset, rightInset: this.rightInset, bottomInset: this.bottomInset,
