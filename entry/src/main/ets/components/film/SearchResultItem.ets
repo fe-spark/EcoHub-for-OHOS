@@ -11,8 +11,9 @@ export struct SearchResultItem {
   @StorageProp('FAVORITE_VERSION') @Watch('onFavVersionChange') private favVersion: number = 0;
   @State private isFav: boolean = false;
   onSelect?: (film: MovieBasicInfo) => void;
+  @State private broken: boolean = false;
   private favChangeCb: () => void = () => {};
-
+  private lastFilmId: string = '';
   aboutToAppear(): void {
     this.updateFavState();
     this.favChangeCb = () => {
@@ -26,6 +27,11 @@ export struct SearchResultItem {
   }
 
   private onFilmChange(): void {
+    const curId = FormatUtil.filmId(this.film);
+    if (curId !== this.lastFilmId) {
+      this.lastFilmId = curId;
+      this.broken = false;
+    }
     this.updateFavState();
   }
 
@@ -75,12 +81,31 @@ export struct SearchResultItem {
   build() {
     Row() {
       Stack({ alignContent: Alignment.Center }) {
-        Image(FormatUtil.poster(this.film))
-          .width(96)
-          .height(142)
-          .objectFit(ImageFit.Cover)
-          .borderRadius(AppTheme.RADIUS_LG)
-          .backgroundColor(AppTheme.BG_CARD)
+        // 骨架底座
+        Column() {
+          AppIcon({
+            src: $r('sys.symbol.film'),
+            iconSize: 26,
+            color: 'rgba(255, 255, 255, 0.12)'
+          })
+        }
+        .width(96)
+        .height(142)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor('rgba(255, 255, 255, 0.04)')
+        .borderRadius(AppTheme.RADIUS_LG)
+
+        if (!this.broken) {
+          Image(FormatUtil.poster(this.film))
+            .width(96)
+            .height(142)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(AppTheme.RADIUS_LG)
+            .syncLoad(false)
+            .onError(() => {
+              this.broken = true;
+            })
+        }
         Row() {
           AppIcon({
             src: $r('sys.symbol.play_fill'),

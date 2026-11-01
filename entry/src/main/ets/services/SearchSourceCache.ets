@@ -1,5 +1,6 @@
 import { FilmApi } from '../api/FilmApi';
 import { MovieBasicInfo, PageInfo, SearchResult, SearchSourceTab } from '../types/FilmModels';
+import { ServerCompat } from './ServerCompat';
 
 export class CachedSource {
   list: MovieBasicInfo[] = [];
@@ -149,18 +150,20 @@ export async function fanoutSearch(
       return false;
     }
     session.put('', agg.list, agg.page, '');
-    onAggregate(agg, tabsFromAggregate(agg.sources || [], agg, session.cache));
+    const rawSources = ServerCompat.getInstance().canCmsDirectSearch ? (agg.sources || []) : [];
+    onAggregate(agg, tabsFromAggregate(rawSources, agg, session.cache));
     const ids: string[] = [];
-    const sources = agg.sources || [];
-    if (currentSource) {
-      ids.push(currentSource);
-    }
-    for (let i = 0; i < sources.length; i++) {
-      const id = sources[i].id || '';
-      if (!id || id === currentSource) {
-        continue;
+    if (ServerCompat.getInstance().canCmsDirectSearch) {
+      if (currentSource) {
+        ids.push(currentSource);
       }
-      ids.push(id);
+      for (let i = 0; i < rawSources.length; i++) {
+        const id = rawSources[i].id || '';
+        if (!id || id === currentSource) {
+          continue;
+        }
+        ids.push(id);
+      }
     }
     const tasks: Promise<void>[] = [];
     for (let i = 0; i < ids.length; i++) {

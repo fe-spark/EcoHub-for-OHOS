@@ -14,10 +14,12 @@ export struct FilmCard {
   @State private isFav: boolean = false;
   onClickCard?: (film: MovieBasicInfo) => void;
   @State private broken: boolean = false;
-  @State private pressed: boolean = false;
-  private favChangeCb: () => void = () => {};
+   @State private pressed: boolean = false;
+   private favChangeCb: () => void = () => {};
+  private lastFilmId: string = '';
 
   aboutToAppear(): void {
+    this.lastFilmId = FormatUtil.filmId(this.film);
     this.updateFavState();
     this.favChangeCb = () => {
       this.updateFavState();
@@ -29,9 +31,14 @@ export struct FilmCard {
     FavoriteManager.offFavoriteChange(this.favChangeCb);
   }
 
-  private onFilmChange(): void {
-    this.updateFavState();
-  }
+   private onFilmChange(): void {
+    const curId = FormatUtil.filmId(this.film);
+    if (curId !== this.lastFilmId) {
+      this.lastFilmId = curId;
+      this.broken = false;
+    }
+     this.updateFavState();
+   }
 
   private onFavVersionChange(): void {
     this.updateFavState();
@@ -43,6 +50,21 @@ export struct FilmCard {
 
   private posterUrl(): string {
     return FormatUtil.poster(this.film);
+  }
+
+  private isPosterBroken(): boolean {
+    return this.broken || !this.posterUrl();
+  }
+
+  private initialLetter(): string {
+    const raw = (this.film.name || '').trim();
+    if (!raw) {
+      return '影';
+    }
+    const stripped = raw.replace(/^[\[【(（][^\]】)）]{1,10}[\]】)）]\s*/, '').trim();
+    const target = stripped || raw;
+    const finalStr = target.replace(/^[《〈"“'‘『「【\[(（\s]+/, '').trim() || target;
+    return finalStr.charAt(0).toUpperCase() || '影';
   }
 
   private cardSize(): Length {
@@ -93,30 +115,48 @@ export struct FilmCard {
   build() {
     Column() {
       Stack({ alignContent: Alignment.BottomEnd }) {
-        if (!this.broken && this.posterUrl()) {
+        // 1. 底座骨架层：加载中显示胶卷占位；无图或加载失败时切换为独立首字母兜底徽章，彻底避免重叠冲突
+        Column() {
+          if (this.isPosterBroken()) {
+            Column() {
+              Text(this.initialLetter())
+                .fontSize(24)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('rgba(255, 255, 255, 0.85)')
+            }
+            .width(44)
+            .height(44)
+            .justifyContent(FlexAlign.Center)
+            .backgroundColor('rgba(255, 255, 255, 0.08)')
+            .borderRadius(22)
+            .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.14)' })
+          } else {
+            AppIcon({
+              src: $r('sys.symbol.film'),
+              iconSize: 32,
+              color: 'rgba(255, 255, 255, 0.12)'
+            })
+          }
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor(this.isPosterBroken() ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.04)')
+        .borderRadius(AppTheme.RADIUS_MD)
+
+        // 2. 真实海报：存在有效海报且尚未出错时渲染，成功后直接覆盖底层骨架
+        if (!this.isPosterBroken()) {
           Image(this.posterUrl())
             .width('100%')
             .height('100%')
             .objectFit(ImageFit.Cover)
             .borderRadius(AppTheme.RADIUS_MD)
-            .backgroundColor(AppTheme.BG_CARD)
+            .syncLoad(false)
             .onError(() => {
               this.broken = true;
             })
-        } else {
-          Column() {
-            Text(this.film.name ? this.film.name.substring(0, 1) : '影')
-              .fontSize(28)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(AppTheme.TEXT_SECONDARY)
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
-          .backgroundColor(AppTheme.BG_CARD)
-          .borderRadius(AppTheme.RADIUS_MD)
         }
-
         Column()
           .width('100%')
           .height('100%')
@@ -125,6 +165,7 @@ export struct FilmCard {
             angle: 180,
             colors: [['rgba(0,0,0,0)', 0.65], ['rgba(10,11,16,0.60)', 1]]
           })
+          .hitTestBehavior(HitTestMode.Transparent)
 
         if (this.isFav) {
           Row() {
@@ -171,13 +212,16 @@ export struct FilmCard {
     }
     .alignItems(HorizontalAlign.Start)
     .scale({ x: this.pressed ? 0.96 : 1, y: this.pressed ? 0.96 : 1 })
-    .animation({ duration: 120, curve: Curve.EaseOut })
     .width(this.cardSize())
     .onTouch((event: TouchEvent) => {
       if (event.type === TouchType.Down) {
-        this.pressed = true;
+        this.getUIContext()?.animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+          this.pressed = true;
+        });
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.pressed = false;
+        this.getUIContext()?.animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+          this.pressed = false;
+        });
       }
     })
     .onClick(() => this.handleClick())

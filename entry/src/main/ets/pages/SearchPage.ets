@@ -11,7 +11,7 @@ import { BackIcon } from '../components/common/BackIcon';
 import { SourceGuard } from '../services/SourceGuard';
 import { FavoriteManager } from '../services/FavoriteManager';
 import { RefreshHint } from '../common/utils/RefreshHint';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { AppToast } from '../common/utils/AppToast';
 import { SearchHistoryManager } from '../services/SearchHistoryManager';
 import { HttpClient } from '../common/network/HttpClient';
@@ -238,8 +238,6 @@ struct SearchPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Column() {
       // Top search bar with Back button
       Row() {
@@ -497,9 +495,5 @@ struct SearchPage {
       right: this.rightInset
     })
     .backgroundColor(AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
   }
 }

@@ -6,6 +6,7 @@ const VERT_LOCK = 18;
 const DIR_BIAS = 1.08;
 const VERT_SENS = 1.75;
 const LONG_PRESS_TOLERANCE = 18;
+const STATUS_BAR_DEADZONE_VP = 48;
 
 export class PlayerTipKind {
   static readonly NONE: number = 0;
@@ -36,12 +37,13 @@ export class PlayerPan {
   leftSide: boolean = false;
   lastBright: number = 0.5;
   lastVolume: number = 0.8;
+  inDeadZone: boolean = false;
 
   reset(): void {
     this.mode = 0;
   }
 
-  begin(x: number, y: number, currentTime: number, playerW: number): void {
+  begin(x: number, y: number, currentTime: number, playerW: number, topInset: number = 0): void {
     this.startX = x;
     this.startY = y;
     this.startSeek = currentTime;
@@ -49,6 +51,7 @@ export class PlayerPan {
     this.startVolume = this.lastVolume;
     this.leftSide = x <= playerW / 2;
     this.mode = 1;
+    this.inDeadZone = y < Math.max(STATUS_BAR_DEADZONE_VP, topInset);
   }
 
   primeBright(value: number): void {
@@ -77,7 +80,7 @@ export class PlayerPan {
       }
       if (dx > LONG_PRESS_TOLERANCE && dx > dy * DIR_BIAS && duration > 0) {
         this.mode = 2;
-      } else if (full && dy >= VERT_LOCK && dy > dx * DIR_BIAS) {
+      } else if (full && !this.inDeadZone && dy >= VERT_LOCK && dy > dx * DIR_BIAS) {
         this.mode = this.leftSide ? 3 : 4;
       } else {
         return null;

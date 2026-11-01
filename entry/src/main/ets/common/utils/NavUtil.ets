@@ -1,6 +1,7 @@
 import { UIContext } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 import { PlayNavigation } from './PlayNavigation';
+import { ServerCompat } from '../../services/ServerCompat';
 
 export interface PlayRouteParams {
   id: string;
@@ -79,54 +80,23 @@ export class NavUtil {
 
   static openPlay(id: string | number, sourceId: string = '', episodeIndex?: number,
     currentTime?: number, sourceMid: string = '', uiContext?: UIContext, title?: string): void {
-    const idText = `${id}`;
     try {
       const r = NavUtil.getRouter(uiContext);
       if (!r) {
         return;
       }
-      if (PlayNavigation.isLocalFilmId(idText)) {
-        const params: PlayRouteParams = { id: idText };
-        if (sourceId) {
-          params.sourceId = sourceId;
-        }
-        if (episodeIndex !== undefined && episodeIndex >= 0) {
-          params.episodeIndex = `${episodeIndex}`;
-        }
-        if (currentTime !== undefined && currentTime >= 0) {
-          params.currentTime = `${currentTime}`;
-        }
-        if (title) {
-          params.title = title;
-        }
-        r.pushUrl({ url: 'pages/PlayPage', params: params });
+      const target = ServerCompat.getInstance().resolvePlayTarget(
+        id,
+        sourceId,
+        sourceMid,
+        episodeIndex,
+        currentTime,
+        title
+      );
+      if (!target.url) {
         return;
       }
-      let liveSource = sourceId;
-      let liveSid = sourceMid;
-      const split = PlayNavigation.splitLivePlayId(idText);
-      if (split) {
-        liveSource = split.sourceId;
-        liveSid = split.sid;
-      }
-      if (!liveSource || !liveSid) {
-        return;
-      }
-      const params: PlayRouteParams = {
-        id: '',
-        sourceId: liveSource,
-        sourceMid: liveSid
-      };
-      if (episodeIndex !== undefined && episodeIndex >= 0) {
-        params.episodeIndex = `${episodeIndex}`;
-      }
-      if (currentTime !== undefined && currentTime >= 0) {
-        params.currentTime = `${currentTime}`;
-      }
-      if (title) {
-        params.title = title;
-      }
-      r.pushUrl({ url: 'pages/LivePlayPage', params: params });
+      r.pushUrl({ url: target.url, params: target.params });
     } catch (_e) {
     }
   }

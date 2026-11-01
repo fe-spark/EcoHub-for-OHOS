@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { util } from '@kit.ArkTS';
+import { ServerCompat } from './ServerCompat';
 
 const PREF_NAME = 'ecohub_settings';
 const KEY_SERVER_URL = 'server_base_url';
@@ -29,6 +30,7 @@ export class ServerConfigManager {
     try {
       this.pref = await preferences.getPreferences(context, PREF_NAME);
       this.cachedUrl = (await this.pref.get(KEY_SERVER_URL, '')) as string;
+      ServerCompat.getInstance().attachPreferences(this.pref, this.storageScope());
     } catch (err) {
       console.error('Failed to get preferences:', JSON.stringify(err));
     }
@@ -221,6 +223,7 @@ export class ServerConfigManager {
 
   public async setServerUrl(url: string): Promise<void> {
     const cleanUrl = this.normalizeRaw(url);
+    console.info(`[ServerConfig] 切换软件源: ${cleanUrl}`);
     this.cachedUrl = cleanUrl;
     if (!this.pref) {
       return;
@@ -229,6 +232,7 @@ export class ServerConfigManager {
       await this.pref.put(KEY_SERVER_URL, cleanUrl);
       await this.pref.flush();
       await this.addServerHistory(cleanUrl);
+      ServerCompat.getInstance().switchHostScope(this.storageScope());
     } catch (_err) {
     }
   }

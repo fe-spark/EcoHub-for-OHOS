@@ -53,7 +53,7 @@ export struct FilmDetailHeader {
         plot: this.cleanPlot
       }),
       autoCancel: true,
-      alignment: DialogAlignment.Center,
+      alignment: DialogAlignment.Bottom,
       customStyle: true,
       backgroundColor: Color.Transparent,
       maskColor: 'rgba(0, 0, 0, 0.65)',

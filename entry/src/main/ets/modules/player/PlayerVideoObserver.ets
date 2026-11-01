@@ -18,7 +18,12 @@ export interface PlayerObserverHost {
 }
 
 export class PlayerVideoObserver {
+  private static readonly SIZE_SETTLE_MS: number = 300;
   private host: PlayerObserverHost;
+  private bestW: number = 0;
+  private bestH: number = 0;
+  private bestUrl: string = '';
+  private sizeTimer: number = -1;
 
   constructor(host: PlayerObserverHost) {
     this.host = host;
@@ -52,10 +57,52 @@ export class PlayerVideoObserver {
     if (!this.host.state.live() || width <= 0 || height <= 0) {
       return;
     }
-    console.info(`[PlayerVideoObserver] 原生视频分辨率更新: ${width}x${height}, isPortrait: ${height > width}`);
-    this.host.state.videoWidth = width;
-    this.host.state.videoHeight = height;
-    this.host.onUIUpdate();
+    const url = this.host.videoUrl;
+    if (url !== this.bestUrl) {
+      this.bestUrl = url;
+      this.bestW = 0;
+      this.bestH = 0;
+    }
+    if (width === this.bestW && height === this.bestH) {
+      return;
+    }
+    this.bestW = width;
+    this.bestH = height;
+
+    // 首帧尺寸立即生效，杜绝初始拉伸与二次跳动
+    if (this.host.state.videoWidth === 0 || this.host.state.videoHeight === 0) {
+      if (this.sizeTimer !== -1) {
+        clearTimeout(this.sizeTimer);
+        this.sizeTimer = -1;
+      }
+      this.host.state.videoWidth = width;
+      this.host.state.videoHeight = height;
+      this.host.onUIUpdate();
+      return;
+    }
+
+    if (this.sizeTimer !== -1) {
+      clearTimeout(this.sizeTimer);
+    }
+    const settleW = width;
+    const settleH = height;
+    const settleUrl = url;
+    this.sizeTimer = setTimeout(() => {
+      this.sizeTimer = -1;
+      if (!this.host.state.live() || this.host.videoUrl !== settleUrl) {
+        return;
+      }
+      if (settleW !== this.bestW || settleH !== this.bestH) {
+        return;
+      }
+      if (this.host.state.videoWidth === settleW && this.host.state.videoHeight === settleH) {
+        return;
+      }
+      console.info(`[PlayerVideoObserver] 按解码尺寸排版: ${settleW}x${settleH}`);
+      this.host.state.videoWidth = settleW;
+      this.host.state.videoHeight = settleH;
+      this.host.onUIUpdate();
+    }, PlayerVideoObserver.SIZE_SETTLE_MS);
   }
 
   handleStart(): void {

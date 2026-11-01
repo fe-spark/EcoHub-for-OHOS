@@ -1,15 +1,15 @@
-import { BackIcon } from '../../components/common/BackIcon';
-
+import { AppTheme } from '../../common/constants/AppTheme';
 @Component
 export struct PlayerIconBtn {
   private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop src: Resource = $r('sys.symbol.play_fill');
-  @Prop iconSize: number = 18;
-  @Prop boxSize: number = 36;
+  @Prop iconSize: number = 20;
+  @Prop boxSize: number = 40;
   @Prop circle: boolean = false;
   @Prop prominent: boolean = false;
   @Prop canTap: boolean = true;
   @Prop iconColor: string = '#FFFFFF';
+  @Prop fontWeight: FontWeight = FontWeight.Medium;
   onTap?: () => void;
   private lastTapAt: number = 0;
 
@@ -39,7 +39,7 @@ export struct PlayerIconBtn {
       SymbolGlyph(this.src)
         .fontSize(this.iconSize)
         .fontColor([this.iconColor])
-        .fontWeight(FontWeight.Medium)
+        .fontWeight(this.fontWeight)
         .hitTestBehavior(HitTestMode.None)
     }
     .width(this.boxSize)
@@ -154,6 +154,7 @@ export struct PlayerChip {
   private static readonly TAP_DEBOUNCE_MS: number = 120;
   @Prop label: string = '';
   @Prop canTap: boolean = true;
+  @Prop highlight: boolean = false;
   onTap?: () => void;
   private lastTapAt: number = 0;
 
@@ -172,51 +173,44 @@ export struct PlayerChip {
   }
 
   build() {
-    Text(this.label)
-      .fontSize(13)
-      .fontWeight(FontWeight.Medium)
-      .fontColor(this.canTap ? '#FFFFFF' : 'rgba(255,255,255,0.35)')
-      .height(44)
-      .padding({ left: 8, right: 8 })
-      .textAlign(TextAlign.Center)
-      .priorityGesture(
-        TapGesture({ count: 1 })
-          .onAction(() => this.handleTap())
-      )
-  }
-}
-
-@Component
-export struct PlayerBackBtn {
-  private static readonly TAP_DEBOUNCE_MS: number = 120;
-  onTap?: () => void;
-  private lastTapAt: number = 0;
-
-  private handleTap(): void {
-    const now = Date.now();
-    if (now - this.lastTapAt < PlayerBackBtn.TAP_DEBOUNCE_MS) {
-      return;
-    }
-    this.lastTapAt = now;
-    if (this.onTap) {
-      this.onTap();
-    }
-  }
-
-  build() {
-    Column() {
-      BackIcon({ color: '#FFFFFF' })
+    Row() {
+      Text(this.label)
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.canTap ? (this.highlight ? AppTheme.ACCENT : '#FFFFFF') : 'rgba(255,255,255,0.35)')
+        .lineHeight(14)
         .hitTestBehavior(HitTestMode.None)
     }
-    .width(40)
-    .height(40)
+    .height(26)
+    .padding({ left: 9, right: 9 })
     .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .backgroundColor('#01000000')
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor(this.highlight ? 'rgba(0, 180, 216, 0.16)' : 'rgba(255, 255, 255, 0.12)')
+    .borderRadius(13)
+    .borderWidth(0.5)
+    .borderColor(this.highlight ? 'rgba(0, 180, 216, 0.35)' : 'rgba(255, 255, 255, 0.18)')
     .responseRegion({ x: 0, y: 0, width: '100%', height: '100%' })
     .priorityGesture(
       TapGesture({ count: 1 })
         .onAction(() => this.handleTap())
     )
+  }
+}
+
+@Component
+export struct PlayerBackBtn {
+  @Prop iconSize: number = 24;
+  @Prop boxSize: number = 40;
+  @Prop fontWeight: FontWeight = FontWeight.Bold;
+  onTap?: () => void;
+
+  build() {
+    PlayerIconBtn({
+      src: $r('sys.symbol.chevron_left'),
+      iconSize: this.iconSize,
+      boxSize: this.boxSize,
+      fontWeight: this.fontWeight,
+      onTap: this.onTap
+    })
   }
 }

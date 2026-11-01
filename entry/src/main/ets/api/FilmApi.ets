@@ -1,6 +1,7 @@
 import { HttpClient } from '../common/network/HttpClient';
 import { QueryParams } from '../common/utils/QueryParams';
 import { ApiParser } from './ApiParser';
+import { ApiEndpoint, ServerCompat } from '../services/ServerCompat';
 import {
   BasicConfig,
   CategoryItem,
@@ -10,10 +11,10 @@ import {
   HomeData,
   MovieBasicInfo,
   PlayInfo,
+  DanmakuComment,
   SearchResult,
   SearchSourceTab
 } from '../types/FilmModels';
-
 export class FilmApi {
   private static siteConfig: BasicConfig | null = null;
   private static configPromise: Promise<BasicConfig> | null = null;
@@ -36,7 +37,7 @@ export class FilmApi {
   }
 
   static async getHome(): Promise<HomeData> {
-    const res = await HttpClient.getInstance().get('/index');
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.HOME));
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '首页数据获取失败');
     }
@@ -48,7 +49,7 @@ export class FilmApi {
       .set('pid', pid)
       .set('current', current)
       .set('pageSize', pageSize);
-    const res = await HttpClient.getInstance().get('/dailyUpdates', params);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.DAILY_UPDATES), params);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '每日更新获取失败');
     }
@@ -56,7 +57,7 @@ export class FilmApi {
   }
 
   static async getNavCategory(): Promise<CategoryItem[]> {
-    const res = await HttpClient.getInstance().get('/navCategory');
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.CATEGORIES));
     if (res.code !== 0 || !res.data) {
       return [];
     }
@@ -105,7 +106,7 @@ export class FilmApi {
 
   static async getHotKeywords(limit: number = 8): Promise<string[]> {
     const params = new QueryParams().set('limit', limit);
-    const res = await HttpClient.getInstance().get('/hotKeywords', params);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.HOT_KEYWORDS), params);
     if (res.code !== 0 || !res.data) {
       return [];
     }
@@ -117,7 +118,7 @@ export class FilmApi {
     if (source) {
       params.set('source', source);
     }
-    const res = await HttpClient.getInstance().get('/searchFilm', params);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.SEARCH), params);
     if (res.code !== 0 || !res.data) {
       const empty: SearchResult = {
         list: [],
@@ -132,7 +133,7 @@ export class FilmApi {
 
   static async getClassify(pid: string): Promise<ClassifyResult> {
     const params = new QueryParams().set('Pid', pid);
-    const res = await HttpClient.getInstance().get('/filmClassify', params);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.CATEGORY_OVERVIEW), params);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '分类数据获取失败');
     }
@@ -140,7 +141,7 @@ export class FilmApi {
   }
 
   static async getFilter(query: QueryParams): Promise<FilterResult> {
-    const res = await HttpClient.getInstance().get('/filmClassifySearch', query);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.FILTER), query);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '筛选数据获取失败');
     }
@@ -148,17 +149,17 @@ export class FilmApi {
   }
 
   static async getPlayInfo(id: string, playFrom: string = '', episode: number = 0, sid: string = ''): Promise<PlayInfo> {
-    if ((!id || id === '0') && sid) {
+    if (ServerCompat.getInstance().isV2 && (!id || id === '0') && sid) {
       return FilmApi.getLivePlayInfo(playFrom, sid, episode);
     }
     const params = new QueryParams()
       .set('id', id)
       .set('playFrom', playFrom)
       .set('episode', episode);
-    if (sid) {
+    if (ServerCompat.getInstance().isV2 && sid) {
       params.set('sid', sid);
     }
-    const res = await HttpClient.getInstance().get('/filmPlayInfo', params, 20000);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.PLAY_INFO), params, 20000);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '播放数据获取失败');
     }
@@ -170,7 +171,7 @@ export class FilmApi {
       .set('source', source)
       .set('sid', sid)
       .set('episode', episode);
-    const res = await HttpClient.getInstance().get('/liveFilmPlayInfo', params, 20000);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.LIVE_PLAY_INFO), params, 20000);
     if (res.code !== 0 || !res.data) {
       throw new Error(res.msg || '现场播放数据获取失败');
     }
@@ -179,7 +180,7 @@ export class FilmApi {
 
   static async getRelate(id: string): Promise<MovieBasicInfo[]> {
     const params = new QueryParams().set('id', id);
-    const res = await HttpClient.getInstance().get('/filmRelate', params);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.RELATED), params);
     if (res.code !== 0 || !res.data) {
       return [];
     }
@@ -194,7 +195,7 @@ export class FilmApi {
       .set('source', source)
       .set('cid', cid)
       .set('sid', sid);
-    const res = await HttpClient.getInstance().get('/liveFilmRelate', params);
+    const res = await HttpClient.getInstance().get(ServerCompat.getInstance().endpoint(ApiEndpoint.LIVE_RELATE), params);
     if (res.code !== 0 || !res.data) {
       return [];
     }
@@ -202,6 +203,46 @@ export class FilmApi {
       return ApiParser.parseMovies(res.data as Object[]);
     }
     return [];
+  }
+
+  static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuComment[]> {
+    if (!ServerCompat.getInstance().canDanmaku) {
+      console.info('[Danmaku] 当前非 V3 协议或环境不支持弹幕特性，跳过请求');
+      return [];
+    }
+    const params = new QueryParams()
+      .set('mid', mid)
+      .set('episode', episode)
+      .set('title', title);
+    try {
+      const ep = ServerCompat.getInstance().endpoint(ApiEndpoint.DANMAKU);
+      console.info(`[Danmaku] 请求弹幕: ep=${ep} mid=${mid} epNum=${episode} title=${title}`);
+      const res = await HttpClient.getInstance().get(ep, params);
+      if ((res.code !== 0 && res.code !== 1) || !Array.isArray(res.data)) {
+        console.warn(`[Danmaku] 响应异常或无数据: code=${res.code} msg=${res.msg}`);
+        return [];
+      }
+      const list: DanmakuComment[] = [];
+      const raw = res.data as Object[];
+      for (let i = 0; i < raw.length; i++) {
+        const row = ApiParser.asRecord(raw[i]);
+        const text = ApiParser.str(row, 'text');
+        if (!text) {
+          continue;
+        }
+        list.push({
+          text: text,
+          time: ApiParser.num(row, 'time'),
+          color: ApiParser.str(row, 'color', '#ffffff'),
+          mode: ApiParser.num(row, 'mode')
+        });
+      }
+      console.info(`[Danmaku] 成功解析弹幕列表: ${list.length} 条`);
+      return list;
+    } catch (err) {
+      console.error(`[Danmaku] 请求发生异常: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
+      return [];
+    }
   }
 }
 

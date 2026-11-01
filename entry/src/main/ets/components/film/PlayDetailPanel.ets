@@ -439,7 +439,6 @@ export struct PlayDetailPanel {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.None)
     .opacity(this.ready ? 1 : 0)
-    .animation({ duration: 150, curve: Curve.EaseOut })
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)

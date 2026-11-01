@@ -12,10 +12,9 @@ export struct FilmRow {
   @Prop moreText: string = '查看全部';
   @Prop pid: number = 0;
   onMore?: () => void;
-  @StorageLink('WIDTH_BP') private widthBp: string = 'sm';
-  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
-  @StorageLink('SAFE_INSET_LEFT') private leftInset: number = 0;
-  @StorageLink('SAFE_INSET_RIGHT') private rightInset: number = 0;
+  @Prop cardWidth: number = 0;
+  @Prop leftInset: number = 0;
+  @Prop rightInset: number = 0;
 
   private openMore(): void {
     if (this.onMore) {
@@ -69,7 +68,7 @@ export struct FilmRow {
         Scroll() {
           Row({ space: AppTheme.SPACE_SM }) {
             ForEach(this.films, (film: MovieBasicInfo) => {
-              FilmCard({ film: film, cardWidth: Breakpoint.cardWidth(this.widthBp, this.windowWidth) })
+              FilmCard({ film: film, cardWidth: this.cardWidth })
             }, (film: MovieBasicInfo) => `${film.id}`)
           }
           .justifyContent(FlexAlign.Start)

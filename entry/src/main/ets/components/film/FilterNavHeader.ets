@@ -10,8 +10,8 @@ export interface FilterSelectedTag {
 export struct FilterNavHeader {
   @Prop total: number = 0;
   @Prop tags: FilterSelectedTag[] = [];
+  @Prop topInset: number = 0;
   onBack: () => void = () => {};
-
   build() {
     Row() {
       Row() {
@@ -59,8 +59,12 @@ export struct FilterNavHeader {
       }
     }
     .width('100%')
-    .height(48)
-    .padding({ left: AppTheme.SPACE_SM, right: AppTheme.SPACE_LG })
+    .height(48 + this.topInset)
+    .padding({
+      top: this.topInset,
+      left: AppTheme.SPACE_SM,
+      right: AppTheme.SPACE_LG
+    })
     .alignItems(VerticalAlign.Center)
     .backgroundColor(AppTheme.BG)
   }

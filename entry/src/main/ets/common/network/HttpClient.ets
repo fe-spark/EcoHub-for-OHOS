@@ -1,6 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { ServerConfigManager } from '../../services/ServerConfigManager';
+import { ApiEndpoint, ServerCompat } from '../../services/ServerCompat';
 import { QueryParams } from '../utils/QueryParams';
 import { SourceGuard } from '../../services/SourceGuard';
 import { SiteHeartbeat } from '../../services/SiteHeartbeat';
@@ -14,6 +15,7 @@ export interface ApiResponse {
 
 interface TrackViewPayload {
   source: string;
+  collect_source?: string;
   action: string;
   resource: string;
   page: string;
@@ -148,8 +150,8 @@ export class HttpClient {
     }
   }
 
-  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = '', resourceCat: string = '', resourceTitle: string = ''): void {
-    this.sendTrack(action, resource, page, deviceModel, resourceCat, resourceTitle).catch(() => {});
+  public trackView(action: string, resource: string = '', page: string = '', deviceModel: string = '', resourceCat: string = '', resourceTitle: string = '', collectSource: string = ''): void {
+    this.sendTrack(action, resource, page, deviceModel, resourceCat, resourceTitle, collectSource).catch(() => {});
   }
 
   private resolveDeviceModel(customModel: string = ''): string {
@@ -168,11 +170,11 @@ export class HttpClient {
     }
   }
 
-  private async sendTrack(action: string, resource: string, page: string, deviceModel: string, resourceCat: string = '', resourceTitle: string = ''): Promise<void> {
+  private async sendTrack(action: string, resource: string, page: string, deviceModel: string, resourceCat: string = '', resourceTitle: string = '', collectSource: string = ''): Promise<void> {
     const manager = ServerConfigManager.getInstance();
     let url = '';
     try {
-      url = manager.buildApiUrl('/stat/view');
+      url = manager.buildApiUrl(ServerCompat.getInstance().endpoint(ApiEndpoint.STATS_VIEW));
     } catch (_err) {
       return;
     }
@@ -201,6 +203,10 @@ export class HttpClient {
       device_model: resolvedModel,
       device_id: deviceId
     };
+    const station = collectSource.trim();
+    if (station.length > 0) {
+      payload.collect_source = station;
+    }
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -278,8 +284,10 @@ export class HttpClient {
       try {
         const res = await this.send(`${origin}/api/provide/app${query}`, 5000, key);
         if (res.code === 1 || res.code === 0) {
+          await ServerCompat.getInstance().updateFromProvideApp(res.data as Object, ServerConfigManager.hostScope(origin));
           return { ok: true };
         }
+        throw new Error(res.msg || '软件源响应异常');
       } catch (appErr) {
         const msg = (appErr instanceof Error) ? appErr.message : '';
         const lower = msg.toLowerCase();
@@ -306,6 +314,7 @@ export class HttpClient {
         if (msg.indexOf('404') >= 0) {
           const healthRes = await this.send(`${origin}/api/health${query}`, 5000, key);
           if (healthRes.code === 0) {
+            await ServerCompat.getInstance().markFallbackV2(ServerConfigManager.hostScope(origin));
             return { ok: true };
           }
         }

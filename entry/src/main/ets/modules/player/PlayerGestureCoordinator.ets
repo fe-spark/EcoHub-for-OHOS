@@ -19,13 +19,13 @@ export interface GestureFinishResult {
 export class PlayerGestureCoordinator {
   public pan: PlayerPan = new PlayerPan();
 
-  start(event: GestureEvent, canPlay: boolean, longPressing: boolean, currentTime: number, playerW: number, ctx?: common.UIAbilityContext): boolean {
+  start(event: GestureEvent, canPlay: boolean, longPressing: boolean, currentTime: number, playerW: number, ctx?: common.UIAbilityContext, topInset: number = 0): boolean {
     if (!canPlay || longPressing || !event.fingerList || event.fingerList.length === 0) {
       this.pan.reset();
       return false;
     }
     const finger = event.fingerList[0];
-    this.pan.begin(finger.localX, finger.localY, currentTime, playerW);
+    this.pan.begin(finger.localX, finger.localY, currentTime, playerW, topInset);
     PlayerWindow.getBrightness(ctx).then((val: number) => {
       this.pan.primeBright(val);
     });

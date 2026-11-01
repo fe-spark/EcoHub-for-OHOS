@@ -7,6 +7,7 @@ import { AppSettingsManager } from '../services/AppSettingsManager';
 import { ClipboardSniffer } from '../common/utils/ClipboardSniffer';
 import { SiteHeartbeat } from '../services/SiteHeartbeat';
 import { AppOrientation } from '../common/utils/AppOrientation';
+import { WindowBar } from '../common/utils/WindowBar';
 
 
 const CUSTOM_FONT_FAMILY: string = 'CalligraphyFont';
@@ -39,10 +40,17 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
+    windowStage.getMainWindow().then((win: window.Window) => {
+      try {
+        win.setWindowLayoutFullScreen(true);
+        win.setWindowBackgroundColor('#FF0A0B10');
+      } catch (_e) {
+      }
+    }).catch((_e: Error) => {
+    });
     Promise.all([
       ServerConfigManager.getInstance().init(this.context),
       AppSettingsManager.getInstance().init(this.context),
-      // ClipboardSniffer.init(this.context)
     ]).then(() => {
       return HistoryManager.migrateLegacy();
     }).then(() => {
@@ -64,19 +72,11 @@ export default class EntryAbility extends UIAbility {
             const rect = win.getWindowProperties().windowRect;
             const ui = win.getUIContext();
             Breakpoint.publish(ui.px2vp(rect.width), ui.px2vp(rect.height));
-            AppOrientation.start(this.context);
+            AppOrientation.init(this.context);
           } catch (_e) {
           }
-          win.setWindowSystemBarEnable(['status', 'navigation']);
-          win.setWindowLayoutFullScreen(true);
-          win.setWindowSystemBarProperties({
-            statusBarColor: '#00000000',
-            statusBarContentColor: '#FFFFFF',
-            navigationBarColor: '#12141C',
-            navigationBarContentColor: '#FFFFFF'
-          });
+          WindowBar.apply(this.context);
         });
-
       });
     }).catch((err: Error) => {
       console.error('Failed to init server config:', JSON.stringify(err));
@@ -85,7 +85,8 @@ export default class EntryAbility extends UIAbility {
           console.error('Failed to load content:', JSON.stringify(loadErr));
           return;
         }
-        AppOrientation.start(this.context);
+        AppOrientation.init(this.context);
+        WindowBar.apply(this.context);
       });
     });
   }

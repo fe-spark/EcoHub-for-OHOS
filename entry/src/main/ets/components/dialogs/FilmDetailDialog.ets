@@ -1,4 +1,4 @@
-import { DialogTurn } from '../common/DialogTurn';
+
 import { AppTheme } from '../../common/constants/AppTheme';
 import { AppIcon } from '../common/AppIcon';
 import { FormatUtil } from '../../common/utils/FormatUtil';
@@ -21,7 +21,6 @@ export struct FilmDetailDialog {
   }
 
   build() {
-    DialogTurn({ onBlank: () => { if (this.controller) { this.controller.close(); } } }) {
     Column() {
       // 顶部拖拽指示把手
       Column()
@@ -272,6 +271,5 @@ export struct FilmDetailDialog {
     .borderRadius({ topLeft: 20, topRight: 20 })
     .alignItems(HorizontalAlign.Start)
     .justifyContent(FlexAlign.Start)
-    }
   }
 }

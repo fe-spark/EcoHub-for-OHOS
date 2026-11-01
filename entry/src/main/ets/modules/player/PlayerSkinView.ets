@@ -9,6 +9,7 @@ export interface PlayerSkinEvents {
   onNext: () => void;
   onSpeed: () => void;
   onScale: () => void;
+  onToggleDanmaku?: () => void;
   onRetry: () => void;
   onErrorDetail: () => void;
   onSeekBack: () => void;
@@ -30,6 +31,7 @@ export interface PlayerSkinEvents {
 
 @Component
 export struct PlayerSkinView {
+  @Prop reloadToken: number = 0;
   @Prop isFull: boolean = false;
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
@@ -46,6 +48,8 @@ export struct PlayerSkinView {
   @Prop muted: boolean = false;
   @Prop speedLabel: string = '1.0x';
   @Prop scaleLabel: string = '适应';
+  @Prop danmakuEnabled: boolean = true;
+  @Prop canDanmaku: boolean = true;
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -64,6 +68,7 @@ export struct PlayerSkinView {
 
   build() {
     PlayerSkin({
+      reloadToken: this.reloadToken,
       isFull: this.isFull,
       showHud: this.showHud,
       showBack: this.showBack,
@@ -80,6 +85,8 @@ export struct PlayerSkinView {
       muted: this.muted,
       speedLabel: this.speedLabel,
       scaleLabel: this.scaleLabel,
+      danmakuEnabled: this.danmakuEnabled,
+      canDanmaku: this.canDanmaku,
       hasPrev: this.hasPrev,
       hasNext: this.hasNext,
       longPressing: this.longPressing,
@@ -101,6 +108,7 @@ export struct PlayerSkinView {
       onNext: () => { if (this.events) this.events.onNext(); },
       onSpeed: () => { if (this.events) this.events.onSpeed(); },
       onScale: () => { if (this.events) this.events.onScale(); },
+      onToggleDanmaku: () => { if (this.events?.onToggleDanmaku) this.events.onToggleDanmaku(); },
       onRetry: () => { if (this.events) this.events.onRetry(); },
       onErrorDetail: () => { if (this.events) this.events.onErrorDetail(); },
       onSeekBack: () => { if (this.events) this.events.onSeekBack(); },

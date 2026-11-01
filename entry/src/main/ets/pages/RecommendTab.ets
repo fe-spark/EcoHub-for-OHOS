@@ -99,8 +99,14 @@ export struct RecommendTab {
     return (sec.movies && sec.movies.length > 0) ? sec.movies : ((sec.hot && sec.hot.length > 0) ? sec.hot : []);
   }
 
+  private static readonly MAX_HOME_SECTIONS: number = 12;
+
   private visibleSections(): HomeSection[] {
-    return this.sections.filter((s: HomeSection) => s.nav.show !== false && this.sectionFilms(s).length > 0);
+    const list = this.sections.filter((s: HomeSection) => s.nav.show !== false && this.sectionFilms(s).length > 0);
+    return list.slice(0, RecommendTab.MAX_HOME_SECTIONS);
+  }
+  private categoryCapsules(): HomeSection[] {
+    return this.sections.filter((s: HomeSection) => s.nav.show !== false);
   }
 
   private categoryGlyph(name: string): string {
@@ -139,9 +145,8 @@ export struct RecommendTab {
     .height(this.isWide() ? 35 : 32)
     .padding({ left: this.isWide() ? 8 : (AppTheme.SPACE_SM - 2), right: this.isWide() ? 13 : (AppTheme.SPACE_MD - 1) })
     .justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Center)
-    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.06)' : CAT_CHIP_BG)
-    .backdropBlur(20)
-    .borderRadius(AppTheme.RADIUS_PILL).clip(true)
+    .backgroundColor(this.isWide() ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.05)')
+    .borderRadius(AppTheme.RADIUS_PILL)
     .border({ width: this.isWide() ? 0.8 : 0.8, color: this.isWide() ? 'rgba(255, 255, 255, 0.12)' : CAT_CHIP_BORDER })
     .onClick(() => { NavUtil.openFilter(section.nav.id); })
   }
@@ -391,11 +396,11 @@ export struct RecommendTab {
             })
 
             // 片库分类快捷导航胶囊
-            if (this.visibleSections().length > 0) {
+            if (this.categoryCapsules().length > 0) {
               Column() {
                 Scroll() {
                   Row({ space: this.isWide() ? 8 : AppTheme.SPACE_SM }) {
-                    ForEach(this.visibleSections(), (section: HomeSection) => {
+                    ForEach(this.categoryCapsules(), (section: HomeSection) => {
                       this.categoryEntry(section)
                     }, (section: HomeSection) => `cat_${section.nav.id}_${this.reloadToken}`)
                   }
@@ -426,6 +431,9 @@ export struct RecommendTab {
                 title: section.nav.name,
                 films: this.sectionFilms(section),
                 pid: section.nav.id,
+                cardWidth: Breakpoint.cardWidth(this.widthBp),
+                leftInset: this.leftInset,
+                rightInset: this.rightInset,
                 onMore: () => {
                   NavUtil.openFilter(section.nav.id);
                 }
@@ -456,7 +464,6 @@ export struct RecommendTab {
         })
         .width('100%')
         .height('100%')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
       }
 
       // 2. 状态栏安全区悬浮刷新指示器（位于内容之上，Header 之下）

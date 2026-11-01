@@ -48,6 +48,10 @@ export class PlayerPlaybackState {
     return this.videoHeight > 0 && this.videoWidth > 0 && this.videoHeight > this.videoWidth;
   }
 
+  public isLandscape(): boolean {
+    return this.videoWidth > 0 && this.videoHeight > 0 && this.videoWidth > this.videoHeight;
+  }
+
   public resumeTime(initialTime: number): number {
     if (this.pendingResumeSec >= 0) {
       const t: number = this.pendingResumeSec;

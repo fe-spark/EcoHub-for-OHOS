@@ -410,6 +410,7 @@ export struct DailyUpdatePane {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(AppTheme.BG)
     .onTouch((event: TouchEvent) => {
       this.handleTouch(event);
     })

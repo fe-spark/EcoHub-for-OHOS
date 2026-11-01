@@ -8,6 +8,7 @@ import { AppToast } from '../../common/utils/AppToast';
 
 @Component
 export struct PlayerSkin {
+  @Prop reloadToken: number = 0;
   @Prop isFull: boolean = false;
   @Prop showHud: boolean = true;
   @Prop showBack: boolean = false;
@@ -23,6 +24,8 @@ export struct PlayerSkin {
   @Prop muted: boolean = false;
   @Prop speedLabel: string = '1.0x';
   @Prop scaleLabel: string = '适应';
+  @Prop danmakuEnabled: boolean = true;
+  @Prop canDanmaku: boolean = true;
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -45,6 +48,7 @@ export struct PlayerSkin {
   onNext?: () => void;
   onSpeed?: () => void;
   onScale?: () => void;
+  onToggleDanmaku?: () => void;
   onRetry?: () => void;
   onErrorDetail?: () => void;
   onSeekBack?: () => void;
@@ -111,6 +115,10 @@ export struct PlayerSkin {
     return this.isFull || this.edgeHud;
   }
 
+  private isPortrait(): boolean {
+    return !this.isFull && !this.edgeHud;
+  }
+
   private showTopFull(): boolean {
     return this.isFull && (this.showHud || !!this.errorText);
   }
@@ -157,11 +165,11 @@ export struct PlayerSkin {
       style: SliderStyle.OutSet
     })
       .width('100%')
-      .height(20)
-      .trackThickness(2)
-      .blockSize({ width: 12, height: 12 })
+      .height(18)
+      .trackThickness(3)
+      .blockSize({ width: 10, height: 10 })
       .blockColor('#FFFFFF')
-      .trackColor('rgba(255,255,255,0.28)')
+      .trackColor('rgba(255,255,255,0.22)')
       .selectedColor(AppTheme.ACCENT)
       .enabled(this.duration > 0 && this.ready)
       .onChange((value: number, mode: SliderChangeMode) => {
@@ -196,14 +204,17 @@ export struct PlayerSkin {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
           .margin({ left: 4, right: 8 })
-        this.skipBtns()
-        this.pipEntry()
+        Row({ space: 4 }) {
+          this.skipBtns()
+          this.castEntry()
+          this.pipEntry()
+        }
       }
       .width('100%')
       .padding({
-        left: this.edge(8, this.leftInset),
-        right: this.edge(8, this.rightInset),
-        top: this.edge(8, this.topInset),
+        left: Math.max(8, this.leftInset + 4),
+        right: Math.max(8, this.rightInset + 4),
+        top: Math.max(8, this.topInset + 4),
         bottom: 8
       })
       .alignItems(VerticalAlign.Center)
@@ -215,11 +226,30 @@ export struct PlayerSkin {
   }
 
   @Builder
-  playToggle() {
+  timeBlock(compact: boolean = false) {
+    Row({ space: 2 }) {
+      Text(FormatUtil.duration(this.currentTime))
+        .fontSize(compact ? 11 : 12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#FFFFFF')
+      Text('/')
+        .fontSize(compact ? 10 : 11)
+        .fontColor('rgba(255,255,255,0.40)')
+        .margin({ left: 3, right: 3 })
+      Text(FormatUtil.duration(this.duration))
+        .fontSize(compact ? 11 : 12)
+        .fontColor('rgba(255,255,255,0.65)')
+    }
+    .alignItems(VerticalAlign.Center)
+    .margin({ left: 4 })
+  }
+
+  @Builder
+  playToggle(boxSize: number = 36, iconSize: number = 22) {
     PlayerIconBtn({
       src: this.continuing() ? $r('sys.symbol.pause_fill') : $r('sys.symbol.play_fill'),
-      iconSize: 22,
-      boxSize: 44,
+      iconSize: iconSize,
+      boxSize: boxSize,
       onTap: this.onPlay
     })
   }
@@ -229,7 +259,7 @@ export struct PlayerSkin {
     if (this.castDeviceName) {
       PlayerIconBtn({
         src: $r('sys.symbol.power'),
-        iconSize: 18,
+        iconSize: 20,
         boxSize: 40,
         iconColor: AppTheme.DANGER,
         onTap: this.onStopCast
@@ -277,81 +307,85 @@ export struct PlayerSkin {
   @Builder
   bottomBar() {
     if (this.showBottom()) {
-      if (this.cinemaHud()) {
-        Column({ space: 2 }) {
-          this.sliderBar()
-          Row() {
-            this.playToggle()
-            Text(this.timeText())
-              .fontSize(12)
-              .fontColor('rgba(255,255,255,0.92)')
-              .margin({ left: 4 })
-              .maxLines(1)
-            Blank()
-            PlayerChip({ label: this.scaleLabel, canTap: this.ready, onTap: this.onScale })
-            PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
+      Column({ space: 4 }) {
+        // 1. 顶层通栏进度条（100% 满宽自由拖拽，彻底解决挤压与误触）
+        this.sliderBar()
+
+        // 2. 底部控制栏（左侧播控与时间，中间弹性留白，右侧功能群组）
+        Row() {
+          // 左侧控制群组：播放/暂停、下一集、时间刻度
+          Row({ space: 4 }) {
+            this.playToggle(36, 22)
+            if (this.hasNext && !this.isPortrait()) {
+              PlayerIconBtn({
+                src: $r('sys.symbol.forward_end_fill'),
+                iconSize: 18,
+                boxSize: 36,
+                onTap: this.onNext
+              })
+            }
+            this.timeBlock(this.isPortrait())
+          }
+          .alignItems(VerticalAlign.Center)
+
+          Blank()
+
+          // 右侧功能调节群组：倍速胶囊、比例胶囊、弹幕开关、静音开关、全屏切换
+          Row({ space: this.isPortrait() ? 6 : 8 }) {
+            PlayerChip({
+              label: this.speedLabel,
+              canTap: this.ready,
+              highlight: this.speedLabel !== '1.0x',
+              onTap: this.onSpeed
+            })
+            if (this.cinemaHud()) {
+              PlayerChip({
+                label: this.scaleLabel,
+                canTap: this.ready,
+                highlight: this.scaleLabel !== '适应',
+                onTap: this.onScale
+              })
+            }
+            if (this.canDanmaku) {
+              PlayerChip({
+                label: '弹幕',
+                canTap: true,
+                highlight: this.danmakuEnabled,
+                onTap: this.onToggleDanmaku
+              })
+            }
             PlayerIconBtn({
-              src: this.muted ? $r('sys.symbol.speaker_slash') : $r('sys.symbol.speaker_wave_2'),
-              iconSize: 20,
-              boxSize: 44,
+              src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
+              iconSize: this.isPortrait() ? 18 : 20,
+              boxSize: this.isPortrait() ? 34 : 36,
               onTap: this.onMute
             })
             if (!this.castDeviceName) {
               PlayerIconBtn({
-                src: this.isFull ? $r('sys.symbol.arrow_down_right_and_arrow_up_left') :
-                  $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-                iconSize: 18,
-                boxSize: 44,
+                src: this.isFull ? $r('sys.symbol.exit_full_screen') : $r('sys.symbol.full_screen'),
+                iconSize: this.isPortrait() ? 18 : 20,
+                boxSize: this.isPortrait() ? 34 : 36,
                 onTap: this.onFull
               })
             }
           }
-          .width('100%')
-          .height(44)
           .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .padding({
-          left: this.edge(4, this.leftInset),
-          right: this.edge(4, this.rightInset),
-          bottom: this.edge(8, this.bottomInset),
-          top: 4
-        })
-        .linearGradient({
-          angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
-        })
-      } else {
-        Row() {
-          this.playToggle()
-          Column() {
-            this.sliderBar()
-          }
-          .layoutWeight(1)
-          .margin({ left: 2, right: 8 })
-          Text(this.timeText())
-            .fontSize(11)
-            .fontColor('rgba(255,255,255,0.88)')
-            .maxLines(1)
-          PlayerChip({ label: this.speedLabel, canTap: this.ready, onTap: this.onSpeed })
-          if (!this.castDeviceName) {
-            PlayerIconBtn({
-              src: $r('sys.symbol.arrow_up_left_and_arrow_down_right'),
-              iconSize: 18,
-              boxSize: 44,
-              onTap: this.onFull
-            })
-          }
-        }
-        .width('100%')
-        .height(44)
-        .padding({ left: 2, right: 2 })
+        .height(38)
         .alignItems(VerticalAlign.Center)
-        .linearGradient({
-          angle: 180,
-          colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.72)', 1]]
-        })
       }
+      .width('100%')
+      .padding({
+        left: Math.max(12, this.leftInset + (this.isFull ? 10 : 4)),
+        right: Math.max(12, this.rightInset + (this.isFull ? 10 : 4)),
+        bottom: this.isFull ? Math.max(12, this.bottomInset) : (this.edgeHud ? Math.max(20, this.bottomInset + 4) : Math.max(8, this.bottomInset)),
+        top: this.isPortrait() ? 2 : 8
+      })
+      .linearGradient({
+        angle: 180,
+        colors: [['rgba(0,0,0,0)', 0], ['rgba(0,0,0,0.36)', 0.45], ['rgba(0,0,0,0.78)', 1]]
+      })
     } else if (!this.errorText && this.ready) {
       Row() {
         Row()
@@ -397,8 +431,10 @@ export struct PlayerSkin {
         PlayerTip({ message: this.feedback, kind: this.feedbackKind })
       }
       PlayerLoadingCard({
+        reloadToken: this.reloadToken,
         visible: this.loading(),
         opening: this.opening,
+        seeking: this.seeking,
         allowRetry: this.canRetryLoad(),
         onRetry: this.onRetry
       })
@@ -409,91 +445,94 @@ export struct PlayerSkin {
   }
 
   build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      PlayerGestureLayer({
-        ignoreHit: !!this.castDeviceName,
-        onPlay: this.onPlay,
-        onToggleHud: this.onToggleHud,
-        onLongPress: this.onLongPress,
-        onLongPressEnd: this.onLongPressEnd,
-        onPanStart: this.onPanStart,
-        onPanMove: this.onPanMove,
-        onPanEnd: this.onPanEnd,
-        onPanCancel: this.onPanCancel
-      })
-        .width('100%')
-        .height('100%')
+    PlayerGestureLayer({
+      ignoreHit: !!this.castDeviceName,
+      onPlay: this.onPlay,
+      onToggleHud: this.onToggleHud,
+      onLongPress: this.onLongPress,
+      onLongPressEnd: this.onLongPressEnd,
+      onPanStart: this.onPanStart,
+      onPanMove: this.onPanMove,
+      onPanEnd: this.onPanEnd,
+      onPanCancel: this.onPanCancel
+    }) {
+      Stack({ alignContent: Alignment.TopStart }) {
+        if (this.showCenterPlay()) {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
+            .hitTestBehavior(HitTestMode.None)
+        }
 
-      if (this.showCenterPlay()) {
-        Column()
-          .width('100%')
-          .height('100%')
-          .backgroundColor(this.isFull ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.24)')
-          .hitTestBehavior(HitTestMode.None)
-      }
-
-      if (this.errorText && !this.castDeviceName) {
-        PlayerErrorPad({
-          onRetry: () => {
-            if (this.onRetry) {
-              this.onRetry();
+        if (this.errorText && !this.castDeviceName) {
+          PlayerErrorPad({
+            onRetry: () => {
+              if (this.onRetry) {
+                this.onRetry();
+              }
+            },
+            onErrorDetail: () => {
+              if (this.onErrorDetail) {
+                this.onErrorDetail();
+              }
             }
-          },
-          onErrorDetail: () => {
-            if (this.onErrorDetail) {
-              this.onErrorDetail();
-            }
-          }
-        })
-      }
+          })
+        }
 
-      Column() {
-        this.centerGroup()
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-      .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(10)
-
-      Column() {
-        this.topBar()
-        Blank().hitTestBehavior(HitTestMode.None)
-        this.bottomBar()
-      }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-      .hitTestBehavior(HitTestMode.Transparent)
-      .zIndex(11)
-
-      if (!this.isFull && (this.showBack || this.hasCastAction() || !!this.onPip)) {
-        Row() {
-          if (this.showBack) {
-            PlayerBackBtn({ onTap: this.onBack })
-          }
-          Blank().hitTestBehavior(HitTestMode.None)
-          Row({ space: 4 }) {
-            this.castEntry()
-            this.pipEntry()
-          }
+        Column() {
+          this.centerGroup()
         }
         .width('100%')
-        .justifyContent(FlexAlign.SpaceBetween)
-        .alignItems(VerticalAlign.Center)
-        .padding({
-          left: this.edge(4, this.leftInset),
-          right: this.edge(4, this.rightInset),
-          top: this.edge(4, this.topInset)
-        })
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
-        .zIndex(999)
+        .zIndex(10)
+
+        Column() {
+          this.topBar()
+          Blank().hitTestBehavior(HitTestMode.None)
+          this.bottomBar()
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+        .hitTestBehavior(HitTestMode.Transparent)
+        .zIndex(11)
+
+        if (!this.isFull && (this.showBack || this.hasCastAction() || !!this.onPip)) {
+          Row() {
+            if (this.showBack) {
+              PlayerBackBtn({ onTap: this.onBack })
+            }
+            Blank().hitTestBehavior(HitTestMode.None)
+            Row({ space: 4 }) {
+              this.castEntry()
+              this.pipEntry()
+            }
+          }
+          .width('100%')
+          .height(44 + this.topInset)
+          .alignItems(VerticalAlign.Bottom)
+          .padding({
+            left: Math.max(12, this.leftInset + 6),
+            right: Math.max(12, this.rightInset + 6),
+            top: this.topInset,
+            bottom: 4
+          })
+          .linearGradient({
+            angle: 180,
+            colors: [['rgba(0,0,0,0.60)', 0], ['rgba(0,0,0,0.20)', 0.6], ['rgba(0,0,0,0)', 1]]
+          })
+          .opacity((!this.isFull && this.showBack) ? 1 : (this.showHud ? 1 : 0))
+          .hitTestBehavior(HitTestMode.Transparent)
+          .zIndex(999)
+        }
       }
+      .width('100%')
+      .height('100%')
+      .hitTestBehavior(HitTestMode.Transparent)
     }
-    .width('100%')
-    .height('100%')
-    .clip(true)
-    .hitTestBehavior(HitTestMode.Transparent)
   }
 }

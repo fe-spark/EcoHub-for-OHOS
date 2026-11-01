@@ -1,5 +1,5 @@
 import { FilmApi } from '../api/FilmApi';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { HistoryItem, MovieBasicInfo, MovieDescriptor, MovieUrlInfo, PlaySource } from '../types/FilmModels';
 import { AppTheme } from '../common/constants/AppTheme';
 import { HistoryManager } from '../services/HistoryManager';
@@ -12,7 +12,10 @@ import { AppOrientation } from '../common/utils/AppOrientation';
 import { PlayerWindow } from '../modules/player/PlayerWindow';
 import { common } from '@kit.AbilityKit';
 import { VideoPlayer } from '../modules/player/VideoPlayer';
+import { PlayerBackBtn } from '../modules/player/PlayerControl';
 import { PlayDetailPanel } from '../components/film/PlayDetailPanel';
+import { FilmDetailHeader } from '../components/film/FilmDetailHeader';
+import { FormatUtil } from '../common/utils/FormatUtil';
 import { LivePlayRelatedView } from '../components/film/LivePlayRelatedView';
 import { LoadingView } from '../components/common/LoadingView';
 import { SourceGuard } from '../services/SourceGuard';
@@ -38,15 +41,16 @@ struct LivePlayPage {
   @State private playingSourceId: string = '';
   @State private viewingSourceId: string = '';
   @State private episodeIndex: number = 0;
-  @State private playUrl: string = '';
+  @State @Watch('onPlayUrlChange') private playUrl: string = '';
+  @State private frameRatio: number = 16 / 9;
   @State private playToken: number = 0;
   @State private playTitle: string = '';
   @State private initialTime: number = 0;
   @State private activeTab: number = 0;
   @State private related: MovieBasicInfo[] = [];
   @State private relateLoading: boolean = false;
-  @State private pageW: number = 0;
-  @State private pageH: number = 0;
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360;
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640;
   @State private topInset: number = 0;
   @State private bottomInset: number = 16;
   @State private leftInset: number = 0;
@@ -81,6 +85,10 @@ struct LivePlayPage {
     this.isFav = key ? await FavoriteManager.isFavorite(key) : false;
   }
 
+  private onPlayUrlChange(): void {
+    this.frameRatio = 16 / 9;
+  }
+
   async aboutToAppear(): Promise<void> {
     this.applyWindowBar();
     const params = this.getUIContext().getRouter().getParams() as Object;
@@ -90,7 +98,7 @@ struct LivePlayPage {
     if (paramTitle) this.name = paramTitle;
     const historyKey = this.historyId();
     if (historyKey) {
-      HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage');
+      HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage', '', '', '', this.sourceId);
       this.syncFavoriteState();
       try {
         const fav = await FavoriteManager.find(historyKey);
@@ -153,12 +161,12 @@ struct LivePlayPage {
     FavoriteManager.offFavoriteChange(this.favChangeCb);
   }
 
-  private setPlayerFull(full: boolean, isPortrait: boolean = false): void {
+  private setPlayerFull(full: boolean, isPortrait: boolean = false, isLandscape: boolean = false): void {
     if (full === this.playerFull) {
       return;
     }
     this.playerFull = full;
-    AppOrientation.setFullscreenRotation(full, !isPortrait);
+    AppOrientation.setFullscreenRotation(full, isLandscape);
     PlayerWindow.setFullscreen(this.getUIContext().getHostContext() as common.UIAbilityContext, full, isPortrait);
   }
 
@@ -277,7 +285,7 @@ struct LivePlayPage {
     if (!newSid || newSid === this.sourceMid) return;
     this.sourceMid = newSid;
     const historyKey = this.historyId();
-    if (historyKey) HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage');
+    if (historyKey) HttpClient.getInstance().trackView('play', historyKey, 'LivePlayPage', '', '', '', this.sourceId);
     this.name = film.name || '';
     this.sources = [];
     this.playUrl = '';
@@ -325,17 +333,35 @@ struct LivePlayPage {
     });
   }
 
-  private isWideScreen(): boolean {
-    if (this.pageW > 0 && this.pageH > 0) return this.pageW >= 600 && this.pageW > this.pageH;
-    return Breakpoint.isWide(this.widthBp) && Breakpoint.windowWidth() > Breakpoint.windowHeight();
+  private isLandscape(): boolean {
+    const w = this.windowWidth > 0 ? this.windowWidth : Breakpoint.windowWidth();
+    const h = this.windowHeight > 0 ? this.windowHeight : Breakpoint.windowHeight();
+    return w > h && h > 0;
   }
 
-  private splitPlay(): boolean { return !this.playerFull && this.isWideScreen(); }
-  private hudLeftInset(): number { return (this.playerFull || this.splitPlay()) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0; }
-  private hudRightInset(): number { return this.playerFull ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : AppTheme.SAFE_EDGE; }
-  private hudTopInset(): number { return (this.playerFull || this.splitPlay()) ? this.topInset : 0; }
-  private hudBottomInset(): number { return (this.playerFull || this.splitPlay()) ? this.bottomInset : 0; }
+  private isPortrait(): boolean {
+    const w = this.windowWidth > 0 ? this.windowWidth : Breakpoint.windowWidth();
+    const h = this.windowHeight > 0 ? this.windowHeight : Breakpoint.windowHeight();
+    return w <= h;
+  }
 
+  private sidebarWidth(): number {
+    const w = this.windowWidth > 0 ? this.windowWidth : 780;
+    return Math.min(360, Math.max(260, w * 0.35));
+  }
+
+  private hudLeftInset(): number {
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.leftInset, AppTheme.SAFE_EDGE) : 0;
+  }
+  private hudRightInset(): number {
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.rightInset, AppTheme.SAFE_EDGE) : 0;
+  }
+  private hudTopInset(): number {
+    return (this.isLandscape() || this.playerFull) ? Math.max(this.topInset, AppTheme.SAFE_EDGE) : 0;
+  }
+  private hudBottomInset(): number {
+    return (this.isLandscape() || this.playerFull) ? this.bottomInset : 0;
+  }
   @Builder
   playTabItem(title: string, index: number) {
     Column() {
@@ -360,7 +386,7 @@ struct LivePlayPage {
       initialTime: this.initialTime,
       showBack: true,
       isFull: this.playerFull,
-      edgeHud: this.splitPlay(),
+      edgeHud: this.isLandscape(),
       pageActive: this.playerActive,
       hasPrev: this.hasPrev(),
       hasNext: this.hasNext(),
@@ -375,15 +401,21 @@ struct LivePlayPage {
       onEnded: () => { if (this.settingAutoPlayNext && this.hasNext()) this.playNext(); },
       onPrev: () => this.playPrev(),
       onNext: () => this.playNext(),
-      onFullscreenChange: (full: boolean, isPortrait?: boolean) => this.setPlayerFull(full, isPortrait),
+      onFullscreenChange: (full: boolean, isPortrait?: boolean, isLandscape?: boolean) => {
+        this.setPlayerFull(full, isPortrait === true, isLandscape === true);
+      },
+      onVideoSize: (width: number, height: number) => {
+        if (width > 0 && height > 0) {
+          this.frameRatio = width / height;
+        }
+      },
       onProgress: (cur: number, dur: number) => {
         this.lastCurrentTime = cur; this.lastDuration = dur; this.persistHistory(cur, dur);
       }
     })
       .width('100%')
-      .height((this.playerFull || this.splitPlay()) ? '100%' : undefined)
-      .aspectRatio((this.playerFull || this.splitPlay()) ? undefined : 16 / 9)
-      .constraintSize({ maxHeight: '100%' })
+      .height((this.playerFull || this.isLandscape()) ? '100%' : undefined)
+      .aspectRatio((this.playerFull || this.isLandscape()) ? undefined : 16 / 9)
   }
 
   @Builder
@@ -426,7 +458,7 @@ struct LivePlayPage {
           LivePlayRelatedView({
             relateLoading: this.relateLoading,
             related: this.related,
-            columns: this.splitPlay() ? 3 : Breakpoint.gridCols(this.widthBp),
+            columns: this.isLandscape() ? 3 : Breakpoint.gridCols(this.widthBp),
             onOpenRelated: (film: MovieBasicInfo) => this.openRelated(film)
           })
         }.width('100%').height('100%')
@@ -435,79 +467,111 @@ struct LivePlayPage {
     .layoutWeight(1)
     .width('100%')
   }
-
   @Builder
   playBody() {
     Row() {
-      Column() { this.playVideo() }
-        .layoutWeight(this.splitPlay() ? 7 : 1)
-        .width(this.splitPlay() ? undefined : '100%')
-        .height(this.splitPlay() || this.playerFull ? '100%' : 'auto')
-        .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+      // 1. 左侧主区域 (所有模式下单例常驻播放器；竖屏或平板横屏时下方自适应内容)
+      Column() {
+        this.playVideo()
 
-      if (this.splitPlay()) {
-        Column() {
-          Column().width(1).height('100%').backgroundColor('rgba(255, 255, 255, 0.14)')
+        // 竖屏非全屏：展示竖屏标准的侧边 Tabs
+        if (this.isPortrait() && !this.playerFull) {
+          Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
+          Column() {
+            this.sideTabs()
+          }
+          .layoutWeight(1)
+          .width('100%')
+          .padding({
+            left: this.leftInset,
+            right: this.rightInset,
+            bottom: this.bottomInset
+          })
         }
-        .height('100%').padding({ top: this.topInset, bottom: this.bottomInset })
-
-        Column() { this.sideTabs() }
-          .layoutWeight(5)
-          .height('100%')
-          .padding({ top: this.topInset, bottom: this.bottomInset })
-          .backgroundColor(AppTheme.BG_ELEVATED)
+      }
+      .layoutWeight(1)
+      .height('100%')
+      .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+      .padding({
+        top: (this.playerFull || this.isLandscape()) ? 0 : this.topInset
+      })
+      if (this.isLandscape() && !this.playerFull) {
+        Column() {
+          this.sideTabs()
+        }
+        .width(this.sidebarWidth())
+        .height('100%')
+        .backgroundColor(AppTheme.BG_ELEVATED)
+        .border({ width: { left: 0.5 }, color: 'rgba(255, 255, 255, 0.10)' })
+        .padding({
+          top: this.topInset,
+          bottom: this.bottomInset
+        })
       }
     }
     .width('100%')
-    .layoutWeight(this.splitPlay() || this.playerFull ? 1 : 0)
-
-    if (!this.playerFull && !this.splitPlay()) {
-      Column().width('100%').height(8).backgroundColor(AppTheme.BG_ELEVATED)
-      this.sideTabs()
-    }
+    .height('100%')
   }
 
   build() {
-    Stack() {
-    AppFrame() {
-    Column() {
-      if (this.loading && !this.sources.length) {
-        LoadingView({ label: '正在打开播放页' })
-      } else if (this.errorText && !this.sources.length) {
-        LivePlayErrorView({
-          filmName: this.name,
-          errorText: this.errorText,
-          isFavorite: this.isFav,
-          onBack: () => {
-            try { this.getUIContext().getRouter().back(); } catch (_e) {}
-          },
-          onRetry: () => { this.loadPlay(); },
-          onRemoveFavorite: () => { this.removeFavorite(); }
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        if (this.loading && !this.sources.length) {
+          LoadingView({ label: '正在打开播放页' })
+            .padding({
+              top: this.topInset,
+              bottom: this.bottomInset,
+              left: this.leftInset,
+              right: this.rightInset
+            })
+        } else if (this.errorText && !this.sources.length) {
+          LivePlayErrorView({
+            filmName: this.name,
+            errorText: this.errorText,
+            isFavorite: this.isFav,
+            onBack: () => {
+              try { this.getUIContext().getRouter().back(); } catch (_e) {}
+            },
+            onRetry: () => { this.loadPlay(); },
+            onRemoveFavorite: () => { this.removeFavorite(); }
+          })
+            .padding({
+              top: this.topInset,
+              bottom: this.bottomInset,
+              left: this.leftInset,
+              right: this.rightInset
+            })
+        } else {
+          this.playBody()
+        }
+      }
+      .width('100%')
+      .height('100%')
+      .padding({
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0
+      })
+      .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
+
+      if (!this.playerFull && (this.loading && !this.sources.length || this.errorText && !this.sources.length)) {
+        Row() {
+          PlayerBackBtn({
+            onTap: () => {
+              try { this.getUIContext().getRouter().back(); } catch (_e) {}
+            }
+          })
+        }
+        .padding({
+          left: Math.max(8, this.leftInset + 4),
+          top: this.topInset + 4
         })
-      } else {
-        this.playBody()
+        .zIndex(9999)
       }
     }
     .width('100%')
     .height('100%')
-    .onAreaChange((_old: Area, newArea: Area) => {
-      const w = Number(newArea.width);
-      const h = Number(newArea.height);
-      if (w > 0 && h > 0) {
-        this.pageW = w;
-        this.pageH = h;
-      }
-    })
-    .padding({
-      top: (this.playerFull || this.splitPlay()) ? 0 : this.topInset,
-      bottom: (this.playerFull || this.splitPlay()) ? 0 : this.bottomInset,
-      left: this.playerFull ? 0 : this.leftInset,
-      right: this.playerFull ? 0 : this.rightInset
-    })
     .backgroundColor(this.playerFull ? '#000000' : AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
   }
 }

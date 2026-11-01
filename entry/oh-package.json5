@@ -1,9 +1,13 @@
 {
   "name": "entry",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "EcoHub for OHOS entry module",
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {}
+  "dependencies": {
+    "@ohos/ijkplayer": "^2.0.13"
+  },
+  "devDependencies": {},
+  "dynamicDependencies": {}
 }

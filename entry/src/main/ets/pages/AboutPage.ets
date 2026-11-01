@@ -1,5 +1,5 @@
 import { AppTheme } from '../common/constants/AppTheme';
-import { AppFrame } from '../components/common/AppFrame';
+
 import { PageHeader } from '../components/common/PageHeader';
 import { AppIcon } from '../components/common/AppIcon';
 import { WindowBar } from '../common/utils/WindowBar';
@@ -166,8 +166,6 @@ struct AboutPage {
   }
 
   build() {
-    Stack() {
-    AppFrame() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
         PageHeader({ title: '关于' })
@@ -413,9 +411,5 @@ struct AboutPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppTheme.BG)
-    }
-    }
-    .width('100%')
-    .height('100%')
   }
 }

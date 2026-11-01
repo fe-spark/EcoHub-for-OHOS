@@ -3,9 +3,12 @@ import { AppTheme } from '../constants/AppTheme';
 export class Breakpoint {
   static readonly KEY_BP: string = 'WIDTH_BP';
   static readonly KEY_WIDTH: string = 'WINDOW_WIDTH';
-  static readonly KEY_HEIGHT: string = 'WINDOW_HEIGHT';
-
-  static ofWidth(vp: number): string {
+   static readonly KEY_HEIGHT: string = 'WINDOW_HEIGHT';
+  private static lastWidth: number = -1;
+  private static lastHeight: number = -1;
+  private static lastBp: string = '';
+ 
+   static ofWidth(vp: number): string {
     if (vp >= 1440) {
       return 'xl';
     }
@@ -18,11 +21,20 @@ export class Breakpoint {
     return 'sm';
   }
 
-  static publish(widthVp: number, heightVp: number): void {
-    AppStorage.setOrCreate<number>(Breakpoint.KEY_WIDTH, widthVp);
-    AppStorage.setOrCreate<number>(Breakpoint.KEY_HEIGHT, heightVp);
-    AppStorage.setOrCreate<string>(Breakpoint.KEY_BP, Breakpoint.ofWidth(widthVp));
-  }
+   static publish(widthVp: number, heightVp: number): void {
+    if (widthVp === Breakpoint.lastWidth && heightVp === Breakpoint.lastHeight) {
+      return;
+    }
+    Breakpoint.lastWidth = widthVp;
+    Breakpoint.lastHeight = heightVp;
+     AppStorage.setOrCreate<number>(Breakpoint.KEY_WIDTH, widthVp);
+     AppStorage.setOrCreate<number>(Breakpoint.KEY_HEIGHT, heightVp);
+    const bp = Breakpoint.ofWidth(widthVp);
+    if (bp !== Breakpoint.lastBp) {
+      Breakpoint.lastBp = bp;
+      AppStorage.setOrCreate<string>(Breakpoint.KEY_BP, bp);
+    }
+   }
 
   static current(): string {
     const bp = AppStorage.get<string>(Breakpoint.KEY_BP);
