@@ -268,8 +268,8 @@ export class ApiParser {
       const values: string[] = [];
       for (let j = 0; j < tags.length; j++) {
         const tag = ApiParser.asRecord(tags[j]);
-        names.push(ApiParser.str(tag, 'Name'));
-        values.push(ApiParser.str(tag, 'Value'));
+        names.push(ApiParser.str(tag, 'Name') || ApiParser.str(tag, 'name') || ApiParser.str(tag, 'n'));
+        values.push(ApiParser.str(tag, 'Value') || ApiParser.str(tag, 'value') || ApiParser.str(tag, 'v'));
       }
       tagNames.push(names);
       tagValues.push(values);
