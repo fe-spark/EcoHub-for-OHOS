@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/fe-spark/EcoHub-for-OHOS)](https://github.com/fe-spark/EcoHub-for-OHOS/releases)
 [![Download HAP](https://img.shields.io/badge/Download-.hap-orange?logo=huawei&logoColor=white)](https://github.com/fe-spark/EcoHub-for-OHOS/releases/latest)
-[![OpenHarmony](https://img.shields.io/badge/OpenHarmony-API%2012+-blue)](https://www.openharmony.cn/)
+[![OpenHarmony](https://img.shields.io/badge/OpenHarmony-API%2013+-blue)](https://www.openharmony.cn/)
 
 [EcoHub](https://github.com/fe-spark/EcoHub) 的 OpenHarmony / HarmonyOS 原生客户端。
 
