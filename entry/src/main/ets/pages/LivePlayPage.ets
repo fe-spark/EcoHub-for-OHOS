@@ -434,6 +434,7 @@ struct LivePlayPage {
       playingSourceId: this.playingSourceId,
       viewingSourceId: this.viewingSourceId,
       episodeIndex: this.episodeIndex,
+      isSplit: this.isLandscape() && !this.playerFull,
       onViewSource: (id: string) => { this.viewingSourceId = id; },
       onSelectEpisode: (sourceId: string, index: number) => { this.selectEpisode(sourceId, index); }
     })

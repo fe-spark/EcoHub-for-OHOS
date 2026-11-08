@@ -22,6 +22,7 @@ export struct PlayDetailPanel {
   @Prop @Watch('onPlayIndexChange') playingSourceId: string = '';
   @Prop @Watch('onViewSourceChange') viewingSourceId: string = '';
   @Prop @Watch('onPlayIndexChange') episodeIndex: number = 0;
+  @Prop @Watch('onSplitChange') isSplit: boolean = false;
   onViewSource?: (id: string) => void;
   onSelectEpisode?: (sourceId: string, index: number) => void;
   @State private groupSourceIds: string[] = [];
@@ -57,6 +58,12 @@ export struct PlayDetailPanel {
         this.scrollToFocusedEpisode(true);
       });
     }
+  }
+
+  private onSplitChange(): void {
+    Promise.resolve().then(() => {
+      this.scrollToFocusedEpisode(false);
+    });
   }
 
   private checkReadyAndScroll(): void {
@@ -135,7 +142,8 @@ export struct PlayDetailPanel {
         const safeRow = Math.min(targetRow, maxRow);
 
         // 第一组首行或无分组前1-2行剧集：保持自然置顶（标题+吸顶栏+首行完整可见，绝不遮挡）
-        if ((g === 0 && safeRow === 0) || (safeRow <= 1 && !this.needsGrouping())) {
+        // 横屏分栏（this.isSplit）下纵向可视高度紧凑(~300vp)，保持精确位移避免大标题占据空间
+        if (!this.isSplit && ((g === 0 && safeRow === 0) || (safeRow <= 1 && !this.needsGrouping()))) {
           this.listScroller.scrollToIndex(0, smooth, ScrollAlign.START);
           return;
         }
@@ -263,6 +271,9 @@ export struct PlayDetailPanel {
   }
 
   private epCols(): number {
+    if (this.isSplit) {
+      return this.usesWideTiles() ? EP_COLS_WIDE : EP_COLS_COMPACT;
+    }
     if (this.widthBp === 'lg' || this.widthBp === 'xl') {
       return this.usesWideTiles() ? 3 : 5;
     }
@@ -380,7 +391,7 @@ export struct PlayDetailPanel {
       .fontColor(this.isEpisodeOn(index) ? AppTheme.TEXT_PRIMARY : AppTheme.TEXT_SECONDARY)
       .width('100%')
       .constraintSize({ minHeight: EPISODE_MIN_H })
-      .padding({ left: AppTheme.SPACE_SM, right: AppTheme.SPACE_SM, top: 10, bottom: 10 })
+      .padding({ left: this.isSplit ? 4 : AppTheme.SPACE_SM, right: this.isSplit ? 4 : AppTheme.SPACE_SM, top: 10, bottom: 10 })
       .textAlign(TextAlign.Center)
       .maxLines(this.epMaxLines())
       .textOverflow({ overflow: TextOverflow.Ellipsis })

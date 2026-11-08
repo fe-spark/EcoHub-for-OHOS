@@ -189,7 +189,7 @@ export struct HomeBanner {
   @Builder
   heroBannerItemMobile(item: BannerItem) {
     Stack({ alignContent: Alignment.Bottom }) {
-      Image(FormatUtil.bannerBackdrop(item))
+      Image(FormatUtil.bannerPoster(item))
         .width('100%')
         .height('100%')
         .objectFit(ImageFit.Cover)

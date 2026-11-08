@@ -381,7 +381,11 @@ export class HttpClient {
 
   /** 保留网络层原始异常文案，避免被收成「网络请求失败」 */
   private static wrapError(err: Object): Error {
+    const emptyBodyHint = '服务器没有返回数据，请检查软件源地址或稍后重试';
     if (err instanceof Error) {
+      if (err.message.indexOf('2300052') >= 0) {
+        return new Error(emptyBodyHint);
+      }
       return err;
     }
     const thrown = err as ThrownLike;
@@ -395,8 +399,12 @@ export class HttpClient {
     if (thrown && thrown.code !== undefined && thrown.code !== null) {
       bits.push(`code: ${thrown.code}`);
     }
+    const joined = bits.join(' ');
+    if (joined.indexOf('2300052') >= 0) {
+      return new Error(emptyBodyHint);
+    }
     if (bits.length > 0) {
-      return new Error(bits.join(' '));
+      return new Error(joined);
     }
     try {
       const rawJson = JSON.stringify(err);
