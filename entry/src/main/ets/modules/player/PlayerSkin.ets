@@ -40,6 +40,7 @@ export struct PlayerSkin {
   @Prop stalled: boolean = false;
   @Prop castDeviceName: string = '';
   @Prop canCast: boolean = false;
+  @State barWidth: number = 0;
   onBack?: () => void;
   onPlay?: () => void;
   onFull?: () => void;
@@ -117,6 +118,11 @@ export struct PlayerSkin {
 
   private isPortrait(): boolean {
     return !this.isFull && !this.edgeHud;
+  }
+
+  // 竖屏视频全屏时屏幕窄，右侧功能群组会把退出全屏按钮挤出屏幕
+  private compact(): boolean {
+    return this.isPortrait() || (this.barWidth > 0 && this.barWidth < 480);
   }
 
   private showTopFull(): boolean {
@@ -316,7 +322,8 @@ export struct PlayerSkin {
           // 左侧控制群组：播放/暂停、下一集、时间刻度
           Row({ space: 4 }) {
             this.playToggle(36, 22)
-            if (this.hasNext && !this.isPortrait()) {
+            // 全屏顶栏已有上集/下集
+            if (this.hasNext && this.edgeHud && !this.isFull) {
               PlayerIconBtn({
                 src: $r('sys.symbol.forward_end_fill'),
                 iconSize: 18,
@@ -324,14 +331,14 @@ export struct PlayerSkin {
                 onTap: this.onNext
               })
             }
-            this.timeBlock(this.isPortrait())
+            this.timeBlock(this.compact())
           }
           .alignItems(VerticalAlign.Center)
 
           Blank()
 
           // 右侧功能调节群组：倍速胶囊、比例胶囊、弹幕开关、静音开关、全屏切换
-          Row({ space: this.isPortrait() ? 6 : 8 }) {
+          Row({ space: this.compact() ? 6 : 8 }) {
             PlayerChip({
               label: this.speedLabel,
               canTap: this.ready,
@@ -356,26 +363,30 @@ export struct PlayerSkin {
             }
             PlayerIconBtn({
               src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
-              iconSize: this.isPortrait() ? 18 : 20,
-              boxSize: this.isPortrait() ? 34 : 36,
+              iconSize: this.compact() ? 18 : 20,
+              boxSize: this.compact() ? 34 : 36,
               onTap: this.onMute
             })
             if (!this.castDeviceName) {
               PlayerIconBtn({
                 src: this.isFull ? $r('sys.symbol.exit_full_screen') : $r('sys.symbol.full_screen'),
-                iconSize: this.isPortrait() ? 18 : 20,
-                boxSize: this.isPortrait() ? 34 : 36,
+                iconSize: this.compact() ? 18 : 20,
+                boxSize: this.compact() ? 34 : 36,
                 onTap: this.onFull
               })
             }
           }
           .alignItems(VerticalAlign.Center)
+          .flexShrink(0)
         }
         .width('100%')
         .height(38)
         .alignItems(VerticalAlign.Center)
       }
       .width('100%')
+      .onAreaChange((_old: Area, next: Area) => {
+        this.barWidth = Number(next.width);
+      })
       .padding({
         left: Math.max(12, this.leftInset + (this.isFull ? 10 : 4)),
         right: Math.max(12, this.rightInset + (this.isFull ? 10 : 4)),
