@@ -556,3 +556,187 @@ export struct PlayerScaleDialog {
       .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.45)', offsetY: 8 })
   }
 }
+
+@CustomDialog
+export struct PlayerSettingsDialog {
+  controller?: CustomDialogController
+  speedLabel: string = '1.0x'
+  scaleMode: number = PlayerScaleMode.FIT
+  isPortrait: boolean = false
+  muted: boolean = false
+  onPickSpeed: (index: number) => void = (_index: number) => {}
+  onPickScale: (mode: number) => void = (_mode: number) => {}
+  onToggleMute: () => void = () => {}
+  onClose?: () => void
+  @State private currentSpeed: string = '1.0x'
+  @State private currentScale: number = 0
+  @State private currentMuted: boolean = false
+  @StorageLink('SAFE_INSET_BOTTOM') private bottomInset: number = 16
+  @StorageLink('WINDOW_WIDTH') private windowWidth: number = 360
+  @StorageLink('WINDOW_HEIGHT') private windowHeight: number = 640
+
+  aboutToAppear(): void {
+    this.currentSpeed = this.speedLabel
+    this.currentScale = this.scaleMode
+    this.currentMuted = this.muted
+  }
+
+  private close(): void {
+    if (this.onClose) {
+      this.onClose()
+    } else if (this.controller) {
+      this.controller.close()
+    }
+  }
+
+  build() {
+    Column({ space: 16 }) {
+      Row() {
+        Row({ space: 8 }) {
+          SymbolGlyph($r('sys.symbol.gearshape'))
+            .fontSize(18)
+            .fontColor([AppTheme.ACCENT])
+          Text('播放设置')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+        }
+        .alignItems(VerticalAlign.Center)
+
+        Blank()
+
+        Column() {
+          SymbolGlyph($r('sys.symbol.xmark'))
+            .fontSize(12)
+            .fontColor(['rgba(255, 255, 255, 0.65)'])
+        }
+        .width(26)
+        .height(26)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .backgroundColor('rgba(255, 255, 255, 0.08)')
+        .borderRadius(13)
+        .onClick(() => this.close())
+      }
+      .width('100%')
+
+      Column({ space: 8 }) {
+        Text('播放速度')
+          .fontSize(12)
+          .fontColor('rgba(255, 255, 255, 0.55)')
+          .width('100%')
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(PlayerSpeed.labels(), (label: string, index: number) => {
+              Row() {
+                Text(label === '1.0x' ? '1.0x 标准' : label)
+                  .fontSize(13)
+                  .fontWeight(this.currentSpeed === label ? FontWeight.Bold : FontWeight.Medium)
+                  .fontColor(this.currentSpeed === label ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)')
+                  .lineHeight(15)
+              }
+              .height(36)
+              .padding({ left: 14, right: 14 })
+              .justifyContent(FlexAlign.Center)
+              .alignItems(VerticalAlign.Center)
+              .backgroundColor(this.currentSpeed === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)')
+              .borderRadius(18)
+              .border({
+                width: 0.5,
+                color: this.currentSpeed === label ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.12)'
+              })
+              .onClick(() => {
+                this.currentSpeed = label
+                this.onPickSpeed(index)
+              })
+            }, (label: string) => `set_spd_${label}`)
+          }
+          .padding({ left: 2, right: 2, top: 2, bottom: 4 })
+        }
+        .width('100%')
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+      }
+      .width('100%')
+
+      Column({ space: 8 }) {
+        Text('画面填充')
+          .fontSize(12)
+          .fontColor('rgba(255, 255, 255, 0.55)')
+          .width('100%')
+        Row({ space: 8 }) {
+          ForEach(PlayerScale.items(this.isPortrait), (item: PlayerScaleItem) => {
+            Column({ space: 3 }) {
+              Text(item.label)
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.currentScale === item.mode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)')
+              Text(item.desc)
+                .fontSize(10)
+                .fontColor(this.currentScale === item.mode ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.45)')
+            }
+            .layoutWeight(1)
+            .height(52)
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .backgroundColor(this.currentScale === item.mode ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.08)')
+            .borderRadius(14)
+            .border({
+              width: 0.5,
+              color: this.currentScale === item.mode ? AppTheme.ACCENT : 'rgba(255, 255, 255, 0.12)'
+            })
+            .onClick(() => {
+              this.currentScale = item.mode
+              this.onPickScale(item.mode)
+            })
+          }, (item: PlayerScaleItem) => `set_scale_${item.mode}`)
+        }
+        .width('100%')
+      }
+      .width('100%')
+
+      Row() {
+        Row({ space: 8 }) {
+          SymbolGlyph(this.currentMuted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'))
+            .fontSize(18)
+            .fontColor(['#FFFFFF'])
+          Text(this.currentMuted ? '已静音' : '声音')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFFFFF')
+        }
+        .alignItems(VerticalAlign.Center)
+
+        Blank()
+
+        Row() {
+          Text(this.currentMuted ? '关闭' : '开启')
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.currentMuted ? 'rgba(255, 255, 255, 0.65)' : '#FFFFFF')
+        }
+        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+        .backgroundColor(this.currentMuted ? 'rgba(255, 255, 255, 0.10)' : AppTheme.ACCENT)
+        .borderRadius(12)
+      }
+      .width('100%')
+      .height(44)
+      .padding({ left: 12, right: 12 })
+      .backgroundColor('rgba(255, 255, 255, 0.08)')
+      .borderRadius(14)
+      .onClick(() => {
+        this.currentMuted = !this.currentMuted
+        this.onToggleMute()
+      })
+    }
+    .width('calc(100% - 32vp)')
+    .constraintSize({ maxWidth: 520 })
+    .margin({ left: 16, right: 16, bottom: Math.max(16, this.bottomInset + 8) })
+    .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+    .backgroundColor('rgba(24, 26, 34, 0.94)')
+    .borderRadius(20)
+    .border({ width: 0.5, color: 'rgba(255, 255, 255, 0.16)' })
+    .shadow({ radius: 24, color: 'rgba(0, 0, 0, 0.45)', offsetY: 8 })
+  }
+}

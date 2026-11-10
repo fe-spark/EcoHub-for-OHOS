@@ -322,37 +322,14 @@ export struct PlayerSkin {
           // 左侧控制群组：播放/暂停、下一集、时间刻度
           Row({ space: 4 }) {
             this.playToggle(36, 22)
-            // 全屏顶栏已有上集/下集
-            if (this.hasNext && this.edgeHud && !this.isFull) {
-              PlayerIconBtn({
-                src: $r('sys.symbol.forward_end_fill'),
-                iconSize: 18,
-                boxSize: 36,
-                onTap: this.onNext
-              })
-            }
             this.timeBlock(this.compact())
           }
           .alignItems(VerticalAlign.Center)
 
           Blank()
 
-          // 右侧功能调节群组：倍速胶囊、比例胶囊、弹幕开关、静音开关、全屏切换
+          // 右侧只留弹幕、设置、全屏，倍速/比例/静音收进设置面板
           Row({ space: this.compact() ? 6 : 8 }) {
-            PlayerChip({
-              label: this.speedLabel,
-              canTap: this.ready,
-              highlight: this.speedLabel !== '1.0x',
-              onTap: this.onSpeed
-            })
-            if (this.cinemaHud()) {
-              PlayerChip({
-                label: this.scaleLabel,
-                canTap: this.ready,
-                highlight: this.scaleLabel !== '适应',
-                onTap: this.onScale
-              })
-            }
             if (this.canDanmaku) {
               PlayerChip({
                 label: '弹幕',
@@ -361,11 +338,11 @@ export struct PlayerSkin {
                 onTap: this.onToggleDanmaku
               })
             }
-            PlayerIconBtn({
-              src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
-              iconSize: this.compact() ? 18 : 20,
-              boxSize: this.compact() ? 34 : 36,
-              onTap: this.onMute
+            PlayerChip({
+              label: '设置',
+              canTap: this.ready,
+              highlight: this.speedLabel !== '1.0x' || this.scaleLabel !== '适应' || this.muted,
+              onTap: this.onSpeed
             })
             if (!this.castDeviceName) {
               PlayerIconBtn({

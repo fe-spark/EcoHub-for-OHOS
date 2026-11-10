@@ -251,11 +251,13 @@ export struct VideoPlayer {
     PlayerWindow.setKeepScreenOn(this.ctx(), on);
   }
 
-  private toggleMute(): void {
+  private toggleMute(showTip: boolean = true): void {
     const res = this.actions.toggleMute();
     this.volumeIndex = res.volume; this.muted = res.muted;
     this.playerAv.setMuted(this.muted); this.castBridge.pushCastVolume();
-    this.watcher.showTip(res.label, PlayerTipKind.VOLUME, (m, k) => { this.feedback = m; this.feedbackKind = k; }, () => { this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE; });
+    if (showTip) {
+      this.watcher.showTip(res.label, PlayerTipKind.VOLUME, (m, k) => { this.feedback = m; this.feedbackKind = k; }, () => { this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE; });
+    }
     this.pulseHud();
   }
 
@@ -474,13 +476,24 @@ export struct VideoPlayer {
 
 
       PlayerSpeedSheet({
-        openSeq: this.speedOpenSeq, speedLabel: this.speedLabel,
+        openSeq: this.speedOpenSeq,
+        speedLabel: this.speedLabel,
+        scaleMode: this.scaleMode,
+        isPortrait: this.state.isPortrait(),
+        muted: this.muted,
         onPick: (idx: number) => {
           this.actions.speedCtrl.pick(idx);
-          this.speedIndex = idx; this.speedLabel = this.actions.speedCtrl.label;
+          this.speedIndex = idx;
+          this.speedLabel = this.actions.speedCtrl.label;
           this.playerAv.setSpeedIndex(idx);
-          this.closeSpeedDialog(); this.pulseHud();
         },
+        onPickScale: (mode: number) => {
+          this.actions.scaleCtrl.pick(mode as PlayerScaleMode);
+          this.scaleMode = mode;
+          this.playerAv.setScaleMode(mode);
+          this.scaleLabel = this.actions.scaleCtrl.label(this.state.isPortrait());
+        },
+        onToggleMute: () => this.toggleMute(false),
         onClosed: () => this.actions.speedCtrl.setShowing(false)
       })
 
