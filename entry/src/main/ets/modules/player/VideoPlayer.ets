@@ -477,8 +477,6 @@ export struct VideoPlayer {
           isFull: this.fullNow(),
           topInset: this.topInset,
           bottomInset: this.bottomInset,
-          leftInset: this.leftInset,
-          rightInset: this.rightInset,
           onStatus: (status: DanmakuStatus) => this.onDanmakuStatus(status)
         })
           .width('100%')

@@ -73,8 +73,6 @@ export struct PlayerDanmakuLayer {
   @Prop @Watch('onLayoutChange') isFull: boolean = false;
   @Prop @Watch('onLayoutChange') topInset: number = 0;
   @Prop @Watch('onLayoutChange') bottomInset: number = 0;
-  @Prop @Watch('onLayoutChange') leftInset: number = 0;
-  @Prop @Watch('onLayoutChange') rightInset: number = 0;
   /** 弹幕加载状态变化（加载中 / 装载完成 / 失败），由控制条显示，不画在视频上 */
   onStatus?: (status: DanmakuStatus) => void;
 
@@ -140,14 +138,17 @@ export struct PlayerDanmakuLayer {
     }
   }
 
+  /**
+   * 水平方向以播放器容器自身的左右边缘为界：滚动弹幕从容器右沿进入、左沿离开，并按容器裁剪。
+   * 不再按左右安全区（挖孔 / 横屏分栏的 leftInset、全屏的 rightInset）内缩，否则弹幕会在容器内部凭空出现和消失。
+   * 垂直方向仍避开状态栏 / 导航条（safeTop / safeBottom）。
+   */
   private safeLeft(): number {
-    return Math.max(0, this.leftInset);
+    return 0;
   }
 
   private safeRight(): number {
-    const minRight = this.safeLeft() + 100;
-    const actualRight = this.viewWidth - Math.max(0, this.rightInset);
-    return Math.max(minRight, actualRight);
+    return Math.max(100, this.viewWidth);
   }
 
   private safeTop(): number {
