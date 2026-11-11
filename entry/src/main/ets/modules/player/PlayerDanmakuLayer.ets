@@ -8,6 +8,7 @@ import {
   danmakuRequestFailedStatus
 } from './DanmakuStatus';
 import { ServerCompat } from '../../services/ServerCompat';
+import { PlayerScaleMode } from './PlayerScale';
 
 export class ActiveDanmaku {
   text: string = '';
@@ -75,6 +76,10 @@ export struct PlayerDanmakuLayer {
   @Prop @Watch('onLayoutChange') bottomInset: number = 0;
   @Prop @Watch('onLayoutChange') leftInset: number = 0;
   @Prop @Watch('onLayoutChange') rightInset: number = 0;
+  /** 视频原始宽高与画面模式：弹幕只在视频实际画面内显示（适应模式下的黑边不算），从画面右沿进入、左沿离开 */
+  @Prop @Watch('onLayoutChange') videoWidth: number = 0;
+  @Prop @Watch('onLayoutChange') videoHeight: number = 0;
+  @Prop @Watch('onLayoutChange') scaleMode: number = PlayerScaleMode.FIT;
   /** 弹幕加载状态变化（加载中 / 装载完成 / 失败），由控制条显示，不画在视频上 */
   onStatus?: (status: DanmakuStatus) => void;
 
@@ -140,23 +145,45 @@ export struct PlayerDanmakuLayer {
     }
   }
 
+  /**
+   * 视频画面在弹幕层（与播放器同尺寸）内的实际显示区域 [left, top, right, bottom]，与 PlayerVideoLayer 的排版一致：
+   * 适应模式按宽高比居中，留出的黑边不算画面；填充 / 拉伸铺满整个播放器；宽高比未知时按整个播放器。
+   */
+  private videoRect(): number[] {
+    const w0 = this.viewWidth;
+    const h0 = this.viewHeight;
+    if (this.scaleMode !== PlayerScaleMode.FIT || this.videoWidth <= 0 || this.videoHeight <= 0 || w0 <= 0 || h0 <= 0) {
+      return [0, 0, w0, h0];
+    }
+    const aspect = this.videoWidth / this.videoHeight;
+    let w = w0;
+    let h = w / aspect;
+    if (h > h0) {
+      h = h0;
+      w = h * aspect;
+    }
+    const l = (w0 - w) / 2;
+    const t = (h0 - h) / 2;
+    return [l, t, l + w, t + h];
+  }
+
   private safeLeft(): number {
-    return Math.max(0, this.leftInset);
+    return Math.max(0, this.leftInset, this.videoRect()[0]);
   }
 
   private safeRight(): number {
     const minRight = this.safeLeft() + 100;
-    const actualRight = this.viewWidth - Math.max(0, this.rightInset);
+    const actualRight = Math.min(this.viewWidth - Math.max(0, this.rightInset), this.videoRect()[2]);
     return Math.max(minRight, actualRight);
   }
 
   private safeTop(): number {
-    return Math.max(0, this.topInset);
+    return Math.max(0, this.topInset, this.videoRect()[1]);
   }
 
   private safeBottom(): number {
     const minBottom = this.safeTop() + 60;
-    const actualBottom = this.viewHeight - Math.max(0, this.bottomInset);
+    const actualBottom = Math.min(this.viewHeight - Math.max(0, this.bottomInset), this.videoRect()[3]);
     return Math.max(minBottom, actualBottom);
   }
 
