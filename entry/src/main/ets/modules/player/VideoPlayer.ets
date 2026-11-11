@@ -96,7 +96,6 @@ export struct VideoPlayer {
   @StorageLink('SETTING_DANMAKU_ENABLED') private danmakuEnabled: boolean = true;
   @State private danmakuStatusText: string = '';
   @State private danmakuStatusTone: string = DanmakuStatusTone.NONE;
-  private danmakuStatusTitle: string = '';
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -413,13 +412,12 @@ export struct VideoPlayer {
     if (!this.danmakuEnabled) {
       AppToast.show('已关闭弹幕');
     } else {
-      AppToast.show(this.danmakuStatusTitle ? `已开启弹幕，${this.danmakuStatusTitle}` : '已开启弹幕');
+      AppToast.show('已开启弹幕');
     }
   }
 
   private onDanmakuStatus(status: DanmakuStatus): void {
     this.danmakuStatusText = status.placeholder;
-    this.danmakuStatusTitle = status.title;
     this.danmakuStatusTone = status.tone;
   }
 
