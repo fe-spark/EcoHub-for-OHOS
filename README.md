@@ -6,9 +6,10 @@
 
 [EcoHub](https://github.com/fe-spark/EcoHub) 的 OpenHarmony / HarmonyOS 原生客户端。
 
-> **提示**：本仓库是 EcoHub 的纯客户端应用，**本身不提供、不存储任何影视资源**。安装后需要配置并接入 EcoHub 软件源（服务端）方可正常浏览与观影。
-> 
-> 相关项目：[EcoHub 主仓库（服务端 + Web）](https://github.com/fe-spark/EcoHub) · [EcoHub for Android](https://github.com/fe-spark/EcoHub-for-Android)
+> [!NOTE]
+> 本仓库是 EcoHub 的客户端，不提供、不存储任何影视资源。安装后需配置并接入 EcoHub 软件源（服务端），方可浏览与观影。
+
+相关项目：[EcoHub 主仓库（服务端 + Web）](https://github.com/fe-spark/EcoHub) · [EcoHub for Android](https://github.com/fe-spark/EcoHub-for-Android)
 
 <div align="center">
 
@@ -18,36 +19,43 @@
 
 ---
 
-## 📥 下载安装
+## 下载安装
 
-- 🚀 **[下载最新版本 HAP (Releases Latest)](https://github.com/fe-spark/EcoHub-for-OHOS/releases/latest)**
-- 📜 **[查看所有历史版本与更新日志](https://github.com/fe-spark/EcoHub-for-OHOS/releases)**
+- [下载最新版本 HAP](https://github.com/fe-spark/EcoHub-for-OHOS/releases/latest)
+- [查看历史版本与更新说明](https://github.com/fe-spark/EcoHub-for-OHOS/releases)
 
 ---
 
-## 📡 软件源说明
+## 配置软件源
 
-客户端所有影视列表、分类、搜索、播放地址均由 **EcoHub 软件源** 提供。
+客户端的影视列表、分类、搜索和播放地址均由 EcoHub 软件源提供。
 
-### 1. 软件源怎么来？
+### 获取地址
 
 - **自建部署（推荐）**  
-  按照 [EcoHub 部署指南](https://github.com/fe-spark/EcoHub/blob/main/docs/README-Deploy.md) 在你的服务器上部署 EcoHub 服务端。  
-  部署成功后，在管理后台「工作台」点击「订阅地址」即可获取客户端订阅源：
+  按照 [EcoHub 部署指南](https://github.com/fe-spark/EcoHub/blob/main/docs/README-Deploy.md) 部署 EcoHub 服务端。部署完成后，在管理后台「工作台」点击「订阅地址」，获取客户端订阅源：
+
+  ```text
+  http://<服务器 IP 或域名>:3000/api/provide/app
   ```
-  http://<你的服务器IP或域名>:3000/api/provide/app
-  ```
-  *(若配置了 HTTPS 或反向代理，格式为 `https://<你的域名>/api/provide/app`，亦兼容原 `/api` 路径)*。在管理后台完成影视数据采集后，客户端即可直接同步。
 
-- **使用公共源 / 他人分享源**  
-  如果你有朋友已经部署了 EcoHub 站点，或使用社区公开的 EcoHub 节点，可以直接获取其软件源地址填入（例如官方演示源 `https://eco.fe-spark.cn/api/provide/app`）。
+  若已配置 HTTPS 或反向代理，格式为 `https://<域名>/api/provide/app`。在管理后台完成影视数据采集后，客户端即可同步。
 
-### 2. 如何在 App 中配置？
+- **他人分享**  
+  亦可填入他人已部署或公开的 EcoHub 软件源地址。示例：`https://eco.fe-spark.cn/api/provide/app`。
 
-1. 打开 App，首次进入或未连接时会自动弹出 **软件源配置** 界面；
-2. 输入软件源地址（如 `http://<服务器IP或域名>:3000` 或复制后台完整的 `/api/provide/app` 订阅源，未填协议头会自动补齐 `https://`；若站点开启了私有化访问，在地址末尾追加 `?key=您的密钥`）；
-3. 点击 **开始观影** / **重新接入**，App 会自动测试与服务端的连通性（请求 `/api/provide/app` 接口）；
-4. 校验通过后即可进入首页观影。后续可在「我的」或设置中管理/切换历史软件源。
+### 在 App 中配置
+
+1. 打开应用。首次启动或尚未配置软件源时，将进入软件源配置页。软件源连接失败时，亦会进入该页。
+2. 在「软件源地址」中填入站点根地址（如 `http://<服务器 IP 或域名>:3000`），或后台提供的完整订阅地址。
+3. 点击「开始观影」（重新连接时为「重新接入」）。应用将请求 `/api/provide/app` 检测连通性。
+4. 校验通过后进入首页。之后可在「我的」中点击「软件源」，管理或切换历史软件源。
+
+未填写协议时，将自动补全为 `https://`。
+
+若站点开启了私有化访问，在地址末尾追加 `?key=<密钥>`。
+
+填写 `/api/provide/app`、`/provide/app` 或 `/api` 路径时，将解析为站点根地址。
 
 ---
 
@@ -63,18 +71,18 @@
 
 | 服务商 | 特点 / 价格 | 链接 |
 | --- | --- | --- |
-| 良心云 | 低至 2 元/月 <br>新用户注册即获体验流量 | [前往注册](https://xn--9kqz23b19z.com/#/register?code=xAmvfdic) |
-| 赔钱机场 | 低至 1.5 元/月 <br>适合高流量与备用需求 | [前往注册](https://xn--mes358aby2apfg.com/register?code=FA4xlzHD&cover=sfw) |
+| 良心云 | 低至 2 元/月<br>新用户注册即获体验流量 | [前往注册](https://xn--9kqz23b19z.com/#/register?code=xAmvfdic) |
+| 赔钱机场 | 低至 1.5 元/月<br>适合高流量与备用需求 | [前往注册](https://xn--mes358aby2apfg.com/register?code=FA4xlzHD&cover=sfw) |
 | DOVE | 适合长期稳定 | [前往注册](https://dovee.cc/a.php?asbcbO1PCgTx2JM66) |
 
 ---
 
-## 🛠️ 本地开发
+## 本地开发
 
-使用 [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/) 打开本工程目录进行调试与打包构建。开发过程中的屏幕旋转、渲染与布局约定见 [开发指南](./docs/DEVELOPMENT.md)。
+使用 [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/) 打开本工程目录，进行调试与打包构建。
 
 ---
 
-## 📄 开源许可
+## 开源许可
 
-本项目遵循 [PolyForm Noncommercial 1.0.0](https://github.com/fe-spark/EcoHub/blob/main/LICENSE) 协议。
+本项目遵循 [PolyForm Noncommercial 1.0.0](./LICENSE) 协议。
