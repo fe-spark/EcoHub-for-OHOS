@@ -38,6 +38,13 @@ export interface DanmakuComment {
   mode: number; // 0: 滚动, 1: 顶部固定, 2: 底部固定
   border: boolean; // 高亮（带边框），对应服务端 DanmakuItem.border
 }
+/** GET /film/danmaku 响应顶层的 meta：本站和全网弹幕各多少条，全网弹幕拉取结果（disabled / ok / empty / error） */
+export interface DanmakuMeta {
+  local: number;
+  network: number;
+  networkStatus: string;
+  networkReason: string;
+}
 export interface CategoryItem {
   id: number;
   pid: number;

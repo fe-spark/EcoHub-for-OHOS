@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { AVVolumePanel } from '@kit.AudioKit';
 import { PlayerDanmakuLayer } from './PlayerDanmakuLayer';
+import { DanmakuStatus, DanmakuStatusTone } from './DanmakuStatus';
 import { PlayerWindow } from './PlayerWindow';
 import { PlayerTipKind } from './PlayerPan';
 import { PlayerStallWatcher } from './PlayerStallWatcher';
@@ -93,6 +94,9 @@ export struct VideoPlayer {
   @State private isPipActive: boolean = false;
   @StorageLink('SETTING_PIP_AUTO_START') @Watch('onSettingPipAutoStartChange') private settingPipAutoStart: boolean = true;
   @StorageLink('SETTING_DANMAKU_ENABLED') private danmakuEnabled: boolean = true;
+  @State private danmakuStatusText: string = '';
+  @State private danmakuStatusTone: string = DanmakuStatusTone.NONE;
+  private danmakuStatusTitle: string = '';
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -404,7 +408,17 @@ export struct VideoPlayer {
     }
     this.danmakuEnabled = !this.danmakuEnabled;
     this.pulseHud();
-    AppToast.show(this.danmakuEnabled ? '已开启弹幕' : '已关闭弹幕');
+    if (!this.danmakuEnabled) {
+      AppToast.show('已关闭弹幕');
+    } else {
+      AppToast.show(this.danmakuStatusTitle ? `已开启弹幕，${this.danmakuStatusTitle}` : '已开启弹幕');
+    }
+  }
+
+  private onDanmakuStatus(status: DanmakuStatus): void {
+    this.danmakuStatusText = status.placeholder;
+    this.danmakuStatusTitle = status.title;
+    this.danmakuStatusTone = status.tone;
   }
 
   private skinActionHost(): PlayerActionHost {
@@ -464,7 +478,8 @@ export struct VideoPlayer {
           topInset: this.topInset,
           bottomInset: this.bottomInset,
           leftInset: this.leftInset,
-          rightInset: this.rightInset
+          rightInset: this.rightInset,
+          onStatus: (status: DanmakuStatus) => this.onDanmakuStatus(status)
         })
           .width('100%')
           .height('100%')
@@ -505,6 +520,7 @@ export struct VideoPlayer {
           speedLabel: this.speedLabel, scaleLabel: this.actions.scaleCtrl.label(this.state.isPortrait()),
           danmakuEnabled: this.danmakuEnabled,
           canDanmaku: this.canDanmakuNow(),
+          danmakuStatusText: this.danmakuStatusText, danmakuStatusTone: this.danmakuStatusTone,
           hasPrev: this.hasPrev, hasNext: this.hasNext, longPressing: this.longPressing,
           feedback: this.feedback, feedbackKind: this.feedbackKind,
           topInset: this.topInset, leftInset: this.leftInset, rightInset: this.rightInset, bottomInset: this.bottomInset,

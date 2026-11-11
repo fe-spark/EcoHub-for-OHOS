@@ -1,6 +1,12 @@
 import { AnimatorResult } from '@kit.ArkUI';
-import { FilmApi } from '../../api/FilmApi';
+import { DanmakuLoadResult, FilmApi } from '../../api/FilmApi';
 import { DanmakuComment } from '../../types/FilmModels';
+import {
+  DANMAKU_LOADING_STATUS,
+  DanmakuStatus,
+  danmakuLoadedStatus,
+  danmakuRequestFailedStatus
+} from './DanmakuStatus';
 import { ServerCompat } from '../../services/ServerCompat';
 
 export class ActiveDanmaku {
@@ -69,6 +75,8 @@ export struct PlayerDanmakuLayer {
   @Prop @Watch('onLayoutChange') bottomInset: number = 0;
   @Prop @Watch('onLayoutChange') leftInset: number = 0;
   @Prop @Watch('onLayoutChange') rightInset: number = 0;
+  /** 弹幕加载状态变化（加载中 / 装载完成 / 失败），由控制条显示，不画在视频上 */
+  onStatus?: (status: DanmakuStatus) => void;
 
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
@@ -325,11 +333,14 @@ export struct PlayerDanmakuLayer {
       return;
     }
 
+    this.reportStatus(DANMAKU_LOADING_STATUS);
     FilmApi.getDanmaku(this.filmId, this.episode > 0 ? this.episode : 1, title)
-      .then((list: DanmakuComment[]) => {
+      .then((res: DanmakuLoadResult) => {
         if (token !== this.gen) {
           return;
         }
+        const list = res.list;
+        this.reportStatus(danmakuLoadedStatus(list.length, res.meta));
         if (list.length === 0) {
           return;
         }
@@ -339,8 +350,19 @@ export struct PlayerDanmakuLayer {
         this.syncAnimatorState();
       })
       .catch((err: Object) => {
-        console.error(`[DanmakuLayer] 弹幕加载失败: ${JSON.stringify(err)}`);
+        if (token !== this.gen) {
+          return;
+        }
+        const msg = err instanceof Error ? err.message : '';
+        console.error(`[DanmakuLayer] 弹幕加载失败: ${msg || JSON.stringify(err)}`);
+        this.reportStatus(danmakuRequestFailedStatus(msg));
       });
+  }
+
+  private reportStatus(status: DanmakuStatus): void {
+    if (this.onStatus) {
+      this.onStatus(status);
+    }
   }
 
   /**

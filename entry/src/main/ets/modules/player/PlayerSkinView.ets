@@ -50,6 +50,8 @@ export struct PlayerSkinView {
   @Prop scaleLabel: string = '适应';
   @Prop danmakuEnabled: boolean = true;
   @Prop canDanmaku: boolean = true;
+  @Prop danmakuStatusText: string = '';
+  @Prop danmakuStatusTone: string = 'none';
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -87,6 +89,8 @@ export struct PlayerSkinView {
       scaleLabel: this.scaleLabel,
       danmakuEnabled: this.danmakuEnabled,
       canDanmaku: this.canDanmaku,
+      danmakuStatusText: this.danmakuStatusText,
+      danmakuStatusTone: this.danmakuStatusTone,
       hasPrev: this.hasPrev,
       hasNext: this.hasNext,
       longPressing: this.longPressing,

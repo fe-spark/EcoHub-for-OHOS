@@ -11,6 +11,8 @@ export interface ApiResponse {
   code: number;
   msg: string;
   data: Object | Object[] | string | number | boolean | null;
+  /** 响应顶层的 meta（如弹幕接口的本站 / 全网条数与全网拉取结果），没有时为空 */
+  meta?: Object | null;
 }
 
 interface TrackViewPayload {
