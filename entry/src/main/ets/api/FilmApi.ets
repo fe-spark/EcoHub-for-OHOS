@@ -12,9 +12,16 @@ import {
   MovieBasicInfo,
   PlayInfo,
   DanmakuComment,
+  DanmakuMeta,
   SearchResult,
   SearchSourceTab
 } from '../types/FilmModels';
+
+export interface DanmakuLoadResult {
+  list: DanmakuComment[];
+  meta: DanmakuMeta | null;
+}
+
 export class FilmApi {
   private static siteConfig: BasicConfig | null = null;
   private static configPromise: Promise<BasicConfig> | null = null;
@@ -205,44 +212,53 @@ export class FilmApi {
     return [];
   }
 
-  static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuComment[]> {
+  private static parseDanmakuMeta(value: Object | null | undefined): DanmakuMeta | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    const row = ApiParser.asRecord(value);
+    return {
+      local: ApiParser.num(row, 'local'),
+      network: ApiParser.num(row, 'network'),
+      networkStatus: ApiParser.str(row, 'networkStatus'),
+      networkReason: ApiParser.str(row, 'networkReason')
+    };
+  }
+
+  /** 获取弹幕列表及响应顶层的 meta；接口返回失败码或网络异常时抛出，由调用方转成弹幕加载状态 */
+  static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuLoadResult> {
     if (!ServerCompat.getInstance().canDanmaku || !mid || mid.trim().length === 0) {
       console.info('[Danmaku] 当前非 V3 协议或缺少影片ID，跳过请求');
-      return [];
+      return { list: [], meta: null };
     }
     const params = new QueryParams()
       .set('mid', mid)
       .set('episode', episode)
       .set('title', title);
-    try {
-      const ep = ServerCompat.getInstance().endpoint(ApiEndpoint.DANMAKU);
-      console.info(`[Danmaku] 请求弹幕: ep=${ep} mid=${mid} epNum=${episode} title=${title}`);
-      const res = await HttpClient.getInstance().get(ep, params);
-      if ((res.code !== 0 && res.code !== 1) || !Array.isArray(res.data)) {
-        console.warn(`[Danmaku] 响应异常或无数据: code=${res.code} msg=${res.msg}`);
-        return [];
-      }
-      const list: DanmakuComment[] = [];
-      const raw = res.data as Object[];
-      for (let i = 0; i < raw.length; i++) {
-        const row = ApiParser.asRecord(raw[i]);
-        const text = ApiParser.str(row, 'text');
-        if (!text) {
-          continue;
-        }
-        list.push({
-          text: text,
-          time: ApiParser.num(row, 'time'),
-          color: ApiParser.str(row, 'color', '#ffffff'),
-          mode: ApiParser.num(row, 'mode')
-        });
-      }
-      console.info(`[Danmaku] 成功解析弹幕列表: ${list.length} 条`);
-      return list;
-    } catch (err) {
-      console.error(`[Danmaku] 请求发生异常: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
-      return [];
+    const ep = ServerCompat.getInstance().endpoint(ApiEndpoint.DANMAKU);
+    console.info(`[Danmaku] 请求弹幕: ep=${ep} mid=${mid} epNum=${episode} title=${title}`);
+    const res = await HttpClient.getInstance().get(ep, params);
+    if (res.code !== 0 && res.code !== 1) {
+      console.warn(`[Danmaku] 响应异常: code=${res.code} msg=${res.msg}`);
+      throw new Error(res.msg || '');
     }
+    const list: DanmakuComment[] = [];
+    const raw: Object[] = Array.isArray(res.data) ? res.data as Object[] : [];
+    for (let i = 0; i < raw.length; i++) {
+      const row = ApiParser.asRecord(raw[i]);
+      const text = ApiParser.str(row, 'text');
+      if (!text) {
+        continue;
+      }
+      list.push({
+        text: text,
+        time: ApiParser.num(row, 'time'),
+        color: ApiParser.str(row, 'color', '#ffffff'),
+        mode: ApiParser.num(row, 'mode')
+      });
+    }
+    console.info(`[Danmaku] 成功解析弹幕列表: ${list.length} 条`);
+    return { list: list, meta: FilmApi.parseDanmakuMeta(res.meta) };
   }
 }
 

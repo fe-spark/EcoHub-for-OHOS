@@ -5,6 +5,7 @@ import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerLabelBtn, PlayerTextBtn
 import { PlayerGestureLayer } from './PlayerGesture';
 import { PlayerErrorPad, PlayerLoadingCard, PlayerTip } from './PlayerTip';
 import { AppToast } from '../../common/utils/AppToast';
+import { DanmakuStatusDot, DanmakuStatusTone } from './DanmakuStatus';
 
 @Component
 export struct PlayerSkin {
@@ -26,6 +27,10 @@ export struct PlayerSkin {
   @Prop scaleLabel: string = '适应';
   @Prop danmakuEnabled: boolean = true;
   @Prop canDanmaku: boolean = true;
+  /** 弹幕加载状态：宽控制条在中间显示文字和状态点，窄控制条只在弹幕开关上显示状态点 */
+  @Prop danmakuStatusText: string = '';
+  @Prop danmakuStatusTone: string = DanmakuStatusTone.NONE;
+  @State private controlRowWidth: number = 0;
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -109,6 +114,16 @@ export struct PlayerSkin {
       return false;
     }
     return this.showHud && this.ready && !this.errorText;
+  }
+
+  /** 与网页端一致：控制条宽度不足 560 时收起状态文字，改在弹幕开关上显示状态点 */
+  private showDanmakuStatusText(): boolean {
+    return this.canDanmaku && this.danmakuStatusText.length > 0 && this.controlRowWidth >= 560;
+  }
+
+  private showDanmakuChipDot(): boolean {
+    return this.canDanmaku && this.danmakuStatusText.length > 0 && !this.showDanmakuStatusText() &&
+      this.danmakuStatusTone !== DanmakuStatusTone.NONE;
   }
 
   private cinemaHud(): boolean {
@@ -328,7 +343,25 @@ export struct PlayerSkin {
           }
           .alignItems(VerticalAlign.Center)
 
-          Blank()
+          if (this.showDanmakuStatusText()) {
+            Row({ space: 6 }) {
+              if (this.danmakuStatusTone !== DanmakuStatusTone.NONE) {
+                DanmakuStatusDot({ tone: this.danmakuStatusTone })
+              }
+              Text(this.danmakuStatusText)
+                .fontSize(12)
+                .fontColor('rgba(255,255,255,0.6)')
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .flexShrink(1)
+            }
+            .layoutWeight(1)
+            .padding({ left: 12, right: 12 })
+            .alignItems(VerticalAlign.Center)
+            .hitTestBehavior(HitTestMode.None)
+          } else {
+            Blank()
+          }
 
           // 右侧功能调节群组：倍速胶囊、比例胶囊、弹幕开关、静音开关、全屏切换
           Row({ space: this.isPortrait() ? 6 : 8 }) {
@@ -347,12 +380,17 @@ export struct PlayerSkin {
               })
             }
             if (this.canDanmaku) {
-              PlayerChip({
-                label: '弹幕',
-                canTap: true,
-                highlight: this.danmakuEnabled,
-                onTap: this.onToggleDanmaku
-              })
+              Stack({ alignContent: Alignment.TopEnd }) {
+                PlayerChip({
+                  label: '弹幕',
+                  canTap: true,
+                  highlight: this.danmakuEnabled,
+                  onTap: this.onToggleDanmaku
+                })
+                if (this.showDanmakuChipDot()) {
+                  DanmakuStatusDot({ tone: this.danmakuStatusTone })
+                }
+              }
             }
             PlayerIconBtn({
               src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
@@ -374,6 +412,9 @@ export struct PlayerSkin {
         .width('100%')
         .height(38)
         .alignItems(VerticalAlign.Center)
+        .onAreaChange((_old: Area, area: Area) => {
+          this.controlRowWidth = Number(area.width);
+        })
       }
       .width('100%')
       .padding({
