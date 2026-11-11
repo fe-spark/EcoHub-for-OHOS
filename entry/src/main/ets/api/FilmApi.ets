@@ -205,6 +205,78 @@ export class FilmApi {
     return [];
   }
 
+  /** 0/1/2 为服务端归一化取值；4/5 为 B 站 / 弹弹play 原始取值（4 底部、5 顶部） */
+  static normalizeDanmakuMode(v: number): number {
+    const m = Math.floor(v);
+    if (m === 1 || m === 5) {
+      return 1;
+    }
+    if (m === 2 || m === 4) {
+      return 2;
+    }
+    return 0;
+  }
+
+  /** 统一成 #RRGGBB：支持 #rgb、#rrggbb、#aarrggbb、0xrrggbb 与十进制整数（如 16777215） */
+  static normalizeDanmakuColor(value: Object | undefined | null): string {
+    if (value === undefined || value === null) {
+      return '#FFFFFF';
+    }
+    if (typeof value === 'number') {
+      return FilmApi.colorFromInt(value as number);
+    }
+    let s = `${value}`.trim();
+    if (s.length === 0) {
+      return '#FFFFFF';
+    }
+    if (s.startsWith('#')) {
+      s = s.substring(1);
+    } else if (s.toLowerCase().startsWith('0x')) {
+      s = s.substring(2);
+    } else if (/^\d+$/.test(s) && s.length !== 6) {
+      // 无前缀的纯数字且不是 6 位：按 B 站 / 弹弹play 十进制颜色处理
+      return FilmApi.colorFromInt(Number(s));
+    }
+    if (!/^[0-9a-fA-F]+$/.test(s)) {
+      return '#FFFFFF';
+    }
+    if (s.length === 3) {
+      s = `${s[0]}${s[0]}${s[1]}${s[1]}${s[2]}${s[2]}`;
+    }
+    if (s.length === 8) {
+      s = s.substring(2); // AARRGGBB
+    }
+    if (s.length !== 6) {
+      return '#FFFFFF';
+    }
+    return `#${s.toUpperCase()}`;
+  }
+
+  private static colorFromInt(v: number): string {
+    if (!isFinite(v) || v < 0 || v > 0xFFFFFF) {
+      return '#FFFFFF';
+    }
+    let hex = Math.floor(v).toString(16).toUpperCase();
+    while (hex.length < 6) {
+      hex = '0' + hex;
+    }
+    return `#${hex}`;
+  }
+
+  private static toFlag(value: Object | undefined | null): boolean {
+    if (value === undefined || value === null) {
+      return false;
+    }
+    if (typeof value === 'boolean') {
+      return value as boolean;
+    }
+    if (typeof value === 'number') {
+      return (value as number) !== 0;
+    }
+    const s = `${value}`.trim().toLowerCase();
+    return s === 'true' || s === '1';
+  }
+
   static async getDanmaku(mid: string, episode: number, title: string): Promise<DanmakuComment[]> {
     if (!ServerCompat.getInstance().canDanmaku || !mid || mid.trim().length === 0) {
       console.info('[Danmaku] 当前非 V3 协议或缺少影片ID，跳过请求');
@@ -230,11 +302,16 @@ export class FilmApi {
         if (!text) {
           continue;
         }
+        const time = ApiParser.num(row, 'time', -1);
+        if (!isFinite(time) || time < 0) {
+          continue;
+        }
         list.push({
           text: text,
-          time: ApiParser.num(row, 'time'),
-          color: ApiParser.str(row, 'color', '#ffffff'),
-          mode: ApiParser.num(row, 'mode')
+          time: time,
+          color: FilmApi.normalizeDanmakuColor(row['color']),
+          mode: FilmApi.normalizeDanmakuMode(ApiParser.num(row, 'mode')),
+          border: FilmApi.toFlag(row['border']) || FilmApi.toFlag(row['highlight'])
         });
       }
       console.info(`[Danmaku] 成功解析弹幕列表: ${list.length} 条`);
