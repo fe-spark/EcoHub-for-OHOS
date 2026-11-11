@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { AVVolumePanel } from '@kit.AudioKit';
 import { PlayerDanmakuLayer } from './PlayerDanmakuLayer';
+import { DanmakuStatus, DanmakuStatusTone } from './DanmakuStatus';
 import { PlayerWindow } from './PlayerWindow';
 import { PlayerTipKind } from './PlayerPan';
 import { PlayerStallWatcher } from './PlayerStallWatcher';
@@ -93,6 +94,8 @@ export struct VideoPlayer {
   @State private isPipActive: boolean = false;
   @StorageLink('SETTING_PIP_AUTO_START') @Watch('onSettingPipAutoStartChange') private settingPipAutoStart: boolean = true;
   @StorageLink('SETTING_DANMAKU_ENABLED') private danmakuEnabled: boolean = true;
+  @State private danmakuStatusText: string = '';
+  @State private danmakuStatusTone: string = DanmakuStatusTone.NONE;
 
   private playerAv: PlayerAv = new PlayerAv();
   private watcher: PlayerStallWatcher = new PlayerStallWatcher();
@@ -251,11 +254,13 @@ export struct VideoPlayer {
     PlayerWindow.setKeepScreenOn(this.ctx(), on);
   }
 
-  private toggleMute(): void {
+  private toggleMute(showTip: boolean = true): void {
     const res = this.actions.toggleMute();
     this.volumeIndex = res.volume; this.muted = res.muted;
     this.playerAv.setMuted(this.muted); this.castBridge.pushCastVolume();
-    this.watcher.showTip(res.label, PlayerTipKind.VOLUME, (m, k) => { this.feedback = m; this.feedbackKind = k; }, () => { this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE; });
+    if (showTip) {
+      this.watcher.showTip(res.label, PlayerTipKind.VOLUME, (m, k) => { this.feedback = m; this.feedbackKind = k; }, () => { this.feedback = ''; this.feedbackKind = PlayerTipKind.NONE; });
+    }
     this.pulseHud();
   }
 
@@ -404,7 +409,16 @@ export struct VideoPlayer {
     }
     this.danmakuEnabled = !this.danmakuEnabled;
     this.pulseHud();
-    AppToast.show(this.danmakuEnabled ? '已开启弹幕' : '已关闭弹幕');
+    if (!this.danmakuEnabled) {
+      AppToast.show('已关闭弹幕');
+    } else {
+      AppToast.show('已开启弹幕');
+    }
+  }
+
+  private onDanmakuStatus(status: DanmakuStatus): void {
+    this.danmakuStatusText = status.placeholder;
+    this.danmakuStatusTone = status.tone;
   }
 
   private skinActionHost(): PlayerActionHost {
@@ -464,7 +478,8 @@ export struct VideoPlayer {
           topInset: this.topInset,
           bottomInset: this.bottomInset,
           leftInset: this.leftInset,
-          rightInset: this.rightInset
+          rightInset: this.rightInset,
+          onStatus: (status: DanmakuStatus) => this.onDanmakuStatus(status)
         })
           .width('100%')
           .height('100%')
@@ -474,13 +489,24 @@ export struct VideoPlayer {
 
 
       PlayerSpeedSheet({
-        openSeq: this.speedOpenSeq, speedLabel: this.speedLabel,
+        openSeq: this.speedOpenSeq,
+        speedLabel: this.speedLabel,
+        scaleMode: this.scaleMode,
+        isPortrait: this.state.isPortrait(),
+        muted: this.muted,
         onPick: (idx: number) => {
           this.actions.speedCtrl.pick(idx);
-          this.speedIndex = idx; this.speedLabel = this.actions.speedCtrl.label;
+          this.speedIndex = idx;
+          this.speedLabel = this.actions.speedCtrl.label;
           this.playerAv.setSpeedIndex(idx);
-          this.closeSpeedDialog(); this.pulseHud();
         },
+        onPickScale: (mode: number) => {
+          this.actions.scaleCtrl.pick(mode as PlayerScaleMode);
+          this.scaleMode = mode;
+          this.playerAv.setScaleMode(mode);
+          this.scaleLabel = this.actions.scaleCtrl.label(this.state.isPortrait());
+        },
+        onToggleMute: () => this.toggleMute(false),
         onClosed: () => this.actions.speedCtrl.setShowing(false)
       })
 
@@ -505,6 +531,7 @@ export struct VideoPlayer {
           speedLabel: this.speedLabel, scaleLabel: this.actions.scaleCtrl.label(this.state.isPortrait()),
           danmakuEnabled: this.danmakuEnabled,
           canDanmaku: this.canDanmakuNow(),
+          danmakuStatusText: this.danmakuStatusText, danmakuStatusTone: this.danmakuStatusTone,
           hasPrev: this.hasPrev, hasNext: this.hasNext, longPressing: this.longPressing,
           feedback: this.feedback, feedbackKind: this.feedbackKind,
           topInset: this.topInset, leftInset: this.leftInset, rightInset: this.rightInset, bottomInset: this.bottomInset,

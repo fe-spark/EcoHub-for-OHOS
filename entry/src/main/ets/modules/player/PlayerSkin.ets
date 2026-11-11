@@ -5,6 +5,7 @@ import { PlayerBackBtn, PlayerChip, PlayerIconBtn, PlayerLabelBtn, PlayerTextBtn
 import { PlayerGestureLayer } from './PlayerGesture';
 import { PlayerErrorPad, PlayerLoadingCard, PlayerTip } from './PlayerTip';
 import { AppToast } from '../../common/utils/AppToast';
+import { DanmakuStatusDot, DanmakuStatusTone } from './DanmakuStatus';
 
 @Component
 export struct PlayerSkin {
@@ -26,6 +27,10 @@ export struct PlayerSkin {
   @Prop scaleLabel: string = '适应';
   @Prop danmakuEnabled: boolean = true;
   @Prop canDanmaku: boolean = true;
+  /** 弹幕加载状态：宽控制条在中间显示文字和状态点，窄控制条只在弹幕开关上显示状态点 */
+  @Prop danmakuStatusText: string = '';
+  @Prop danmakuStatusTone: string = DanmakuStatusTone.NONE;
+  @State private controlRowWidth: number = 0;
   @Prop hasPrev: boolean = false;
   @Prop hasNext: boolean = false;
   @Prop longPressing: boolean = false;
@@ -40,6 +45,7 @@ export struct PlayerSkin {
   @Prop stalled: boolean = false;
   @Prop castDeviceName: string = '';
   @Prop canCast: boolean = false;
+  @State barWidth: number = 0;
   onBack?: () => void;
   onPlay?: () => void;
   onFull?: () => void;
@@ -111,12 +117,27 @@ export struct PlayerSkin {
     return this.showHud && this.ready && !this.errorText;
   }
 
+  /** 与网页端一致：控制条宽度不足 560 时收起状态文字，改在弹幕开关上显示状态点 */
+  private showDanmakuStatusText(): boolean {
+    return this.canDanmaku && this.danmakuStatusText.length > 0 && this.controlRowWidth >= 560;
+  }
+
+  private showDanmakuChipDot(): boolean {
+    return this.canDanmaku && this.danmakuStatusText.length > 0 && !this.showDanmakuStatusText() &&
+      this.danmakuStatusTone !== DanmakuStatusTone.NONE;
+  }
+
   private cinemaHud(): boolean {
     return this.isFull || this.edgeHud;
   }
 
   private isPortrait(): boolean {
     return !this.isFull && !this.edgeHud;
+  }
+
+  // 竖屏视频全屏时屏幕窄，右侧功能群组会把退出全屏按钮挤出屏幕
+  private compact(): boolean {
+    return this.isPortrait() || (this.barWidth > 0 && this.barWidth < 480);
   }
 
   private showTopFull(): boolean {
@@ -316,66 +337,74 @@ export struct PlayerSkin {
           // 左侧控制群组：播放/暂停、下一集、时间刻度
           Row({ space: 4 }) {
             this.playToggle(36, 22)
-            if (this.hasNext && !this.isPortrait()) {
-              PlayerIconBtn({
-                src: $r('sys.symbol.forward_end_fill'),
-                iconSize: 18,
-                boxSize: 36,
-                onTap: this.onNext
-              })
-            }
-            this.timeBlock(this.isPortrait())
+            this.timeBlock(this.compact())
           }
           .alignItems(VerticalAlign.Center)
 
-          Blank()
+          if (this.showDanmakuStatusText()) {
+            Row({ space: 6 }) {
+              if (this.danmakuStatusTone !== DanmakuStatusTone.NONE) {
+                DanmakuStatusDot({ tone: this.danmakuStatusTone })
+              }
+              Text(this.danmakuStatusText)
+                .fontSize(12)
+                .fontColor('rgba(255,255,255,0.6)')
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .flexShrink(1)
+            }
+            .layoutWeight(1)
+            .padding({ left: 12, right: 12 })
+            .alignItems(VerticalAlign.Center)
+            .hitTestBehavior(HitTestMode.None)
+          } else {
+            Blank()
+          }
 
-          // 右侧功能调节群组：倍速胶囊、比例胶囊、弹幕开关、静音开关、全屏切换
-          Row({ space: this.isPortrait() ? 6 : 8 }) {
-            PlayerChip({
-              label: this.speedLabel,
-              canTap: this.ready,
-              highlight: this.speedLabel !== '1.0x',
-              onTap: this.onSpeed
-            })
-            if (this.cinemaHud()) {
-              PlayerChip({
-                label: this.scaleLabel,
-                canTap: this.ready,
-                highlight: this.scaleLabel !== '适应',
-                onTap: this.onScale
-              })
-            }
+          // 右侧只留弹幕、设置、全屏，倍速/比例/静音收进设置面板
+          Row({ space: this.compact() ? 6 : 8 }) {
             if (this.canDanmaku) {
-              PlayerChip({
-                label: '弹幕',
-                canTap: true,
-                highlight: this.danmakuEnabled,
-                onTap: this.onToggleDanmaku
-              })
+              Stack({ alignContent: Alignment.TopEnd }) {
+                PlayerChip({
+                  label: '弹幕',
+                  canTap: true,
+                  highlight: this.danmakuEnabled,
+                  onTap: this.onToggleDanmaku
+                })
+                if (this.showDanmakuChipDot()) {
+                  DanmakuStatusDot({ tone: this.danmakuStatusTone })
+                }
+              }
             }
-            PlayerIconBtn({
-              src: this.muted ? $r('sys.symbol.speaker_slash_fill') : $r('sys.symbol.speaker_wave_2_fill'),
-              iconSize: this.isPortrait() ? 18 : 20,
-              boxSize: this.isPortrait() ? 34 : 36,
-              onTap: this.onMute
+            PlayerChip({
+              label: '设置',
+              canTap: this.ready,
+              highlight: this.speedLabel !== '1.0x' || this.scaleLabel !== '适应' || this.muted,
+              onTap: this.onSpeed
             })
             if (!this.castDeviceName) {
               PlayerIconBtn({
                 src: this.isFull ? $r('sys.symbol.exit_full_screen') : $r('sys.symbol.full_screen'),
-                iconSize: this.isPortrait() ? 18 : 20,
-                boxSize: this.isPortrait() ? 34 : 36,
+                iconSize: this.compact() ? 18 : 20,
+                boxSize: this.compact() ? 34 : 36,
                 onTap: this.onFull
               })
             }
           }
           .alignItems(VerticalAlign.Center)
+          .flexShrink(0)
         }
         .width('100%')
         .height(38)
         .alignItems(VerticalAlign.Center)
+        .onAreaChange((_old: Area, area: Area) => {
+          this.controlRowWidth = Number(area.width);
+        })
       }
       .width('100%')
+      .onAreaChange((_old: Area, next: Area) => {
+        this.barWidth = Number(next.width);
+      })
       .padding({
         left: Math.max(12, this.leftInset + (this.isFull ? 10 : 4)),
         right: Math.max(12, this.rightInset + (this.isFull ? 10 : 4)),

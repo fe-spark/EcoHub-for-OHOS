@@ -1,10 +1,16 @@
-import { PlayerSpeedDialog } from './PlayerTip';
+import { PlayerSettingsDialog } from './PlayerTip';
+import { PlayerScaleMode } from './PlayerScale';
 
 @Component
 export struct PlayerSpeedSheet {
   @Prop @Watch('onOpenChange') openSeq: number = 0;
   @Prop speedLabel: string = '1.0x';
+  @Prop scaleMode: number = PlayerScaleMode.FIT;
+  @Prop isPortrait: boolean = false;
+  @Prop muted: boolean = false;
   onPick: (index: number) => void = (_index: number) => {};
+  onPickScale: (mode: number) => void = (_mode: number) => {};
+  onToggleMute: () => void = () => {};
   onClosed: () => void = () => {};
   private dialog: CustomDialogController | null = null;
 
@@ -20,20 +26,21 @@ export struct PlayerSpeedSheet {
     this.open();
   }
 
-  private isLandscape(): boolean {
-    const w = AppStorage.get<number>('WINDOW_WIDTH') || 0;
-    const h = AppStorage.get<number>('WINDOW_HEIGHT') || 0;
-    return w > h && h > 0;
-  }
-
   private open(): void {
-    const isLand = this.isLandscape();
     this.dialog = new CustomDialogController({
-      builder: PlayerSpeedDialog({
+      builder: PlayerSettingsDialog({
         speedLabel: this.speedLabel,
+        scaleMode: this.scaleMode,
+        isPortrait: this.isPortrait,
+        muted: this.muted,
         onPickSpeed: (index: number) => {
           this.onPick(index);
-          this.close();
+        },
+        onPickScale: (mode: number) => {
+          this.onPickScale(mode);
+        },
+        onToggleMute: () => {
+          this.onToggleMute();
         },
         onClose: () => {
           this.close();
