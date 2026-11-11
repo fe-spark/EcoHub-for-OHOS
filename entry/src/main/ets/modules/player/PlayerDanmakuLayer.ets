@@ -89,6 +89,8 @@ export struct PlayerDanmakuLayer {
   private allComments: DanmakuComment[] = [];
   private activeList: ActiveDanmaku[] = [];
   private pending: DanmakuComment[] = [];
+  private tickSpawned: number = 0; // 本帧已上屏条数
+  private tickFull: boolean[] = [false, false, false]; // 本帧滚动 / 顶部 / 底部是否已排不下
   private nextIndex: number = 0;
   private currentVideoTime: number = 0;
   private loadKey: string = '';
@@ -450,7 +452,8 @@ export struct PlayerDanmakuLayer {
       return;
     }
     const maxActive = this.maxActive();
-    let spawnedThisTick = 0;
+    this.tickSpawned = 0;
+    this.tickFull = [false, false, false];
 
     // 1. 先处理排队中的弹幕（先来先上），超过等待上限的丢弃
     if (this.pending.length > 0) {
@@ -460,11 +463,7 @@ export struct PlayerDanmakuLayer {
         if (toTime - c.time > PlayerDanmakuLayer.MAX_WAIT_SEC) {
           continue;
         }
-        if (spawnedThisTick < PlayerDanmakuLayer.MAX_SPAWN_PER_TICK &&
-          this.activeList.length < maxActive &&
-          this.spawnSingleComment(c, 0)) {
-          spawnedThisTick++;
-        } else {
+        if (!this.trySpawn(c, 0, maxActive)) {
           keep.push(c);
         }
       }
@@ -484,14 +483,29 @@ export struct PlayerDanmakuLayer {
         continue;
       }
 
-      const canSpawnNow = spawnedThisTick < PlayerDanmakuLayer.MAX_SPAWN_PER_TICK &&
-        this.activeList.length < maxActive;
-      if (canSpawnNow && this.spawnSingleComment(c, Math.max(0, toTime - c.time))) {
-        spawnedThisTick++;
-        continue;
+      if (!this.trySpawn(c, Math.max(0, toTime - c.time), maxActive)) {
+        this.enqueue(c);
       }
-      this.enqueue(c);
     }
+  }
+
+  private static modeOf(c: DanmakuComment): number {
+    return c.mode === 1 ? 1 : (c.mode === 2 ? 2 : 0);
+  }
+
+  /** 尝试立即上屏；本帧某类弹幕（滚动 / 顶部 / 底部）已经排不下时，同类后续弹幕直接留在队列，不再逐条重试 */
+  private trySpawn(c: DanmakuComment, elapsed: number, maxActive: number): boolean {
+    const mode = PlayerDanmakuLayer.modeOf(c);
+    if (this.tickFull[mode] || this.tickSpawned >= PlayerDanmakuLayer.MAX_SPAWN_PER_TICK ||
+      this.activeList.length >= maxActive) {
+      return false;
+    }
+    if (this.spawnSingleComment(c, elapsed)) {
+      this.tickSpawned++;
+      return true;
+    }
+    this.tickFull[mode] = true;
+    return false;
   }
 
   private enqueue(c: DanmakuComment): void {
@@ -574,7 +588,7 @@ export struct PlayerDanmakuLayer {
   }
 
   private spawnSingleComment(c: DanmakuComment, elapsed: number = 0.0): boolean {
-    const mode = c.mode === 1 ? 1 : (c.mode === 2 ? 2 : 0);
+    const mode = PlayerDanmakuLayer.modeOf(c);
     if (mode !== 0 && elapsed >= PlayerDanmakuLayer.FIXED_DURATION) {
       return false;
     }
@@ -585,6 +599,12 @@ export struct PlayerDanmakuLayer {
     const speed = this.getScrollSpeed();
     const startX = safeR - (speed * elapsed);
 
+    // 先用不依赖文字宽度的条件判断有没有空位（宽度越大越难放下，宽度 0 都放不下就一定放不下），行满时不再测量文字
+    const fixedPick = mode === 0 ? null : this.pickFixedLane(mode);
+    if (fixedPick !== null ? fixedPick.lane < 0 : this.pickScrollLane(startX, 0).lane < 0) {
+      return false;
+    }
+
     const pad = highlight ? PlayerDanmakuLayer.BORDER_PAD : 0;
     const itemWidth = this.measureText(c.text, highlight) + pad * 2;
     // 若因历史恢复计算出的位置已经滑出安全左边缘，直接跳过
@@ -592,7 +612,7 @@ export struct PlayerDanmakuLayer {
       return false;
     }
 
-    const pick = mode === 0 ? this.pickScrollLane(startX, itemWidth) : this.pickFixedLane(mode);
+    const pick = fixedPick !== null ? fixedPick : this.pickScrollLane(startX, itemWidth);
     if (pick.lane < 0) {
       return false; // 行满：由调用方决定排队还是放弃
     }
