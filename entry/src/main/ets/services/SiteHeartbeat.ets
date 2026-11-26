@@ -1,6 +1,7 @@
 import { connection } from '@kit.NetworkKit';
 import { UIContext } from '@kit.ArkUI';
 import { FilmApi } from '../api/FilmApi';
+import { HttpClient } from '../common/network/HttpClient';
 import { BasicConfig } from '../types/FilmModels';
 import { ServerConfigManager } from './ServerConfigManager';
 import { SourceGuard } from './SourceGuard';
@@ -157,6 +158,7 @@ export class SiteHeartbeat {
 
     const currentGen = this.generation;
     this.probing = true;
+    let authBlocked = false;
     let requestUrl = serverUrl;
     try {
       requestUrl = ServerConfigManager.getInstance().buildApiUrl('/config/basic');
@@ -172,6 +174,22 @@ export class SiteHeartbeat {
       console.info(`[SiteHeartbeat] 心跳成功: ${requestUrl}`);
       // 明确成功：重置连续故障计数
       this.consecutiveFailures = 0;
+      if (config.privateAccess) {
+        const authOk = await HttpClient.getInstance().checkPrivateAccessValid(8000);
+        if (currentGen !== this.generation) {
+          return;
+        }
+        if (!authOk) {
+          authBlocked = true;
+          SourceGuard.intercept(undefined, () => {
+            this.consecutiveFailures = 0;
+            if (this.running) {
+              this.scheduleNext(60000);
+            }
+          });
+          return;
+        }
+      }
       // 站点关闭运行状态检测
       this.checkSiteClosedState(config);
     } catch (err) {
@@ -202,7 +220,7 @@ export class SiteHeartbeat {
     } finally {
       this.probing = false;
       // 过期探针只负责释放 probing；调度由当前 generation 的探针或 resetFailures 负责
-      if (currentGen === this.generation && this.running && this.consecutiveFailures < MAX_FAILURES) {
+      if (currentGen === this.generation && this.running && !authBlocked && this.consecutiveFailures < MAX_FAILURES) {
         this.scheduleNext(HEARTBEAT_INTERVAL_MS);
       }
     }

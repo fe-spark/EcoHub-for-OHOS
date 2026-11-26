@@ -13,6 +13,7 @@ export interface BasicConfig {
   describe: string;
   state: boolean;
   hint: string;
+  privateAccess?: boolean;
   tipEnabled: boolean;
   tipTitle: string;
   tipMessage: string;

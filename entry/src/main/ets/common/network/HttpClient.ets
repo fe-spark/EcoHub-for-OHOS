@@ -28,6 +28,16 @@ interface TrackViewPayload {
   device_id?: string;
 }
 
+export class HttpStatusError extends Error {
+  public readonly statusCode: number;
+
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = 'HttpStatusError';
+    this.statusCode = statusCode;
+  }
+}
+
 export interface ConnectionResult {
   ok: boolean;
   message?: string;
@@ -137,15 +147,17 @@ export class HttpClient {
         return JSON.parse(response.result as string) as ApiResponse;
       }
       let errMsg = `HTTP ${response.responseCode}`;
+      const rawBody = typeof response.result === 'string' ? response.result : '';
       try {
-        if (response.result) {
-          const errBody = JSON.parse(response.result as string) as ApiResponse;
+        if (rawBody) {
+          const errBody = JSON.parse(rawBody) as ApiResponse;
           if (errBody && errBody.msg) {
             errMsg = errBody.msg;
           }
         }
       } catch (_e) {}
-      throw new Error(errMsg);
+      this.checkPrivateIntercept(response.responseCode, rawBody, errMsg);
+      throw new HttpStatusError(response.responseCode, errMsg);
     } catch (err) {
       httpRequest.destroy();
       throw HttpClient.wrapError(err);
@@ -333,7 +345,46 @@ export class HttpClient {
     }
   }
 
-  private async send(url: string, timeout: number, customKey?: string): Promise<ApiResponse> {
+  public async checkPrivateAccessValid(timeout: number = 5000): Promise<boolean> {
+    const manager = ServerConfigManager.getInstance();
+    const cachedUrl = manager.getCachedServerUrl();
+    if (!cachedUrl) {
+      return true;
+    }
+    const origin = ServerConfigManager.stripApiSuffix(manager.normalizeRaw(cachedUrl));
+    if (!origin || origin === 'https://' || origin === 'http://') {
+      return true;
+    }
+    const key = manager.getProvideKey();
+    if (!key) {
+      return false;
+    }
+    try {
+      await this.send(`${origin}/api/provide/app`, timeout, key, false);
+      return true;
+    } catch (err) {
+      if (err instanceof HttpStatusError && (err.statusCode === 401 || err.statusCode === 403)) {
+        return false;
+      }
+      const msg = (err instanceof Error) ? err.message : `${err}`;
+      if (msg.indexOf('私有化') >= 0 || msg.indexOf('订阅密钥') >= 0 || msg.indexOf('HTTP 401') >= 0 || msg.indexOf('HTTP 403') >= 0) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  private checkPrivateIntercept(statusCode: number, rawBody: string, errMsg: string): void {
+    if (statusCode !== 401 && statusCode !== 403) {
+      return;
+    }
+    const hasPrivateFlag = rawBody.indexOf('"private_access":true') >= 0 || rawBody.indexOf('"private_access": true') >= 0;
+    if (hasPrivateFlag || errMsg.indexOf('私有化') >= 0 || errMsg.indexOf('订阅密钥') >= 0) {
+      SourceGuard.intercept();
+    }
+  }
+
+  private async send(url: string, timeout: number, customKey?: string, interceptOnAuthFail: boolean = true): Promise<ApiResponse> {
     const httpRequest = http.createHttp();
     const userAgent = await this.resolveUserAgent();
     let deviceId = '';
@@ -366,15 +417,19 @@ export class HttpClient {
         return JSON.parse(response.result as string) as ApiResponse;
       }
       let errMsg = `HTTP ${response.responseCode}`;
+      const rawBody = typeof response.result === 'string' ? response.result : '';
       try {
-        if (response.result) {
-          const errBody = JSON.parse(response.result as string) as ApiResponse;
+        if (rawBody) {
+          const errBody = JSON.parse(rawBody) as ApiResponse;
           if (errBody && errBody.msg) {
             errMsg = errBody.msg;
           }
         }
       } catch (_e) {}
-      throw new Error(errMsg);
+      if (interceptOnAuthFail) {
+        this.checkPrivateIntercept(response.responseCode, rawBody, errMsg);
+      }
+      throw new HttpStatusError(response.responseCode, errMsg);
     } catch (err) {
       httpRequest.destroy();
       throw HttpClient.wrapError(err);

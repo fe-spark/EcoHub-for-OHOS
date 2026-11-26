@@ -418,6 +418,7 @@ export class ApiParser {
       describe: ApiParser.str(record, 'describe'),
       state: record['state'] === undefined ? true : ApiParser.bool(record, 'state', true),
       hint: ApiParser.str(record, 'hint', '网站升级中, 暂时无法访问'),
+      privateAccess: ApiParser.bool(record, 'privateAccess'),
       tipEnabled: ApiParser.bool(tip, 'enabled'),
       tipTitle: ApiParser.str(tip, 'title', '赞赏支持'),
       tipMessage: ApiParser.str(tip, 'message'),
