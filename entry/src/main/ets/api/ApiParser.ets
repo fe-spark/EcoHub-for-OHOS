@@ -159,20 +159,53 @@ export class ApiParser {
     for (let i = 0; i < bannersRaw.length; i++) {
       banners.push(ApiParser.parseBanner(bannersRaw[i]));
     }
+    const recommendsRaw = ApiParser.list(record, 'recommends');
     const contentRaw = ApiParser.list(record, 'content');
-    const content: HomeSection[] = [];
-    for (let i = 0; i < contentRaw.length; i++) {
-      const sectionRecord = ApiParser.asRecord(contentRaw[i]);
+    const sections: HomeSection[] = [];
+    let hasCategoryInRecommends = false;
+
+    for (let i = 0; i < recommendsRaw.length; i++) {
+      const sectionRecord = ApiParser.asRecord(recommendsRaw[i]);
+      const nav = ApiParser.parseCategory(ApiParser.obj(sectionRecord, 'nav'));
+      const rawKind = ApiParser.str(sectionRecord, 'kind');
+      const kind = rawKind ? rawKind : (nav.id > 0 ? 'category' : 'recommend');
+      if (kind === 'category') {
+        hasCategoryInRecommends = true;
+      }
+      const title = ApiParser.str(sectionRecord, 'title');
+      const effectiveNav: CategoryItem = kind === 'category'
+        ? nav
+        : { id: 0, pid: 0, name: title, show: true, children: [] };
       const section: HomeSection = {
-        nav: ApiParser.parseCategory(ApiParser.obj(sectionRecord, 'nav')),
-        movies: ApiParser.parseMovies(ApiParser.list(sectionRecord, 'movies')),
+        id: ApiParser.str(sectionRecord, 'id'),
+        kind: kind,
+        title: title,
+        nav: effectiveNav,
+        movies: ApiParser.parseMovies(ApiParser.list(sectionRecord, 'items')),
         hot: ApiParser.parseMovies(ApiParser.list(sectionRecord, 'hot'))
       };
-      content.push(section);
+      sections.push(section);
+    }
+
+    // 兼容旧版服务端（v3.1.6 仅返回 content；v3.1.7 recommends 不含分类楼层）
+    if (!hasCategoryInRecommends) {
+      for (let i = 0; i < contentRaw.length; i++) {
+        const sectionRecord = ApiParser.asRecord(contentRaw[i]);
+        const nav = ApiParser.parseCategory(ApiParser.obj(sectionRecord, 'nav'));
+        const section: HomeSection = {
+          id: `cat_${nav.id}`,
+          kind: 'category',
+          title: nav.name,
+          nav: nav,
+          movies: ApiParser.parseMovies(ApiParser.list(sectionRecord, 'movies')),
+          hot: ApiParser.parseMovies(ApiParser.list(sectionRecord, 'hot'))
+        };
+        sections.push(section);
+      }
     }
     const data: HomeData = {
       banners: banners,
-      content: content
+      content: sections
     };
     return data;
   }

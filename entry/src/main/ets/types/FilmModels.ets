@@ -93,6 +93,9 @@ export interface BannerItem {
 }
 
 export interface HomeSection {
+  id?: string;
+  kind?: string;
+  title?: string;
   nav: CategoryItem;
   movies: MovieBasicInfo[];
   hot: MovieBasicInfo[];
