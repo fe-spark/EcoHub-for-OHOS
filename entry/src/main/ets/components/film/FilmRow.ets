@@ -16,6 +16,10 @@ export struct FilmRow {
   @Prop leftInset: number = 0;
   @Prop rightInset: number = 0;
 
+  private hasMoreAction(): boolean {
+    return this.onMore !== undefined || this.pid > 0;
+  }
+
   private openMore(): void {
     if (this.onMore) {
       this.onMore();
@@ -44,21 +48,27 @@ export struct FilmRow {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .layoutWeight(1)
-          .onClick(() => this.openMore())
+          .onClick(() => {
+            if (this.hasMoreAction()) {
+              this.openMore();
+            }
+          })
 
-          Row({ space: 3 }) {
-            Text(this.moreText)
-              .fontSize(12)
-              .fontColor(AppTheme.TEXT_MUTED)
-            AppIcon({
-              src: $r('sys.symbol.chevron_right'),
-              iconSize: 11,
-              color: AppTheme.TEXT_MUTED
-            })
+          if (this.hasMoreAction()) {
+            Row({ space: 3 }) {
+              Text(this.moreText)
+                .fontSize(12)
+                .fontColor(AppTheme.TEXT_MUTED)
+              AppIcon({
+                src: $r('sys.symbol.chevron_right'),
+                iconSize: 11,
+                color: AppTheme.TEXT_MUTED
+              })
+            }
+            .height(28)
+            .padding({ left: AppTheme.SPACE_SM })
+            .onClick(() => this.openMore())
           }
-          .height(28)
-          .padding({ left: AppTheme.SPACE_SM })
-          .onClick(() => this.openMore())
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)

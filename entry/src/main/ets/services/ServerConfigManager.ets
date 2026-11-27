@@ -327,8 +327,8 @@ export class ServerConfigManager {
       base = base.substring(0, queryIndex);
     }
     base = base.replace(/\/+$/g, '');
-    // 兼容剥离 /api/provide/app, /provide/app 或 /api 软件源端点，解析出 origin
-    base = base.replace(/\/(api\/)?provide\/app$/i, '').replace(/\/+$/g, '');
+    // 兼容剥离 /api/provide/(app|tvbox|vod), /provide/(app|tvbox|vod) 或 /api 软件源端点，解析出 origin
+    base = base.replace(/\/(api\/)?provide\/(app|tvbox|vod)$/i, '').replace(/\/+$/g, '');
     while (/\/api$/i.test(base)) {
       base = base.replace(/\/api$/i, '').replace(/\/+$/g, '');
     }

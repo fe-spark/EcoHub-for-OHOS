@@ -13,6 +13,7 @@ export interface BasicConfig {
   describe: string;
   state: boolean;
   hint: string;
+  privateAccess?: boolean;
   tipEnabled: boolean;
   tipTitle: string;
   tipMessage: string;
@@ -92,6 +93,9 @@ export interface BannerItem {
 }
 
 export interface HomeSection {
+  id?: string;
+  kind?: string;
+  title?: string;
   nav: CategoryItem;
   movies: MovieBasicInfo[];
   hot: MovieBasicInfo[];

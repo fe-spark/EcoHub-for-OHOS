@@ -101,12 +101,26 @@ export struct RecommendTab {
 
   private static readonly MAX_HOME_SECTIONS: number = 12;
 
+  private isCategorySection(sec: HomeSection): boolean {
+    const kind = sec.kind || 'category';
+    return kind === 'category' && sec.nav.id > 0;
+  }
+
+  private sectionTitle(sec: HomeSection): string {
+    return (sec.title && sec.title.length > 0) ? sec.title : sec.nav.name;
+  }
+
   private visibleSections(): HomeSection[] {
-    const list = this.sections.filter((s: HomeSection) => s.nav.show !== false && this.sectionFilms(s).length > 0);
+    const list = this.sections.filter((s: HomeSection) => {
+      if (this.isCategorySection(s) && s.nav.show === false) {
+        return false;
+      }
+      return this.sectionFilms(s).length > 0;
+    });
     return list.slice(0, RecommendTab.MAX_HOME_SECTIONS);
   }
   private categoryCapsules(): HomeSection[] {
-    return this.sections.filter((s: HomeSection) => s.nav.show !== false);
+    return this.sections.filter((s: HomeSection) => this.isCategorySection(s) && s.nav.show !== false);
   }
 
   private categoryGlyph(name: string): string {
@@ -425,20 +439,20 @@ export struct RecommendTab {
               .margin({ bottom: this.isWide() ? 14 : AppTheme.SPACE_LG })
             }
 
-            // 各分类影视横向推荐流（通栏无卡片沉浸背景带）
+            // 各推荐与分类影视横向推荐流（通栏无卡片沉浸背景带）
             ForEach(this.visibleSections(), (section: HomeSection) => {
               FilmRow({
-                title: section.nav.name,
+                title: this.sectionTitle(section),
                 films: this.sectionFilms(section),
-                pid: section.nav.id,
+                pid: this.isCategorySection(section) ? section.nav.id : 0,
                 cardWidth: Breakpoint.cardWidth(this.widthBp),
                 leftInset: this.leftInset,
                 rightInset: this.rightInset,
-                onMore: () => {
+                onMore: this.isCategorySection(section) ? () => {
                   NavUtil.openFilter(section.nav.id);
-                }
+                } : undefined
               })
-            }, (section: HomeSection) => `sec_${section.nav.id}_${this.reloadToken}`)
+            }, (section: HomeSection, index: number) => `sec_${section.id || section.nav.id}_${index}_${this.reloadToken}`)
           }
           .width('100%')
           .padding({ bottom: 0 })

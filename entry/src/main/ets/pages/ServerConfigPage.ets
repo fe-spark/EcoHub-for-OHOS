@@ -6,6 +6,8 @@ import { WindowBar } from '../common/utils/WindowBar';
 import { NavUtil } from '../common/utils/NavUtil';
 import { SourceGuard } from '../services/SourceGuard';
 import { common } from '@kit.AbilityKit';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { KeyboardAvoidMode } from '@kit.ArkUI';
 import { AppIcon } from '../components/common/AppIcon';
 import { BackIcon } from '../components/common/BackIcon';
@@ -125,6 +127,57 @@ struct ServerConfigPage {
     });
   }
 
+  private async scanSourceCode() {
+    if (this.isLoading) {
+      return;
+    }
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    try {
+      const options: scanBarcode.ScanOptions = {
+        scanTypes: [scanCore.ScanType.QR_CODE],
+        enableMultiMode: false,
+        enableAlbum: true
+      };
+      const result: scanBarcode.ScanResult = await scanBarcode.startScanForResult(ctx, options);
+      const raw = (result?.originalValue || '').trim();
+      if (!raw) {
+        return;
+      }
+      if (!this.isValidScannedUrl(raw)) {
+        this.errorTip = '未识别到有效的软件源地址';
+        try {
+          AppToast.show(this.errorTip);
+        } catch (_e) {}
+        return;
+      }
+      this.serverUrl = raw;
+      this.errorTip = '';
+      await this.saveAndConnect();
+    } catch (err) {
+      const bizErr = err as BusinessError;
+      // 1000500002: 用户主动取消扫码
+      if (bizErr && bizErr.code === 1000500002) {
+        return;
+      }
+      const msg = (bizErr && bizErr.message) ? bizErr.message : '扫码失败，请重试';
+      this.errorTip = msg;
+      try {
+        AppToast.show(msg);
+      } catch (_e) {}
+    }
+  }
+
+  private isValidScannedUrl(raw: string): boolean {
+    if (!raw || /\s/.test(raw)) {
+      return false;
+    }
+    const lower = raw.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      return raw.length > 8;
+    }
+    return raw.indexOf('.') >= 0;
+  }
+
   private async saveAndConnect() {
     this.showHistoryDialog = false;
     this.errorTip = '';
@@ -189,7 +242,7 @@ struct ServerConfigPage {
     Stack({ alignContent: Alignment.TopStart }) {
       // Main Page Column that pads away safe insets and the soft keyboard
       Column() {
-        // Top header with back button if not in forced reconnect mode
+        // Top header with back button (left) and scan button (right)
         Row() {
           if (!this.reconnect) {
             BackIcon({ color: AppTheme.TEXT_PRIMARY })
@@ -200,6 +253,23 @@ struct ServerConfigPage {
                 }
               })
           }
+
+          Blank()
+
+          Row() {
+            AppIcon({
+              src: $r('sys.symbol.line_viewfinder'),
+              iconSize: this.isLandscape() ? 22 : 24,
+              color: AppTheme.TEXT_PRIMARY
+            })
+          }
+          .width(32)
+          .height(32)
+          .justifyContent(FlexAlign.Center)
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            this.scanSourceCode();
+          })
         }
         .width('100%')
         .height(this.isLandscape() ? 36 : 48)
